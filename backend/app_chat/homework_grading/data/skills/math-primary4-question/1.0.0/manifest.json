@@ -1,0 +1,127 @@
+{
+  "schema_version": "feedback-skill-v1",
+  "id": "math-primary4-question",
+  "version": "1.0.0",
+  "kind": "specialized",
+  "compatible_schema": "feedback-context-v2",
+  "subject_scope": [
+    "math"
+  ],
+  "education_scope": [
+    "primary"
+  ],
+  "material_scope": [
+    "homework",
+    "exam"
+  ],
+  "unit_scope": [
+    "question"
+  ],
+  "grades": [
+    4
+  ],
+  "priority": 10,
+  "coverage_status": "offline_only",
+  "rules": [
+    {
+      "id": "math-detect-rules",
+      "stages": [
+        "detect"
+      ],
+      "condition": "always",
+      "text_key": "math-detect-rules",
+      "evaluation_item": "math-detect-rules",
+      "refines": [],
+      "conflicts": [],
+      "source": "subject_prompt_rules.py:MATH_DETECT_RULES"
+    },
+    {
+      "id": "math-grade-rules",
+      "stages": [
+        "grade",
+        "review",
+        "cross_page"
+      ],
+      "condition": "always",
+      "text_key": "math-grade-rules",
+      "evaluation_item": "math-grade-rules",
+      "refines": [],
+      "conflicts": [],
+      "source": "subject_prompt_rules.py:MATH_GRADE_RULES"
+    },
+    {
+      "id": "math-pass1-grade-transcription-lock",
+      "stages": [
+        "grade"
+      ],
+      "condition": "always",
+      "text_key": "math-pass1-grade-transcription-lock",
+      "evaluation_item": "math-pass1-grade-transcription-lock",
+      "refines": [],
+      "conflicts": [],
+      "source": "prompts.py:MATH_PASS1_GRADE_TRANSCRIPTION_LOCK"
+    },
+    {
+      "id": "math-pass1-grade-user-audit",
+      "stages": [
+        "grade"
+      ],
+      "condition": "always",
+      "text_key": "math-pass1-grade-user-audit",
+      "evaluation_item": "math-pass1-grade-user-audit",
+      "refines": [],
+      "conflicts": [],
+      "source": "prompts.py:MATH_PASS1_GRADE_USER_AUDIT"
+    },
+    {
+      "id": "math-operation-law-full-name-grade-rules",
+      "stages": [
+        "grade",
+        "review"
+      ],
+      "condition": "math_operation_law",
+      "text_key": "math-operation-law-full-name-grade-rules",
+      "evaluation_item": "math-operation-law-full-name-grade-rules",
+      "refines": [],
+      "conflicts": [],
+      "source": "subject_prompt_rules.py:MATH_OPERATION_LAW_FULL_NAME_GRADE_RULES"
+    },
+    {
+      "id": "math-verification-suffix",
+      "stages": [
+        "grade"
+      ],
+      "condition": "always",
+      "text_key": "math-verification-suffix",
+      "evaluation_item": "math-verification-suffix",
+      "refines": [],
+      "conflicts": [],
+      "source": "prompts.py:MATH_VERIFICATION_SUFFIX"
+    },
+    {
+      "id": "-uncertain-rules[math]",
+      "stages": [
+        "grade"
+      ],
+      "condition": "always",
+      "text_key": "-uncertain-rules[math]",
+      "evaluation_item": "-uncertain-rules[math]",
+      "refines": [],
+      "conflicts": [],
+      "source": "prompts.py:_UNCERTAIN_RULES[math]"
+    },
+    {
+      "id": "-subject-hints[math]",
+      "stages": [
+        "grade",
+        "review"
+      ],
+      "condition": "always",
+      "text_key": "-subject-hints[math]",
+      "evaluation_item": "-subject-hints[math]",
+      "refines": [],
+      "conflicts": [],
+      "source": "prompts.py:_SUBJECT_HINTS[math]"
+    }
+  ]
+}

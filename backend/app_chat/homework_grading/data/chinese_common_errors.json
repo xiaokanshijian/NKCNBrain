@@ -1,0 +1,2929 @@
+{
+  "_meta": {
+    "description": "中小学高频错别字表。wrong 为典型错写，right 为正字，pinyin 为数字标调。",
+    "source": "docs/中小学高频错别字表.txt",
+    "count": 584
+  },
+  "errors": [
+    {
+      "wrong": "爱带",
+      "right": "爱戴",
+      "pinyin": "ai4 dai4"
+    },
+    {
+      "wrong": "白晰",
+      "right": "白皙",
+      "pinyin": "bai2 xi1"
+    },
+    {
+      "wrong": "爆乱",
+      "right": "暴乱",
+      "pinyin": "bao4 luan4"
+    },
+    {
+      "wrong": "报筹",
+      "right": "报酬",
+      "pinyin": "bao4 chou2"
+    },
+    {
+      "wrong": "暴炸",
+      "right": "爆炸",
+      "pinyin": "bao4 zha4"
+    },
+    {
+      "wrong": "卑却",
+      "right": "卑怯",
+      "pinyin": "bei1 qie4"
+    },
+    {
+      "wrong": "辩析",
+      "right": "辨析",
+      "pinyin": "bian4 xi1"
+    },
+    {
+      "wrong": "恶耗",
+      "right": "噩耗",
+      "pinyin": "e4 hao4"
+    },
+    {
+      "wrong": "材华",
+      "right": "才华",
+      "pinyin": "cai2 hua2"
+    },
+    {
+      "wrong": "喝采",
+      "right": "喝彩",
+      "pinyin": "he4 cai3"
+    },
+    {
+      "wrong": "翱游",
+      "right": "遨游",
+      "pinyin": "ao2 you2"
+    },
+    {
+      "wrong": "娘两",
+      "right": "娘俩",
+      "pinyin": "niang2 lia3"
+    },
+    {
+      "wrong": "更叠",
+      "right": "更迭",
+      "pinyin": "geng1 die2"
+    },
+    {
+      "wrong": "恰商",
+      "right": "洽商",
+      "pinyin": "qia4 shang1"
+    },
+    {
+      "wrong": "起迄",
+      "right": "起讫",
+      "pinyin": "qi3 qi4"
+    },
+    {
+      "wrong": "沾辱",
+      "right": "玷辱",
+      "pinyin": "dian4 ru3"
+    },
+    {
+      "wrong": "中裁",
+      "right": "仲裁",
+      "pinyin": "zhong4 cai2"
+    },
+    {
+      "wrong": "雕彻",
+      "right": "雕砌",
+      "pinyin": "diao1 qi4"
+    },
+    {
+      "wrong": "陷井",
+      "right": "陷阱",
+      "pinyin": "xian4 jing3"
+    },
+    {
+      "wrong": "劈谣",
+      "right": "辟谣",
+      "pinyin": "pi4 yao2"
+    },
+    {
+      "wrong": "明片",
+      "right": "名片",
+      "pinyin": "ming2 pian4"
+    },
+    {
+      "wrong": "梦餍",
+      "right": "梦魇",
+      "pinyin": "meng4 yan3"
+    },
+    {
+      "wrong": "缈视",
+      "right": "藐视",
+      "pinyin": "miao3 shi4"
+    },
+    {
+      "wrong": "募然",
+      "right": "蓦然",
+      "pinyin": "mo4 ran2"
+    },
+    {
+      "wrong": "蓦捐",
+      "right": "募捐",
+      "pinyin": "mu4 juan1"
+    },
+    {
+      "wrong": "通辑",
+      "right": "通缉",
+      "pinyin": "tong1 ji1"
+    },
+    {
+      "wrong": "杂踏",
+      "right": "杂沓",
+      "pinyin": "za2 ta4"
+    },
+    {
+      "wrong": "奕棋",
+      "right": "弈棋",
+      "pinyin": "yi4 qi2"
+    },
+    {
+      "wrong": "疏峻",
+      "right": "疏浚",
+      "pinyin": "shu1 jun4"
+    },
+    {
+      "wrong": "吉详",
+      "right": "吉祥",
+      "pinyin": "ji2 xiang2"
+    },
+    {
+      "wrong": "肖象",
+      "right": "肖像",
+      "pinyin": "xiao4 xiang4"
+    },
+    {
+      "wrong": "开消",
+      "right": "开销",
+      "pinyin": "kai1 xiao1"
+    },
+    {
+      "wrong": "撕杀",
+      "right": "厮杀",
+      "pinyin": "si1 sha1"
+    },
+    {
+      "wrong": "膺品",
+      "right": "赝品",
+      "pinyin": "yan4 pin3"
+    },
+    {
+      "wrong": "贮立",
+      "right": "伫立",
+      "pinyin": "zhu4 li4"
+    },
+    {
+      "wrong": "渲泄",
+      "right": "宣泄",
+      "pinyin": "xuan1 xie4"
+    },
+    {
+      "wrong": "宣染",
+      "right": "渲染",
+      "pinyin": "xuan4 ran3"
+    },
+    {
+      "wrong": "延申",
+      "right": "延伸",
+      "pinyin": "yan2 shen1"
+    },
+    {
+      "wrong": "奢糜",
+      "right": "奢靡",
+      "pinyin": "she1 mi2"
+    },
+    {
+      "wrong": "毗临",
+      "right": "毗邻",
+      "pinyin": "pi2 lin2"
+    },
+    {
+      "wrong": "骠悍",
+      "right": "剽悍",
+      "pinyin": "piao1 han4"
+    },
+    {
+      "wrong": "永决",
+      "right": "永诀",
+      "pinyin": "yong3 jue2"
+    },
+    {
+      "wrong": "欧打",
+      "right": "殴打",
+      "pinyin": "ou1 da3"
+    },
+    {
+      "wrong": "座落",
+      "right": "坐落",
+      "pinyin": "zuo4 luo4"
+    },
+    {
+      "wrong": "幅射",
+      "right": "辐射",
+      "pinyin": "fu2 she4"
+    },
+    {
+      "wrong": "拥带",
+      "right": "拥戴",
+      "pinyin": "yong1 dai4"
+    },
+    {
+      "wrong": "煤碳",
+      "right": "煤炭",
+      "pinyin": "mei2 tan4"
+    },
+    {
+      "wrong": "编篡",
+      "right": "编纂",
+      "pinyin": "bian1 zuan3"
+    },
+    {
+      "wrong": "按磨",
+      "right": "按摩",
+      "pinyin": "an4 mo2"
+    },
+    {
+      "wrong": "爆躁",
+      "right": "暴躁",
+      "pinyin": "bao4 zao4"
+    },
+    {
+      "wrong": "蜇居",
+      "right": "蛰居",
+      "pinyin": "zhe2 ju1"
+    },
+    {
+      "wrong": "下功夫",
+      "right": "下工夫",
+      "pinyin": "xia4 gong1 fu"
+    },
+    {
+      "wrong": "显象管",
+      "right": "显像管",
+      "pinyin": "xian3 xiang4 guan3"
+    },
+    {
+      "wrong": "爆发户",
+      "right": "暴发户",
+      "pinyin": "bao4 fa1 hu4"
+    },
+    {
+      "wrong": "造事者",
+      "right": "肇事者",
+      "pinyin": "zhao4 shi4 zhe3"
+    },
+    {
+      "wrong": "纹身",
+      "right": "文身",
+      "pinyin": "wen2 shen1"
+    },
+    {
+      "wrong": "座标系",
+      "right": "坐标系",
+      "pinyin": "zuo4 biao1 xi4"
+    },
+    {
+      "wrong": "照像机",
+      "right": "照相机",
+      "pinyin": "zhao4 xiang4 ji1"
+    },
+    {
+      "wrong": "暖哄哄",
+      "right": "暖烘烘",
+      "pinyin": "nuan3 hong1 hong1"
+    },
+    {
+      "wrong": "名信片",
+      "right": "明信片",
+      "pinyin": "ming2 xin4 pian4"
+    },
+    {
+      "wrong": "坐右铭",
+      "right": "座右铭",
+      "pinyin": "zuo4 you4 ming2"
+    },
+    {
+      "wrong": "天然汽",
+      "right": "天然气",
+      "pinyin": "tian1 ran2 qi4"
+    },
+    {
+      "wrong": "煤汽机",
+      "right": "煤气机",
+      "pinyin": "mei2 qi4 ji1"
+    },
+    {
+      "wrong": "引伸义",
+      "right": "引申义",
+      "pinyin": "yin3 shen1 yi4"
+    },
+    {
+      "wrong": "雄纠纠",
+      "right": "雄赳赳",
+      "pinyin": "xiong2 jiu1 jiu1"
+    },
+    {
+      "wrong": "冷不妨",
+      "right": "冷不防",
+      "pinyin": "leng3 bu4 fang2"
+    },
+    {
+      "wrong": "百练成钢",
+      "right": "百炼成钢",
+      "pinyin": "bai3 lian4 cheng2 gang1"
+    },
+    {
+      "wrong": "火山暴发",
+      "right": "火山爆发",
+      "pinyin": "huo3 shan1 bao4 fa1"
+    },
+    {
+      "wrong": "和霭可亲",
+      "right": "和蔼可亲",
+      "pinyin": "he2 ai3 ke3 qin1"
+    },
+    {
+      "wrong": "爱不失手",
+      "right": "爱不释手",
+      "pinyin": "ai4 bu4 shi4 shou3"
+    },
+    {
+      "wrong": "爱乌及屋",
+      "right": "爱屋及乌",
+      "pinyin": "ai4 wu1 ji2 wu1"
+    },
+    {
+      "wrong": "安份守己",
+      "right": "安分守己",
+      "pinyin": "an1 fen4 shou3 ji3"
+    },
+    {
+      "wrong": "按居乐业",
+      "right": "安居乐业",
+      "pinyin": "an1 ju1 le4 ye4"
+    },
+    {
+      "wrong": "暗然泪下",
+      "right": "黯然泪下",
+      "pinyin": "an4 ran2 lei4 xia4"
+    },
+    {
+      "wrong": "黯无天日",
+      "right": "暗无天日",
+      "pinyin": "an4 wu2 tian1 ri4"
+    },
+    {
+      "wrong": "敖敖待哺",
+      "right": "嗷嗷待哺",
+      "pinyin": "ao2 ao2 dai4 bu3"
+    },
+    {
+      "wrong": "飞扬拔扈",
+      "right": "飞扬跋扈",
+      "pinyin": "fei1 yang2 ba2 hu4"
+    },
+    {
+      "wrong": "绝不罢休",
+      "right": "决不罢休",
+      "pinyin": "jue2 bu4 ba4 xiu1"
+    },
+    {
+      "wrong": "白壁微瑕",
+      "right": "白璧微瑕",
+      "pinyin": "bai2 bi4 wei1 xia2"
+    },
+    {
+      "wrong": "英雄倍出",
+      "right": "英雄辈出",
+      "pinyin": "ying1 xiong2 bei4 chu1"
+    },
+    {
+      "wrong": "半途而费",
+      "right": "半途而废",
+      "pinyin": "ban4 tu2 er2 fei4"
+    },
+    {
+      "wrong": "哀声叹气",
+      "right": "唉声叹气",
+      "pinyin": "ai1 sheng1 tan4 qi4"
+    },
+    {
+      "wrong": "山洪爆发",
+      "right": "山洪暴发",
+      "pinyin": "shan1 hong2 bao4 fa1"
+    },
+    {
+      "wrong": "武装爆动",
+      "right": "武装暴动",
+      "pinyin": "wu3 zhuang1 bao4 dong4"
+    },
+    {
+      "wrong": "五色斑澜",
+      "right": "五色斑斓",
+      "pinyin": "wu3 se4 ban1 lan2"
+    },
+    {
+      "wrong": "百步串杨",
+      "right": "百步穿杨",
+      "pinyin": "bai3 bu4 chuan1 yang2"
+    },
+    {
+      "wrong": "百尺杆头",
+      "right": "百尺竿头",
+      "pinyin": "bai3 chi3 gan1 tou2"
+    },
+    {
+      "wrong": "罢绌百家",
+      "right": "罢黜百家",
+      "pinyin": "ba4 chu4 bai3 jia1"
+    },
+    {
+      "wrong": "百战不贻",
+      "right": "百战不殆",
+      "pinyin": "bai3 zhan4 bu4 dai4"
+    },
+    {
+      "wrong": "大有稗益",
+      "right": "大有裨益",
+      "pinyin": "da4 you3 bi4 yi4"
+    },
+    {
+      "wrong": "原物必还",
+      "right": "原物璧还",
+      "pinyin": "yuan2 wu4 bi4 huan2"
+    },
+    {
+      "wrong": "森严壁磊",
+      "right": "森严壁垒",
+      "pinyin": "sen1 yan2 bi4 lei3"
+    },
+    {
+      "wrong": "鞭僻入理",
+      "right": "鞭辟入里",
+      "pinyin": "bian1 pi4 ru4 li3"
+    },
+    {
+      "wrong": "能言善辨",
+      "right": "能言善辩",
+      "pinyin": "neng2 yan2 shan4 bian4"
+    },
+    {
+      "wrong": "变本加利",
+      "right": "变本加厉",
+      "pinyin": "bian4 ben3 jia1 li4"
+    },
+    {
+      "wrong": "变换莫测",
+      "right": "变幻莫测",
+      "pinyin": "bian4 huan4 mo4 ce4"
+    },
+    {
+      "wrong": "骠肥体壮",
+      "right": "膘肥体壮",
+      "pinyin": "biao1 fei2 ti3 zhuang4"
+    },
+    {
+      "wrong": "标柄千古",
+      "right": "彪炳千古",
+      "pinyin": "biao1 bing3 qian1 gu3"
+    },
+    {
+      "wrong": "别出心才",
+      "right": "别出心裁",
+      "pinyin": "bie2 chu1 xin1 cai2"
+    },
+    {
+      "wrong": "兵慌马乱",
+      "right": "兵荒马乱",
+      "pinyin": "bing1 huang1 ma3 luan4"
+    },
+    {
+      "wrong": "彬彬有理",
+      "right": "彬彬有礼",
+      "pinyin": "bin1 bin1 you3 li3"
+    },
+    {
+      "wrong": "涣然一新",
+      "right": "焕然一新",
+      "pinyin": "huan4 ran2 yi1 xin1"
+    },
+    {
+      "wrong": "摒气凝神",
+      "right": "屏气凝神",
+      "pinyin": "bing3 qi4 ning2 shen2"
+    },
+    {
+      "wrong": "病入膏盲",
+      "right": "病入膏肓",
+      "pinyin": "bing4 ru4 gao1 huang1"
+    },
+    {
+      "wrong": "并行不背",
+      "right": "并行不悖",
+      "pinyin": "bing4 xing2 bu4 bei4"
+    },
+    {
+      "wrong": "拨乱返正",
+      "right": "拨乱反正",
+      "pinyin": "bo1 luan4 fan3 zheng4"
+    },
+    {
+      "wrong": "军事布署",
+      "right": "军事部署",
+      "pinyin": "jun1 shi4 bu4 shu3"
+    },
+    {
+      "wrong": "人所不耻",
+      "right": "人所不齿",
+      "pinyin": "ren2 suo3 bu4 chi3"
+    },
+    {
+      "wrong": "不共带天",
+      "right": "不共戴天",
+      "pinyin": "bu4 gong4 dai4 tian1"
+    },
+    {
+      "wrong": "不寒而立",
+      "right": "不寒而栗",
+      "pinyin": "bu4 han2 er2 li4"
+    },
+    {
+      "wrong": "不惶顾及",
+      "right": "不遑顾及",
+      "pinyin": "bu4 huang2 gu4 ji2"
+    },
+    {
+      "wrong": "不记其数",
+      "right": "不计其数",
+      "pinyin": "bu4 ji4 qi2 shu4"
+    },
+    {
+      "wrong": "不接不离",
+      "right": "不即不离",
+      "pinyin": "bu4 ji2 bu4 li2"
+    },
+    {
+      "wrong": "不加思索",
+      "right": "不假思索",
+      "pinyin": "bu4 jia3 si1 suo3"
+    },
+    {
+      "wrong": "不卑不吭",
+      "right": "不卑不亢",
+      "pinyin": "bu4 bei1 bu4 kang4"
+    },
+    {
+      "wrong": "不径而走",
+      "right": "不胫而走",
+      "pinyin": "bu4 jing4 er2 zou3"
+    },
+    {
+      "wrong": "继往不究",
+      "right": "既往不咎",
+      "pinyin": "ji4 wang3 bu4 jiu4"
+    },
+    {
+      "wrong": "不堪之论",
+      "right": "不刊之论",
+      "pinyin": "bu4 kan1 zhi1 lun4"
+    },
+    {
+      "wrong": "不可思异",
+      "right": "不可思议",
+      "pinyin": "bu4 ke3 si1 yi4"
+    },
+    {
+      "wrong": "不明一文",
+      "right": "不名一文",
+      "pinyin": "bu4 ming2 yi1 wen2"
+    },
+    {
+      "wrong": "不求深解",
+      "right": "不求甚解",
+      "pinyin": "bu4 qiu2 shen4 jie3"
+    },
+    {
+      "wrong": "宁死不曲",
+      "right": "宁死不屈",
+      "pinyin": "ning4 si3 bu4 qu1"
+    },
+    {
+      "wrong": "麻木不忍",
+      "right": "麻木不仁",
+      "pinyin": "ma2 mu4 bu4 ren2"
+    },
+    {
+      "wrong": "不详之兆",
+      "right": "不祥之兆",
+      "pinyin": "bu4 xiang2 zhi1 zhao4"
+    },
+    {
+      "wrong": "步履维坚",
+      "right": "步履维艰",
+      "pinyin": "bu4 lv3 wei2 jian1"
+    },
+    {
+      "wrong": "雄材大略",
+      "right": "雄才大略",
+      "pinyin": "xiong2 cai2 da4 lue4"
+    },
+    {
+      "wrong": "材疏学浅",
+      "right": "才疏学浅",
+      "pinyin": "cai2 shu1 xue2 qian3"
+    },
+    {
+      "wrong": "神采弈弈",
+      "right": "神采奕奕",
+      "pinyin": "shen2 cai3 yi4 yi4"
+    },
+    {
+      "wrong": "材华横溢",
+      "right": "才华横溢",
+      "pinyin": "cai2 hua2 heng2 yi4"
+    },
+    {
+      "wrong": "兴高彩烈",
+      "right": "兴高采烈",
+      "pinyin": "xing4 gao1 cai3 lie4"
+    },
+    {
+      "wrong": "张灯结采",
+      "right": "张灯结彩",
+      "pinyin": "zhang1 deng1 jie2 cai3"
+    },
+    {
+      "wrong": "惨绝人圜",
+      "right": "惨绝人寰",
+      "pinyin": "can3 jue2 ren2 huan2"
+    },
+    {
+      "wrong": "灿然一笑",
+      "right": "粲然一笑",
+      "pinyin": "can4 ran2 yi1 xiao4"
+    },
+    {
+      "wrong": "苍海桑田",
+      "right": "沧海桑田",
+      "pinyin": "cang1 hai3 sang1 tian2"
+    },
+    {
+      "wrong": "沧茫大海",
+      "right": "苍茫大海",
+      "pinyin": "cang1 mang2 da4 hai3"
+    },
+    {
+      "wrong": "藏诟纳污",
+      "right": "藏垢纳污",
+      "pinyin": "cang2 gou4 na4 wu1"
+    },
+    {
+      "wrong": "测隐之心",
+      "right": "恻隐之心",
+      "pinyin": "ce4 yin3 zhi1 xin1"
+    },
+    {
+      "wrong": "成出不穷",
+      "right": "层出不穷",
+      "pinyin": "ceng2 chu1 bu4 qiong2"
+    },
+    {
+      "wrong": "层见迭出",
+      "right": "层见叠出",
+      "pinyin": "ceng2 xian4 die2 chu1"
+    },
+    {
+      "wrong": "层峦叠障",
+      "right": "层峦叠嶂",
+      "pinyin": "ceng2 luan2 die2 zhang4"
+    },
+    {
+      "wrong": "插科打浑",
+      "right": "插科打诨",
+      "pinyin": "cha1 ke1 da3 hun4"
+    },
+    {
+      "wrong": "蝉连冠军",
+      "right": "蝉联冠军",
+      "pinyin": "chan2 lian2 guan4 jun1"
+    },
+    {
+      "wrong": "陈陈相应",
+      "right": "陈陈相因",
+      "pinyin": "chen2 chen2 xiang1 yin1"
+    },
+    {
+      "wrong": "陈词烂调",
+      "right": "陈词滥调",
+      "pinyin": "chen2 ci2 lan4 diao4"
+    },
+    {
+      "wrong": "自学成才",
+      "right": "自学成材",
+      "pinyin": "zi4 xue2 cheng2 cai2"
+    },
+    {
+      "wrong": "惩前毙后",
+      "right": "惩前毖后",
+      "pinyin": "cheng2 qian2 bi4 hou4"
+    },
+    {
+      "wrong": "惩一禁百",
+      "right": "惩一儆百",
+      "pinyin": "cheng2 yi1 jing3 bai3"
+    },
+    {
+      "wrong": "吃里爬外",
+      "right": "吃里扒外",
+      "pinyin": "chi1 li3 pa2 wai4"
+    },
+    {
+      "wrong": "斥之以鼻",
+      "right": "嗤之以鼻",
+      "pinyin": "chi1 zhi1 yi3 bi2"
+    },
+    {
+      "wrong": "冲耳不闻",
+      "right": "充耳不闻",
+      "pinyin": "chong1 er3 bu4 wen2"
+    },
+    {
+      "wrong": "首当其充",
+      "right": "首当其冲",
+      "pinyin": "shou3 dang1 qi2 chong1"
+    },
+    {
+      "wrong": "忧心冲冲",
+      "right": "忧心忡忡",
+      "pinyin": "you1 xin1 chong1 chong1"
+    },
+    {
+      "wrong": "山峦重迭",
+      "right": "山峦重叠",
+      "pinyin": "shan1 luan2 chong2 die2"
+    },
+    {
+      "wrong": "一愁莫展",
+      "right": "一筹莫展",
+      "pinyin": "yi1 chou2 mo4 zhan3"
+    },
+    {
+      "wrong": "出类拔粹",
+      "right": "出类拔萃",
+      "pinyin": "chu1 lei4 ba2 cui4"
+    },
+    {
+      "wrong": "出奇不意",
+      "right": "出其不意",
+      "pinyin": "chu1 qi2 bu4 yi4"
+    },
+    {
+      "wrong": "出奇致胜",
+      "right": "出奇制胜",
+      "pinyin": "chu1 qi2 zhi4 sheng4"
+    },
+    {
+      "wrong": "出人投地",
+      "right": "出人头地",
+      "pinyin": "chu1 ren2 tou2 di4"
+    },
+    {
+      "wrong": "除旧补新",
+      "right": "除旧布新",
+      "pinyin": "chu2 jiu4 bu4 xin1"
+    },
+    {
+      "wrong": "处心集虑",
+      "right": "处心积虑",
+      "pinyin": "chu3 xin1 ji1 lv4"
+    },
+    {
+      "wrong": "穿流不息",
+      "right": "川流不息",
+      "pinyin": "chuan1 liu2 bu4 xi1"
+    },
+    {
+      "wrong": "传颂一时",
+      "right": "传诵一时",
+      "pinyin": "chuan2 song4 yi1 shi2"
+    },
+    {
+      "wrong": "吹毛求刺",
+      "right": "吹毛求疵",
+      "pinyin": "chui1 mao2 qiu2 ci1"
+    },
+    {
+      "wrong": "从常计议",
+      "right": "从长计议",
+      "pinyin": "cong2 chang2 ji4 yi4"
+    },
+    {
+      "wrong": "粗枝大意",
+      "right": "粗枝大叶",
+      "pinyin": "cu1 zhi1 da4 ye4"
+    },
+    {
+      "wrong": "粗制烂造",
+      "right": "粗制滥造",
+      "pinyin": "cu1 zhi4 lan4 zao4"
+    },
+    {
+      "wrong": "措火积薪",
+      "right": "厝火积薪",
+      "pinyin": "cuo4 huo3 ji1 xin1"
+    },
+    {
+      "wrong": "错手不及",
+      "right": "措手不及",
+      "pinyin": "cuo4 shou3 bu4 ji2"
+    },
+    {
+      "wrong": "大才小用",
+      "right": "大材小用",
+      "pinyin": "da4 cai2 xiao3 yong4"
+    },
+    {
+      "wrong": "大放獗词",
+      "right": "大放厥词",
+      "pinyin": "da4 fang4 jue2 ci2"
+    },
+    {
+      "wrong": "大声急呼",
+      "right": "大声疾呼",
+      "pinyin": "da4 sheng1 ji2 hu1"
+    },
+    {
+      "wrong": "大廷广众",
+      "right": "大庭广众",
+      "pinyin": "da4 ting2 guang3 zhong4"
+    },
+    {
+      "wrong": "虎视耽耽",
+      "right": "虎视眈眈",
+      "pinyin": "hu3 shi4 dan1 dan1"
+    },
+    {
+      "wrong": "当人不让",
+      "right": "当仁不让",
+      "pinyin": "dang1 ren2 bu4 rang4"
+    },
+    {
+      "wrong": "倒打一把",
+      "right": "倒打一耙",
+      "pinyin": "dao4 da3 yi1 pa2"
+    },
+    {
+      "wrong": "得不尝失",
+      "right": "得不偿失",
+      "pinyin": "de2 bu4 chang2 shi1"
+    },
+    {
+      "wrong": "得垄望蜀",
+      "right": "得陇望蜀",
+      "pinyin": "de2 long3 wang4 shu3"
+    },
+    {
+      "wrong": "地大物搏",
+      "right": "地大物博",
+      "pinyin": "di4 da4 wu4 bo2"
+    },
+    {
+      "wrong": "掂斤拨两",
+      "right": "掂斤播两",
+      "pinyin": "dian1 jin1 bo1 liang3"
+    },
+    {
+      "wrong": "草木雕零",
+      "right": "草木凋零",
+      "pinyin": "cao3 mu4 diao1 ling2"
+    },
+    {
+      "wrong": "凋虫小技",
+      "right": "雕虫小技",
+      "pinyin": "diao1 chong2 xiao3 ji4"
+    },
+    {
+      "wrong": "调以轻心",
+      "right": "掉以轻心",
+      "pinyin": "diao4 yi3 qing1 xin1"
+    },
+    {
+      "wrong": "吊虎离山",
+      "right": "调虎离山",
+      "pinyin": "diao4 hu3 li2 shan1"
+    },
+    {
+      "wrong": "迭床架屋",
+      "right": "叠床架屋",
+      "pinyin": "die2 chuang2 jia4 wu1"
+    },
+    {
+      "wrong": "动则得咎",
+      "right": "动辄得咎",
+      "pinyin": "dong4 zhe2 de2 jiu4"
+    },
+    {
+      "wrong": "以毒功毒",
+      "right": "以毒攻毒",
+      "pinyin": "yi3 du2 gong1 du2"
+    },
+    {
+      "wrong": "独挡一面",
+      "right": "独当一面",
+      "pinyin": "du2 dang1 yi1 mian4"
+    },
+    {
+      "wrong": "独劈蹊径",
+      "right": "独辟蹊径",
+      "pinyin": "du2 pi4 xi1 jing4"
+    },
+    {
+      "wrong": "独占螯头",
+      "right": "独占鳌头",
+      "pinyin": "du2 zhan4 ao2 tou2"
+    },
+    {
+      "wrong": "度过难关",
+      "right": "渡过难关",
+      "pinyin": "du4 guo4 nan2 guan1"
+    },
+    {
+      "wrong": "疾贤妒能",
+      "right": "嫉贤妒能",
+      "pinyin": "ji2 xian2 du4 neng2"
+    },
+    {
+      "wrong": "堵绝浪费",
+      "right": "杜绝浪费",
+      "pinyin": "du4 jue2 lang4 fei4"
+    },
+    {
+      "wrong": "断章取意",
+      "right": "断章取义",
+      "pinyin": "duan4 zhang1 qu3 yi4"
+    },
+    {
+      "wrong": "对针下药",
+      "right": "对症下药",
+      "pinyin": "dui4 zheng4 xia4 yao4"
+    },
+    {
+      "wrong": "两军对恃",
+      "right": "两军对峙",
+      "pinyin": "liang3 jun1 dui4 zhi4"
+    },
+    {
+      "wrong": "恶灌满盈",
+      "right": "恶贯满盈",
+      "pinyin": "e4 guan4 man3 ying2"
+    },
+    {
+      "wrong": "发号司令",
+      "right": "发号施令",
+      "pinyin": "fa1 hao4 shi1 ling4"
+    },
+    {
+      "wrong": "震聋发聩",
+      "right": "振聋发聩",
+      "pinyin": "zhen4 long2 fa1 kui4"
+    },
+    {
+      "wrong": "令人发直",
+      "right": "令人发指",
+      "pinyin": "ling4 ren2 fa4 zhi3"
+    },
+    {
+      "wrong": "要言不繁",
+      "right": "要言不烦",
+      "pinyin": "yao4 yan2 bu4 fan2"
+    },
+    {
+      "wrong": "繁文溽节",
+      "right": "繁文缛节",
+      "pinyin": "fan2 wen2 ru4 jie2"
+    },
+    {
+      "wrong": "易如翻掌",
+      "right": "易如反掌",
+      "pinyin": "yi4 ru2 fan3 zhang3"
+    },
+    {
+      "wrong": "防患未燃",
+      "right": "防患未然",
+      "pinyin": "fang2 huan4 wei4 ran2"
+    },
+    {
+      "wrong": "飞声文坛",
+      "right": "蜚声文坛",
+      "pinyin": "fei1 sheng1 wen2 tan2"
+    },
+    {
+      "wrong": "成绩蜚然",
+      "right": "成绩斐然",
+      "pinyin": "cheng2 ji4 fei3 ran2"
+    },
+    {
+      "wrong": "缠绵悱测",
+      "right": "缠绵悱恻",
+      "pinyin": "chan2 mian2 fei3 ce4"
+    },
+    {
+      "wrong": "非夷所思",
+      "right": "匪夷所思",
+      "pinyin": "fei3 yi2 suo3 si1"
+    },
+    {
+      "wrong": "纲纪废驰",
+      "right": "纲纪废弛",
+      "pinyin": "gang1 ji4 fei4 chi2"
+    },
+    {
+      "wrong": "费寝忘食",
+      "right": "废寝忘食",
+      "pinyin": "fei4 qin3 wang4 shi2"
+    },
+    {
+      "wrong": "废尽心思",
+      "right": "费尽心思",
+      "pinyin": "fei4 jin4 xin1 si1"
+    },
+    {
+      "wrong": "分道扬标",
+      "right": "分道扬镳",
+      "pinyin": "fen1 dao4 yang2 biao1"
+    },
+    {
+      "wrong": "分庭抗理",
+      "right": "分庭抗礼",
+      "pinyin": "fen1 ting2 kang4 li3"
+    },
+    {
+      "wrong": "纷至踏来",
+      "right": "纷至沓来",
+      "pinyin": "fen1 zhi4 ta4 lai2"
+    },
+    {
+      "wrong": "愤闷不平",
+      "right": "愤懑不平",
+      "pinyin": "fen4 men4 bu4 ping2"
+    },
+    {
+      "wrong": "丰功伟迹",
+      "right": "丰功伟绩",
+      "pinyin": "feng1 gong1 wei3 ji4"
+    },
+    {
+      "wrong": "蜂涌而至",
+      "right": "蜂拥而至",
+      "pinyin": "feng1 yong1 er2 zhi4"
+    },
+    {
+      "wrong": "凤冠霞披",
+      "right": "凤冠霞帔",
+      "pinyin": "feng4 guan1 xia2 pei4"
+    },
+    {
+      "wrong": "幅圆辽阔",
+      "right": "幅员辽阔",
+      "pinyin": "fu2 yuan2 liao2 kuo4"
+    },
+    {
+      "wrong": "浮光略影",
+      "right": "浮光掠影",
+      "pinyin": "fu2 guang1 lüe4 ying3"
+    },
+    {
+      "wrong": "斧底抽薪",
+      "right": "釜底抽薪",
+      "pinyin": "fu3 di3 chou1 xin1"
+    },
+    {
+      "wrong": "付之东流",
+      "right": "付诸东流",
+      "pinyin": "fu4 zhu1 dong1 liu2"
+    },
+    {
+      "wrong": "言简意该",
+      "right": "言简意赅",
+      "pinyin": "yan2 jian3 yi4 gai1"
+    },
+    {
+      "wrong": "甘败下风",
+      "right": "甘拜下风",
+      "pinyin": "gan1 bai4 xia4 feng1"
+    },
+    {
+      "wrong": "改斜归正",
+      "right": "改邪归正",
+      "pinyin": "gai3 xie2 gui1 zheng4"
+    },
+    {
+      "wrong": "甘之如怡",
+      "right": "甘之如饴",
+      "pinyin": "gan1 zhi1 ru2 yi2"
+    },
+    {
+      "wrong": "感恩带德",
+      "right": "感恩戴德",
+      "pinyin": "gan3 en1 dai4 de2"
+    },
+    {
+      "wrong": "根深底固",
+      "right": "根深蒂固",
+      "pinyin": "gen1 shen1 di4 gu4"
+    },
+    {
+      "wrong": "工力悉抵",
+      "right": "工力悉敌",
+      "pinyin": "gong1 li4 xi1 di2"
+    },
+    {
+      "wrong": "功亏一蒉",
+      "right": "功亏一篑",
+      "pinyin": "gong1 kui1 yi1 kui4"
+    },
+    {
+      "wrong": "全神灌注",
+      "right": "全神贯注",
+      "pinyin": "quan2 shen2 guan4 zhu4"
+    },
+    {
+      "wrong": "鬼斧神功",
+      "right": "鬼斧神工",
+      "pinyin": "gui3 fu3 shen2 gong1"
+    },
+    {
+      "wrong": "鬼域技俩",
+      "right": "鬼蜮伎俩",
+      "pinyin": "gui3 yu4 ji4 liang3"
+    },
+    {
+      "wrong": "过尤不及",
+      "right": "过犹不及",
+      "pinyin": "guo4 you2 bu4 ji2"
+    },
+    {
+      "wrong": "禁若寒蝉",
+      "right": "噤若寒蝉",
+      "pinyin": "jin4 ruo4 han2 chan2"
+    },
+    {
+      "wrong": "含辛如苦",
+      "right": "含辛茹苦",
+      "pinyin": "han2 xin1 ru2 ku3"
+    },
+    {
+      "wrong": "汗流夹背",
+      "right": "汗流浃背",
+      "pinyin": "han4 liu2 jia1 bei4"
+    },
+    {
+      "wrong": "合盘托出",
+      "right": "和盘托出",
+      "pinyin": "he2 pan2 tuo1 chu1"
+    },
+    {
+      "wrong": "合衷共济",
+      "right": "和衷共济",
+      "pinyin": "he2 zhong1 gong4 ji4"
+    },
+    {
+      "wrong": "轰堂大笑",
+      "right": "哄堂大笑",
+      "pinyin": "hong1 tang2 da4 xiao4"
+    },
+    {
+      "wrong": "后发治人",
+      "right": "后发制人",
+      "pinyin": "hou4 fa1 zhi4 ren2"
+    },
+    {
+      "wrong": "划地为牢",
+      "right": "画地为牢",
+      "pinyin": "hua4 di4 wei2 lao2"
+    },
+    {
+      "wrong": "回光反照",
+      "right": "回光返照",
+      "pinyin": "hui2 guang1 fan3 zhao4"
+    },
+    {
+      "wrong": "独具惠眼",
+      "right": "独具慧眼",
+      "pinyin": "du2 ju4 hui4 yan3"
+    },
+    {
+      "wrong": "昏馈无能",
+      "right": "昏聩无能",
+      "pinyin": "hun1 kui4 wu2 neng2"
+    },
+    {
+      "wrong": "浑浑恶恶",
+      "right": "浑浑噩噩",
+      "pinyin": "hun2 hun2 e4 e4"
+    },
+    {
+      "wrong": "浑玉朴金",
+      "right": "璞玉浑金",
+      "pinyin": "pu2 yu4 hun2 jin1"
+    },
+    {
+      "wrong": "忽然开朗",
+      "right": "豁然开朗",
+      "pinyin": "huo4 ran2 kai1 lang3"
+    },
+    {
+      "wrong": "祸国秧民",
+      "right": "祸国殃民",
+      "pinyin": "huo4 guo2 yang1 min2"
+    },
+    {
+      "wrong": "击浊扬清",
+      "right": "激浊扬清",
+      "pinyin": "ji1 zhuo2 yang2 qing1"
+    },
+    {
+      "wrong": "急言厉色",
+      "right": "疾言厉色",
+      "pinyin": "ji2 yan2 li4 se4"
+    },
+    {
+      "wrong": "集液成裘",
+      "right": "集腋成裘",
+      "pinyin": "ji2 ye4 cheng2 qiu2"
+    },
+    {
+      "wrong": "挤挤一堂",
+      "right": "济济一堂",
+      "pinyin": "ji3 ji3 yi1 tang2"
+    },
+    {
+      "wrong": "计日成功",
+      "right": "计日程功",
+      "pinyin": "ji4 ri4 cheng2 gong1"
+    },
+    {
+      "wrong": "肆无忌殚",
+      "right": "肆无忌惮",
+      "pinyin": "si4 wu2 ji4 dan4"
+    },
+    {
+      "wrong": "既往开来",
+      "right": "继往开来",
+      "pinyin": "ji4 wang3 kai1 lai2"
+    },
+    {
+      "wrong": "佳言懿行",
+      "right": "嘉言懿行",
+      "pinyin": "jia1 yan2 yi4 xing2"
+    },
+    {
+      "wrong": "艰壁清野",
+      "right": "坚壁清野",
+      "pinyin": "jian1 bi4 qing1 ye3"
+    },
+    {
+      "wrong": "艰不可摧",
+      "right": "坚不可摧",
+      "pinyin": "jian1 bu4 ke3 cui1"
+    },
+    {
+      "wrong": "历尽坚辛",
+      "right": "历尽艰辛",
+      "pinyin": "li4 jin4 jian1 xin1"
+    },
+    {
+      "wrong": "坚难困苦",
+      "right": "艰难困苦",
+      "pinyin": "jian1 nan2 kun4 ku3"
+    },
+    {
+      "wrong": "矫糅造作",
+      "right": "矫揉造作",
+      "pinyin": "jiao3 rou2 zao4 zuo4"
+    },
+    {
+      "wrong": "接长补短",
+      "right": "截长补短",
+      "pinyin": "jie2 chang2 bu3 duan3"
+    },
+    {
+      "wrong": "可资借戒",
+      "right": "可资借鉴",
+      "pinyin": "ke3 zi1 jie4 jian4"
+    },
+    {
+      "wrong": "弱不经风",
+      "right": "弱不禁风",
+      "pinyin": "ruo4 bu4 jin1 feng1"
+    },
+    {
+      "wrong": "金榜提名",
+      "right": "金榜题名",
+      "pinyin": "jin1 bang3 ti2 ming2"
+    },
+    {
+      "wrong": "金壁辉煌",
+      "right": "金碧辉煌",
+      "pinyin": "jin1 bi4 hui1 huang2"
+    },
+    {
+      "wrong": "金刚努目",
+      "right": "金刚怒目",
+      "pinyin": "jin1 gang1 nu4 mu4"
+    },
+    {
+      "wrong": "金钢钻头",
+      "right": "金刚钻头",
+      "pinyin": "jin1 gang1 zuan4 tou2"
+    },
+    {
+      "wrong": "决无仅有",
+      "right": "绝无仅有",
+      "pinyin": "jue2 wu2 jin3 you3"
+    },
+    {
+      "wrong": "挤身三强",
+      "right": "跻身三强",
+      "pinyin": "ji1 shen1 san1 qiang2"
+    },
+    {
+      "wrong": "精兵减政",
+      "right": "精兵简政",
+      "pinyin": "jing1 bing1 jian3 zheng4"
+    },
+    {
+      "wrong": "精诚所致",
+      "right": "精诚所至",
+      "pinyin": "jing1 cheng2 suo3 zhi4"
+    },
+    {
+      "wrong": "居心不测",
+      "right": "居心叵测",
+      "pinyin": "ju1 xin1 po3 ce4"
+    },
+    {
+      "wrong": "以警效尤",
+      "right": "以儆效尤",
+      "pinyin": "yi3 jing3 xiao4 you2"
+    },
+    {
+      "wrong": "举一返三",
+      "right": "举一反三",
+      "pinyin": "ju3 yi1 fan3 san1"
+    },
+    {
+      "wrong": "拒谏是非",
+      "right": "拒谏饰非",
+      "pinyin": "ju4 jian4 shi4 fei1"
+    },
+    {
+      "wrong": "一应具全",
+      "right": "一应俱全",
+      "pinyin": "yi1 ying1 ju4 quan2"
+    },
+    {
+      "wrong": "精神矍烁",
+      "right": "精神矍铄",
+      "pinyin": "jing1 shen2 jue2 shuo4"
+    },
+    {
+      "wrong": "赞不决口",
+      "right": "赞不绝口",
+      "pinyin": "zan4 bu4 jue2 kou3"
+    },
+    {
+      "wrong": "峻工验收",
+      "right": "竣工验收",
+      "pinyin": "jun4 gong1 yan4 shou1"
+    },
+    {
+      "wrong": "开诚不公",
+      "right": "开诚布公",
+      "pinyin": "kai1 cheng2 bu4 gong1"
+    },
+    {
+      "wrong": "开门缉盗",
+      "right": "开门揖盗",
+      "pinyin": "kai1 men2 yi1 dao4"
+    },
+    {
+      "wrong": "开天劈地",
+      "right": "开天辟地",
+      "pinyin": "kai1 tian1 pi4 di4"
+    },
+    {
+      "wrong": "开源截流",
+      "right": "开源节流",
+      "pinyin": "kai1 yuan2 jie2 liu2"
+    },
+    {
+      "wrong": "开中明义",
+      "right": "开宗明义",
+      "pinyin": "kai1 zong1 ming2 yi4"
+    },
+    {
+      "wrong": "勘平叛乱",
+      "right": "戡平叛乱",
+      "pinyin": "kan1 ping2 pan4 luan4"
+    },
+    {
+      "wrong": "刻划人物",
+      "right": "刻画人物",
+      "pinyin": "ke4 hua4 ren2 wu4"
+    },
+    {
+      "wrong": "可望不可及",
+      "right": "可望不可即",
+      "pinyin": "ke3 wang4 bu4 ke3 ji2"
+    },
+    {
+      "wrong": "刻己奉公",
+      "right": "克己奉公",
+      "pinyin": "ke4 ji3 feng4 gong1"
+    },
+    {
+      "wrong": "刻勤刻俭",
+      "right": "克勤克俭",
+      "pinyin": "ke4 qin2 ke4 jian3"
+    },
+    {
+      "wrong": "夸夸奇谈",
+      "right": "夸夸其谈",
+      "pinyin": "kua1 kua1 qi2 tan2"
+    },
+    {
+      "wrong": "宽弘大量",
+      "right": "宽宏大量",
+      "pinyin": "kuan1 hong2 da4 liang4"
+    },
+    {
+      "wrong": "困兽尤斗",
+      "right": "困兽犹斗",
+      "pinyin": "kun4 shou4 you2 dou4"
+    },
+    {
+      "wrong": "味同嚼腊",
+      "right": "味同嚼蜡",
+      "pinyin": "wei4 tong2 jiao2 la4"
+    },
+    {
+      "wrong": "意兴阑姗",
+      "right": "意兴阑珊",
+      "pinyin": "yi4 xing4 lan2 shan1"
+    },
+    {
+      "wrong": "无耻滥言",
+      "right": "无耻谰言",
+      "pinyin": "wu2 chi3 lan2 yan2"
+    },
+    {
+      "wrong": "烂竽充数",
+      "right": "滥竽充数",
+      "pinyin": "lan4 yu2 chong1 shu4"
+    },
+    {
+      "wrong": "宁缺毋烂",
+      "right": "宁缺毋滥",
+      "pinyin": "ning4 que1 wu2 lan4"
+    },
+    {
+      "wrong": "老陈持重",
+      "right": "老成持重",
+      "pinyin": "lao3 cheng2 chi2 zhong4"
+    },
+    {
+      "wrong": "老奸巨滑",
+      "right": "老奸巨猾",
+      "pinyin": "lao3 jian1 ju4 hua2"
+    },
+    {
+      "wrong": "雷历风行",
+      "right": "雷厉风行",
+      "pinyin": "lei2 li4 feng1 xing2"
+    },
+    {
+      "wrong": "礼上往来",
+      "right": "礼尚往来",
+      "pinyin": "li3 shang4 wang3 lai2"
+    },
+    {
+      "wrong": "理曲词穷",
+      "right": "理屈词穷",
+      "pinyin": "li3 qu1 ci2 qiong2"
+    },
+    {
+      "wrong": "立杆见影",
+      "right": "立竿见影",
+      "pinyin": "li4 gan1 jian4 ying3"
+    },
+    {
+      "wrong": "立功渎罪",
+      "right": "立功赎罪",
+      "pinyin": "li4 gong1 shu2 zui4"
+    },
+    {
+      "wrong": "厉精图治",
+      "right": "励精图治",
+      "pinyin": "li4 jing1 tu2 zhi4"
+    },
+    {
+      "wrong": "励兵秣马",
+      "right": "厉兵秣马",
+      "pinyin": "li4 bing1 mo4 ma3"
+    },
+    {
+      "wrong": "厉厉在目",
+      "right": "历历在目",
+      "pinyin": "li4 li4 zai4 mu4"
+    },
+    {
+      "wrong": "藕断丝联",
+      "right": "藕断丝连",
+      "pinyin": "ou3 duan4 si1 lian2"
+    },
+    {
+      "wrong": "连锁反映",
+      "right": "连锁反应",
+      "pinyin": "lian2 suo3 fan3 ying4"
+    },
+    {
+      "wrong": "横征暴殓",
+      "right": "横征暴敛",
+      "pinyin": "heng2 zheng1 bao4 lian3"
+    },
+    {
+      "wrong": "廖若晨星",
+      "right": "寥若晨星",
+      "pinyin": "liao2 ruo4 chen2 xing1"
+    },
+    {
+      "wrong": "一麟半爪",
+      "right": "一鳞半爪",
+      "pinyin": "yi1 lin2 ban4 zhao3"
+    },
+    {
+      "wrong": "流览报纸",
+      "right": "浏览报纸",
+      "pinyin": "liu2 lan3 bao4 zhi3"
+    },
+    {
+      "wrong": "留恋忘返",
+      "right": "流连忘返",
+      "pinyin": "liu2 lian2 wang4 fan3"
+    },
+    {
+      "wrong": "老态龙肿",
+      "right": "老态龙钟",
+      "pinyin": "lao3 tai4 long2 zhong1"
+    },
+    {
+      "wrong": "炉火成青",
+      "right": "炉火纯青",
+      "pinyin": "lu2 huo3 chun2 qing1"
+    },
+    {
+      "wrong": "暂露头角",
+      "right": "崭露头角",
+      "pinyin": "zhan3 lu4 tou2 jiao3"
+    },
+    {
+      "wrong": "戳力同心",
+      "right": "戮力同心",
+      "pinyin": "lu4 li4 tong2 xin1"
+    },
+    {
+      "wrong": "沦肌夹髓",
+      "right": "沦肌浃髓",
+      "pinyin": "lun2 ji1 jia1 sui3"
+    },
+    {
+      "wrong": "无与论比",
+      "right": "无与伦比",
+      "pinyin": "wu2 yu3 lun2 bi3"
+    },
+    {
+      "wrong": "漫条斯理",
+      "right": "慢条斯理",
+      "pinyin": "man4 tiao2 si1 li3"
+    },
+    {
+      "wrong": "慢不经心",
+      "right": "漫不经心",
+      "pinyin": "man4 bu4 jing1 xin1"
+    },
+    {
+      "wrong": "茫无头序",
+      "right": "茫无头绪",
+      "pinyin": "mang2 wu2 tou2 xu4"
+    },
+    {
+      "wrong": "毛骨耸然",
+      "right": "毛骨悚然",
+      "pinyin": "mao2 gu3 song3 ran2"
+    },
+    {
+      "wrong": "名列前矛",
+      "right": "名列前茅",
+      "pinyin": "ming2 lie4 qian2 mao2"
+    },
+    {
+      "wrong": "貌和神离",
+      "right": "貌合神离",
+      "pinyin": "mao4 he2 shen2 li2"
+    },
+    {
+      "wrong": "冒然从事",
+      "right": "贸然从事",
+      "pinyin": "mao4 ran2 cong2 shi4"
+    },
+    {
+      "wrong": "无精打彩",
+      "right": "无精打采",
+      "pinyin": "wu2 jing1 da3 cai3"
+    },
+    {
+      "wrong": "门廷若市",
+      "right": "门庭若市",
+      "pinyin": "men2 ting2 ruo4 shi4"
+    },
+    {
+      "wrong": "朦懂无知",
+      "right": "懵懂无知",
+      "pinyin": "meng3 dong3 wu2 zhi1"
+    },
+    {
+      "wrong": "靡烂不堪",
+      "right": "糜烂不堪",
+      "pinyin": "mi2 lan4 bu4 kan1"
+    },
+    {
+      "wrong": "迷天大谎",
+      "right": "弥天大谎",
+      "pinyin": "mi2 tian1 da4 huang3"
+    },
+    {
+      "wrong": "望风披糜",
+      "right": "望风披靡",
+      "pinyin": "wang4 feng1 pi1 mi3"
+    },
+    {
+      "wrong": "糜糜之音",
+      "right": "靡靡之音",
+      "pinyin": "mi3 mi3 zhi1 yin1"
+    },
+    {
+      "wrong": "密而不宣",
+      "right": "秘而不宣",
+      "pinyin": "mi4 er2 bu4 xuan1"
+    },
+    {
+      "wrong": "祖传密方",
+      "right": "祖传秘方",
+      "pinyin": "zu3 chuan2 mi4 fang1"
+    },
+    {
+      "wrong": "沉缅往事",
+      "right": "沉湎往事",
+      "pinyin": "chen2 mian3 wang3 shi4"
+    },
+    {
+      "wrong": "湎怀先烈",
+      "right": "缅怀先烈",
+      "pinyin": "mian3 huai2 xian1 lie4"
+    },
+    {
+      "wrong": "面面具到",
+      "right": "面面俱到",
+      "pinyin": "mian4 mian4 ju4 dao4"
+    },
+    {
+      "wrong": "虚无缥渺",
+      "right": "虚无缥缈",
+      "pinyin": "xu1 wu2 piao1 miao3"
+    },
+    {
+      "wrong": "死不冥目",
+      "right": "死不瞑目",
+      "pinyin": "si3 bu4 ming2 mu4"
+    },
+    {
+      "wrong": "瞑思苦想",
+      "right": "冥思苦想",
+      "pinyin": "ming2 si1 ku3 xiang3"
+    },
+    {
+      "wrong": "深明大意",
+      "right": "深明大义",
+      "pinyin": "shen1 ming2 da4 yi4"
+    },
+    {
+      "wrong": "明查暗访",
+      "right": "明察暗访",
+      "pinyin": "ming2 cha2 an4 fang3"
+    },
+    {
+      "wrong": "名哲保身",
+      "right": "明哲保身",
+      "pinyin": "ming2 zhe2 bao3 shen1"
+    },
+    {
+      "wrong": "磨肩擦背",
+      "right": "摩肩擦背",
+      "pinyin": "mo2 jian1 ca1 bei4"
+    },
+    {
+      "wrong": "顶礼模拜",
+      "right": "顶礼膜拜",
+      "pinyin": "ding3 li3 mo2 bai4"
+    },
+    {
+      "wrong": "穷途没路",
+      "right": "穷途末路",
+      "pinyin": "qiong2 tu2 mo4 lu4"
+    },
+    {
+      "wrong": "莫明其妙",
+      "right": "莫名其妙",
+      "pinyin": "mo4 ming2 qi2 miao4"
+    },
+    {
+      "wrong": "莫中一是",
+      "right": "莫衷一是",
+      "pinyin": "mo4 zhong1 yi1 shi4"
+    },
+    {
+      "wrong": "谋取暴利",
+      "right": "牟取暴利",
+      "pinyin": "mou2 qu3 bao4 li4"
+    },
+    {
+      "wrong": "暮蔼沉沉",
+      "right": "暮霭沉沉",
+      "pinyin": "mu4 ai3 chen2 chen2"
+    },
+    {
+      "wrong": "目不瑕接",
+      "right": "目不暇接",
+      "pinyin": "mu4 bu4 xia2 jie1"
+    },
+    {
+      "wrong": "令人目炫",
+      "right": "令人目眩",
+      "pinyin": "ling4 ren2 mu4 xuan4"
+    },
+    {
+      "wrong": "脑羞成怒",
+      "right": "恼羞成怒",
+      "pinyin": "nao3 xiu1 cheng2 nu4"
+    },
+    {
+      "wrong": "能曲能伸",
+      "right": "能屈能伸",
+      "pinyin": "neng2 qu1 neng2 shen1"
+    },
+    {
+      "wrong": "泥砂俱下",
+      "right": "泥沙俱下",
+      "pinyin": "ni2 sha1 ju4 xia4"
+    },
+    {
+      "wrong": "消声匿迹",
+      "right": "销声匿迹",
+      "pinyin": "xiao1 sheng1 ni4 ji4"
+    },
+    {
+      "wrong": "弄巧成绌",
+      "right": "弄巧成拙",
+      "pinyin": "nong4 qiao3 cheng2 zhuo1"
+    },
+    {
+      "wrong": "盘根错结",
+      "right": "盘根错节",
+      "pinyin": "pan2 gen1 cuo4 jie2"
+    },
+    {
+      "wrong": "判若洪沟",
+      "right": "判若鸿沟",
+      "pinyin": "pan4 ruo4 hong2 gou1"
+    },
+    {
+      "wrong": "旁证博引",
+      "right": "旁征博引",
+      "pinyin": "pang2 zheng1 bo2 yin3"
+    },
+    {
+      "wrong": "如法炮治",
+      "right": "如法炮制",
+      "pinyin": "ru2 fa3 pao2 zhi4"
+    },
+    {
+      "wrong": "篷筚生辉",
+      "right": "蓬荜生辉",
+      "pinyin": "peng2 bi4 sheng1 hui1"
+    },
+    {
+      "wrong": "蓬头诟面",
+      "right": "蓬头垢面",
+      "pinyin": "peng2 tou2 gou4 mian4"
+    },
+    {
+      "wrong": "披星带月",
+      "right": "披星戴月",
+      "pinyin": "pi1 xing1 dai4 yue4"
+    },
+    {
+      "wrong": "披肝厉胆",
+      "right": "披肝沥胆",
+      "pinyin": "pi1 gan1 li4 dan3"
+    },
+    {
+      "wrong": "披艰执锐",
+      "right": "披坚执锐",
+      "pinyin": "pi1 jian1 zhi2 rui4"
+    },
+    {
+      "wrong": "披沙捡金",
+      "right": "披沙拣金",
+      "pinyin": "pi1 sha1 jian3 jin1"
+    },
+    {
+      "wrong": "辟头盖脸",
+      "right": "劈头盖脸",
+      "pinyin": "pi1 tou2 gai4 lian3"
+    },
+    {
+      "wrong": "凭心而论",
+      "right": "平心而论",
+      "pinyin": "ping2 xin1 er2 lun4"
+    },
+    {
+      "wrong": "破斧沉舟",
+      "right": "破釜沉舟",
+      "pinyin": "po4 fu3 chen2 zhou1"
+    },
+    {
+      "wrong": "迫不急待",
+      "right": "迫不及待",
+      "pinyin": "po4 bu4 ji2 dai4"
+    },
+    {
+      "wrong": "铺张扬利",
+      "right": "铺张扬厉",
+      "pinyin": "pu1 zhang1 yang2 li4"
+    },
+    {
+      "wrong": "朴朔迷离",
+      "right": "扑朔迷离",
+      "pinyin": "pu1 shuo4 mi2 li2"
+    },
+    {
+      "wrong": "文笔奇倔",
+      "right": "文笔奇崛",
+      "pinyin": "wen2 bi3 qi2 jue2"
+    },
+    {
+      "wrong": "气喘嘘嘘",
+      "right": "气喘吁吁",
+      "pinyin": "qi4 chuan3 xu1 xu1"
+    },
+    {
+      "wrong": "气极败坏",
+      "right": "气急败坏",
+      "pinyin": "qi4 ji2 bai4 huai4"
+    },
+    {
+      "wrong": "气势凶凶",
+      "right": "气势汹汹",
+      "pinyin": "qi4 shi4 xiong1 xiong1"
+    },
+    {
+      "wrong": "讫今为止",
+      "right": "迄今为止",
+      "pinyin": "qi4 jin1 wei2 zhi3"
+    },
+    {
+      "wrong": "博识恰闻",
+      "right": "博识洽闻",
+      "pinyin": "bo2 shi2 qia4 wen2"
+    },
+    {
+      "wrong": "千锤百练",
+      "right": "千锤百炼",
+      "pinyin": "qian1 chui2 bai3 lian4"
+    },
+    {
+      "wrong": "前车之戒",
+      "right": "前车之鉴",
+      "pinyin": "qian2 che1 zhi1 jian4"
+    },
+    {
+      "wrong": "深致欠意",
+      "right": "深致歉意",
+      "pinyin": "shen1 zhi4 qian4 yi4"
+    },
+    {
+      "wrong": "强词夺礼",
+      "right": "强词夺理",
+      "pinyin": "qiang3 ci2 duo2 li3"
+    },
+    {
+      "wrong": "敲榨勒索",
+      "right": "敲诈勒索",
+      "pinyin": "qiao1 zha4 le4 suo3"
+    },
+    {
+      "wrong": "巧装打扮",
+      "right": "乔装打扮",
+      "pinyin": "qiao2 zhuang1 da3 ban4"
+    },
+    {
+      "wrong": "巧夺天公",
+      "right": "巧夺天工",
+      "pinyin": "qiao3 duo2 tian1 gong1"
+    },
+    {
+      "wrong": "巧立明目",
+      "right": "巧立名目",
+      "pinyin": "qiao3 li4 ming2 mu4"
+    },
+    {
+      "wrong": "契而不舍",
+      "right": "锲而不舍",
+      "pinyin": "qie4 er2 bu4 she3"
+    },
+    {
+      "wrong": "浸人心脾",
+      "right": "沁人心脾",
+      "pinyin": "qin4 ren2 xin1 pi2"
+    },
+    {
+      "wrong": "轻歌慢舞",
+      "right": "轻歌曼舞",
+      "pinyin": "qing1 ge1 man4 wu3"
+    },
+    {
+      "wrong": "磬竹难书",
+      "right": "罄竹难书",
+      "pinyin": "qing4 zhu2 nan2 shu1"
+    },
+    {
+      "wrong": "穷兵渎武",
+      "right": "穷兵黩武",
+      "pinyin": "qiong2 bing1 du2 wu3"
+    },
+    {
+      "wrong": "趋之若骛",
+      "right": "趋之若鹜",
+      "pinyin": "qu1 zhi1 ruo4 wu4"
+    },
+    {
+      "wrong": "雀巢鸠占",
+      "right": "鹊巢鸠占",
+      "pinyin": "que4 chao2 jiu1 zhan4"
+    },
+    {
+      "wrong": "欢呼鹊跃",
+      "right": "欢呼雀跃",
+      "pinyin": "huan1 hu1 que4 yue4"
+    },
+    {
+      "wrong": "惹事生非",
+      "right": "惹是生非",
+      "pinyin": "re3 shi4 sheng1 fei1"
+    },
+    {
+      "wrong": "仁致义尽",
+      "right": "仁至义尽",
+      "pinyin": "ren2 zhi4 yi4 jin4"
+    },
+    {
+      "wrong": "色厉内忍",
+      "right": "色厉内荏",
+      "pinyin": "se4 li4 nei4 ren3"
+    },
+    {
+      "wrong": "忍劳忍怨",
+      "right": "任劳任怨",
+      "pinyin": "ren4 lao2 ren4 yuan4"
+    },
+    {
+      "wrong": "融汇贯通",
+      "right": "融会贯通",
+      "pinyin": "rong2 hui4 guan4 tong1"
+    },
+    {
+      "wrong": "耳儒目染",
+      "right": "耳濡目染",
+      "pinyin": "er3 ru2 mu4 ran3"
+    },
+    {
+      "wrong": "儒子可教",
+      "right": "孺子可教",
+      "pinyin": "ru2 zi3 ke3 jiao4"
+    },
+    {
+      "wrong": "如火如茶",
+      "right": "如火如荼",
+      "pinyin": "ru2 huo3 ru2 tu2"
+    },
+    {
+      "wrong": "如雷灌耳",
+      "right": "如雷贯耳",
+      "pinyin": "ru2 lei2 guan4 er3"
+    },
+    {
+      "wrong": "入情入礼",
+      "right": "入情入理",
+      "pinyin": "ru4 qing2 ru4 li3"
+    },
+    {
+      "wrong": "大杀风景",
+      "right": "大煞风景",
+      "pinyin": "da4 sha1 feng1 jing3"
+    },
+    {
+      "wrong": "扇风点火",
+      "right": "煽风点火",
+      "pinyin": "shan1 feng1 dian3 huo3"
+    },
+    {
+      "wrong": "山青水秀",
+      "right": "山清水秀",
+      "pinyin": "shan1 qing1 shui3 xiu4"
+    },
+    {
+      "wrong": "跚跚来迟",
+      "right": "姗姗来迟",
+      "pinyin": "shan1 shan1 lai2 chi2"
+    },
+    {
+      "wrong": "伤天害礼",
+      "right": "伤天害理",
+      "pinyin": "shang1 tian1 hai4 li3"
+    },
+    {
+      "wrong": "稍安毋躁",
+      "right": "少安毋躁",
+      "pinyin": "shao3 an1 wu2 zao4"
+    },
+    {
+      "wrong": "舍身取义",
+      "right": "舍生取义",
+      "pinyin": "she3 sheng1 qu3 yi4"
+    },
+    {
+      "wrong": "三令五伸",
+      "right": "三令五申",
+      "pinyin": "san1 ling4 wu3 shen1"
+    },
+    {
+      "wrong": "大现身手",
+      "right": "大显身手",
+      "pinyin": "da4 xian3 shen1 shou3"
+    },
+    {
+      "wrong": "伸东击西",
+      "right": "声东击西",
+      "pinyin": "sheng1 dong1 ji1 xi1"
+    },
+    {
+      "wrong": "生杀与夺",
+      "right": "生杀予夺",
+      "pinyin": "sheng1 sha1 yu3 duo2"
+    },
+    {
+      "wrong": "生死悠关",
+      "right": "生死攸关",
+      "pinyin": "sheng1 si3 you1 guan1"
+    },
+    {
+      "wrong": "歌舞生平",
+      "right": "歌舞升平",
+      "pinyin": "ge1 wu3 sheng1 ping2"
+    },
+    {
+      "wrong": "稳操胜卷",
+      "right": "稳操胜券",
+      "pinyin": "wen3 cao1 sheng4 quan4"
+    },
+    {
+      "wrong": "拾人牙惠",
+      "right": "拾人牙慧",
+      "pinyin": "shi2 ren2 ya2 hui4"
+    },
+    {
+      "wrong": "试目以待",
+      "right": "拭目以待",
+      "pinyin": "shi4 mu4 yi3 dai4"
+    },
+    {
+      "wrong": "持才傲物",
+      "right": "恃才傲物",
+      "pinyin": "shi4 cai2 ao4 wu4"
+    },
+    {
+      "wrong": "世外桃园",
+      "right": "世外桃源",
+      "pinyin": "shi4 wai4 tao2 yuan2"
+    },
+    {
+      "wrong": "誓不两立",
+      "right": "势不两立",
+      "pinyin": "shi4 bu4 liang3 li4"
+    },
+    {
+      "wrong": "势均力抵",
+      "right": "势均力敌",
+      "pinyin": "shi4 jun1 li4 di2"
+    },
+    {
+      "wrong": "势如爆竹",
+      "right": "势如破竹",
+      "pinyin": "shi4 ru2 po4 zhu2"
+    },
+    {
+      "wrong": "事得其反",
+      "right": "适得其反",
+      "pinyin": "shi4 de2 qi2 fan3"
+    },
+    {
+      "wrong": "手屈一指",
+      "right": "首屈一指",
+      "pinyin": "shou3 qu1 yi1 zhi3"
+    },
+    {
+      "wrong": "眼急手快",
+      "right": "眼疾手快",
+      "pinyin": "yan3 ji2 shou3 kuai4"
+    },
+    {
+      "wrong": "水泻不通",
+      "right": "水泄不通",
+      "pinyin": "shui3 xie4 bu4 tong1"
+    },
+    {
+      "wrong": "死心踏地",
+      "right": "死心塌地",
+      "pinyin": "si3 xin1 ta1 di4"
+    },
+    {
+      "wrong": "悚人听闻",
+      "right": "耸人听闻",
+      "pinyin": "song3 ren2 ting1 wen2"
+    },
+    {
+      "wrong": "追本朔源",
+      "right": "追本溯源",
+      "pinyin": "zhui1 ben3 su4 yuan2"
+    },
+    {
+      "wrong": "素昧平身",
+      "right": "素昧平生",
+      "pinyin": "su4 mei4 ping2 sheng1"
+    },
+    {
+      "wrong": "随声附合",
+      "right": "随声附和",
+      "pinyin": "sui2 sheng1 fu4 he4"
+    },
+    {
+      "wrong": "贪脏枉法",
+      "right": "贪赃枉法",
+      "pinyin": "tan1 zang1 wang3 fa3"
+    },
+    {
+      "wrong": "谈笑风声",
+      "right": "谈笑风生",
+      "pinyin": "tan2 xiao4 feng1 sheng1"
+    },
+    {
+      "wrong": "昙花一显",
+      "right": "昙花一现",
+      "pinyin": "tan2 hua1 yi1 xian4"
+    },
+    {
+      "wrong": "坦胸露臂",
+      "right": "袒胸露臂",
+      "pinyin": "tan3 xiong1 lu4 bi4"
+    },
+    {
+      "wrong": "叹为观之",
+      "right": "叹为观止",
+      "pinyin": "tan4 wei2 guan1 zhi3"
+    },
+    {
+      "wrong": "题纲挈领",
+      "right": "提纲挈领",
+      "pinyin": "ti2 gang1 qie4 ling3"
+    },
+    {
+      "wrong": "天经地仪",
+      "right": "天经地义",
+      "pinyin": "tian1 jing1 di4 yi4"
+    },
+    {
+      "wrong": "挺而走险",
+      "right": "铤而走险",
+      "pinyin": "ting3 er2 zou3 xian3"
+    },
+    {
+      "wrong": "通货膨涨",
+      "right": "通货膨胀",
+      "pinyin": "tong1 huo4 peng2 zhang4"
+    },
+    {
+      "wrong": "通情达礼",
+      "right": "通情达理",
+      "pinyin": "tong1 qing2 da2 li3"
+    },
+    {
+      "wrong": "异曲同功",
+      "right": "异曲同工",
+      "pinyin": "yi4 qu3 tong2 gong1"
+    },
+    {
+      "wrong": "痛心嫉首",
+      "right": "痛心疾首",
+      "pinyin": "tong4 xin1 ji2 shou3"
+    },
+    {
+      "wrong": "偷工简料",
+      "right": "偷工减料",
+      "pinyin": "tou1 gong1 jian3 liao4"
+    },
+    {
+      "wrong": "走头无路",
+      "right": "走投无路",
+      "pinyin": "zou3 tou2 wu2 lu4"
+    },
+    {
+      "wrong": "图谋不规",
+      "right": "图谋不轨",
+      "pinyin": "tu2 mou2 bu4 gui3"
+    },
+    {
+      "wrong": "图穷匕现",
+      "right": "图穷匕见",
+      "pinyin": "tu2 qiong2 bi3 xian4"
+    },
+    {
+      "wrong": "生灵涂碳",
+      "right": "生灵涂炭",
+      "pinyin": "sheng1 ling2 tu2 tan4"
+    },
+    {
+      "wrong": "推陈相见",
+      "right": "推诚相见",
+      "pinyin": "tui1 cheng2 xiang1 jian4"
+    },
+    {
+      "wrong": "退化变质",
+      "right": "蜕化变质",
+      "pinyin": "tui4 hua4 bian4 zhi4"
+    },
+    {
+      "wrong": "完壁归赵",
+      "right": "完璧归赵",
+      "pinyin": "wan2 bi4 gui1 zhao4"
+    },
+    {
+      "wrong": "万籁具寂",
+      "right": "万籁俱寂",
+      "pinyin": "wan4 lai4 ju4 ji4"
+    },
+    {
+      "wrong": "置若惘闻",
+      "right": "置若罔闻",
+      "pinyin": "zhi4 ruo4 wang3 wen2"
+    },
+    {
+      "wrong": "委屈求全",
+      "right": "委曲求全",
+      "pinyin": "wei3 qu1 qiu2 quan2"
+    },
+    {
+      "wrong": "文恬武嘻",
+      "right": "文恬武嬉",
+      "pinyin": "wen2 tian2 wu3 xi1"
+    },
+    {
+      "wrong": "有条不稳",
+      "right": "有条不紊",
+      "pinyin": "you3 tiao2 bu4 wen3"
+    },
+    {
+      "wrong": "左右开工",
+      "right": "左右开弓",
+      "pinyin": "zuo3 you4 kai1 gong1"
+    },
+    {
+      "wrong": "坐地分脏",
+      "right": "坐地分赃",
+      "pinyin": "zuo4 di4 fen1 zang1"
+    },
+    {
+      "wrong": "谆谆告戒",
+      "right": "谆谆告诫",
+      "pinyin": "zhun1 zhun1 gao4 jie4"
+    },
+    {
+      "wrong": "指手划脚",
+      "right": "指手画脚",
+      "pinyin": "zhi3 shou3 hua4 jiao3"
+    },
+    {
+      "wrong": "珍重其事",
+      "right": "郑重其事",
+      "pinyin": "zheng4 zhong4 qi2 shi4"
+    },
+    {
+      "wrong": "步入正规",
+      "right": "步入正轨",
+      "pinyin": "bu4 ru4 zheng4 gui3"
+    },
+    {
+      "wrong": "知书达礼",
+      "right": "知书达理",
+      "pinyin": "zhi1 shu1 da2 li3"
+    },
+    {
+      "wrong": "直接了当",
+      "right": "直截了当",
+      "pinyin": "zhi2 jie2 liao3 dang4"
+    },
+    {
+      "wrong": "直言不晦",
+      "right": "直言不讳",
+      "pinyin": "zhi2 yan2 bu4 hui4"
+    },
+    {
+      "wrong": "专心至志",
+      "right": "专心致志",
+      "pinyin": "zhuan1 xin1 zhi4 zhi4"
+    },
+    {
+      "wrong": "灸手可热",
+      "right": "炙手可热",
+      "pinyin": "zhi4 shou3 ke3 re4"
+    },
+    {
+      "wrong": "中流抵柱",
+      "right": "中流砥柱",
+      "pinyin": "zhong1 liu2 di3 zhu4"
+    },
+    {
+      "wrong": "远见灼识",
+      "right": "远见卓识",
+      "pinyin": "yuan3 jian4 zhuo2 shi2"
+    },
+    {
+      "wrong": "真象大白",
+      "right": "真相大白",
+      "pinyin": "zhen1 xiang4 da4 bai2"
+    },
+    {
+      "wrong": "招惹事非",
+      "right": "招惹是非",
+      "pinyin": "zhao1 re3 shi4 fei1"
+    },
+    {
+      "wrong": "斩钉接铁",
+      "right": "斩钉截铁",
+      "pinyin": "zhan3 ding1 jie2 tie3"
+    },
+    {
+      "wrong": "口干舌躁",
+      "right": "口干舌燥",
+      "pinyin": "kou3 gan1 she2 zao4"
+    },
+    {
+      "wrong": "不骄不燥",
+      "right": "不骄不躁",
+      "pinyin": "bu4 jiao1 bu4 zao4"
+    },
+    {
+      "wrong": "再接再励",
+      "right": "再接再厉",
+      "pinyin": "zai4 jie1 zai4 li4"
+    },
+    {
+      "wrong": "栽脏陷害",
+      "right": "栽赃陷害",
+      "pinyin": "zai1 zang1 xian4 hai4"
+    },
+    {
+      "wrong": "陨身不恤",
+      "right": "殒身不恤",
+      "pinyin": "yun3 shen1 bu4 xu4"
+    },
+    {
+      "wrong": "语无论次",
+      "right": "语无伦次",
+      "pinyin": "yu3 wu2 lun2 ci4"
+    },
+    {
+      "wrong": "怨天犹人",
+      "right": "怨天尤人",
+      "pinyin": "yuan4 tian1 you2 ren2"
+    },
+    {
+      "wrong": "利害悠关",
+      "right": "利害攸关",
+      "pinyin": "li4 hai4 you1 guan1"
+    },
+    {
+      "wrong": "犹柔寡断",
+      "right": "优柔寡断",
+      "pinyin": "you1 rou2 gua3 duan4"
+    },
+    {
+      "wrong": "义气用事",
+      "right": "意气用事",
+      "pinyin": "yi4 qi4 yong4 shi4"
+    },
+    {
+      "wrong": "始作踊者",
+      "right": "始作俑者",
+      "pinyin": "shi3 zuo4 yong3 zhe3"
+    },
+    {
+      "wrong": "涌跃报名",
+      "right": "踊跃报名",
+      "pinyin": "yong3 yue4 bao4 ming2"
+    },
+    {
+      "wrong": "永往直前",
+      "right": "勇往直前",
+      "pinyin": "yong3 wang3 zhi2 qian2"
+    },
+    {
+      "wrong": "绿草如荫",
+      "right": "绿草如茵",
+      "pinyin": "lv4 cao3 ru2 yin1"
+    },
+    {
+      "wrong": "因地治宜",
+      "right": "因地制宜",
+      "pinyin": "yin1 di4 zhi4 yi2"
+    },
+    {
+      "wrong": "因才施教",
+      "right": "因材施教",
+      "pinyin": "yin1 cai2 shi1 jiao4"
+    },
+    {
+      "wrong": "义无返顾",
+      "right": "义无反顾",
+      "pinyin": "yi4 wu2 fan3 gu4"
+    },
+    {
+      "wrong": "受益非浅",
+      "right": "受益匪浅",
+      "pinyin": "shou4 yi4 fei3 qian3"
+    },
+    {
+      "wrong": "词不达义",
+      "right": "词不达意",
+      "pinyin": "ci2 bu4 da2 yi4"
+    },
+    {
+      "wrong": "以逸代劳",
+      "right": "以逸待劳",
+      "pinyin": "yi3 yi4 dai4 lao2"
+    },
+    {
+      "wrong": "一如继往",
+      "right": "一如既往",
+      "pinyin": "yi1 ru2 ji4 wang3"
+    },
+    {
+      "wrong": "一喏千金",
+      "right": "一诺千金",
+      "pinyin": "yi1 nuo4 qian1 jin1"
+    },
+    {
+      "wrong": "一劳永易",
+      "right": "一劳永逸",
+      "pinyin": "yi1 lao2 yong3 yi4"
+    },
+    {
+      "wrong": "一脉相成",
+      "right": "一脉相承",
+      "pinyin": "yi1 mai4 xiang1 cheng2"
+    },
+    {
+      "wrong": "一獗不振",
+      "right": "一蹶不振",
+      "pinyin": "yi1 jue2 bu4 zhen4"
+    },
+    {
+      "wrong": "一盖而论",
+      "right": "一概而论",
+      "pinyin": "yi1 gai4 er2 lun4"
+    },
+    {
+      "wrong": "一促而就",
+      "right": "一蹴而就",
+      "pinyin": "yi1 cu4 er2 jiu4"
+    },
+    {
+      "wrong": "一层不变",
+      "right": "一成不变",
+      "pinyin": "yi1 cheng2 bu4 bian4"
+    },
+    {
+      "wrong": "跃武扬威",
+      "right": "耀武扬威",
+      "pinyin": "yao4 wu3 yang2 wei1"
+    },
+    {
+      "wrong": "沓无音信",
+      "right": "杳无音信",
+      "pinyin": "yao3 wu2 yin1 xin4"
+    },
+    {
+      "wrong": "指高气扬",
+      "right": "趾高气扬",
+      "pinyin": "zhi3 gao1 qi4 yang2"
+    },
+    {
+      "wrong": "眼花撩乱",
+      "right": "眼花缭乱",
+      "pinyin": "yan3 hua1 liao2 luan4"
+    },
+    {
+      "wrong": "严正申明",
+      "right": "严正声明",
+      "pinyin": "yan2 zheng4 sheng1 ming2"
+    },
+    {
+      "wrong": "严阵以代",
+      "right": "严阵以待",
+      "pinyin": "yan2 zhen4 yi3 dai4"
+    },
+    {
+      "wrong": "言不由中",
+      "right": "言不由衷",
+      "pinyin": "yan2 bu4 you2 zhong1"
+    },
+    {
+      "wrong": "淹没无闻",
+      "right": "湮没无闻",
+      "pinyin": "yan1 mo4 wu2 wen2"
+    },
+    {
+      "wrong": "雪中送碳",
+      "right": "雪中送炭",
+      "pinyin": "xue3 zhong1 song4 tan4"
+    },
+    {
+      "wrong": "喧然大波",
+      "right": "轩然大波",
+      "pinyin": "xuan1 ran2 da4 bo1"
+    },
+    {
+      "wrong": "千头万序",
+      "right": "千头万绪",
+      "pinyin": "qian1 tou2 wan4 xu4"
+    },
+    {
+      "wrong": "诩诩如生",
+      "right": "栩栩如生",
+      "pinyin": "xu3 xu3 ru2 sheng1"
+    },
+    {
+      "wrong": "大相径廷",
+      "right": "大相径庭",
+      "pinyin": "da4 xiang1 jing4 ting2"
+    },
+    {
+      "wrong": "吁寒问暖",
+      "right": "嘘寒问暖",
+      "pinyin": "xu1 han2 wen4 nuan3"
+    },
+    {
+      "wrong": "一泄千里",
+      "right": "一泻千里",
+      "pinyin": "yi1 xie4 qian1 li3"
+    },
+    {
+      "wrong": "沆泄一气",
+      "right": "沆瀣一气",
+      "pinyin": "hang4 xie4 yi1 qi4"
+    },
+    {
+      "wrong": "心安礼得",
+      "right": "心安理得",
+      "pinyin": "xin1 an1 li3 de2"
+    },
+    {
+      "wrong": "别出新裁",
+      "right": "别出心裁",
+      "pinyin": "bie2 chu1 xin1 cai2"
+    },
+    {
+      "wrong": "心旷神饴",
+      "right": "心旷神怡",
+      "pinyin": "xin1 kuang4 shen2 yi2"
+    },
+    {
+      "wrong": "凶相必露",
+      "right": "凶相毕露",
+      "pinyin": "xiong1 xiang4 bi4 lu4"
+    },
+    {
+      "wrong": "直抒胸意",
+      "right": "直抒胸臆",
+      "pinyin": "zhi2 shu1 xiong1 yi4"
+    },
+    {
+      "wrong": "修养生息",
+      "right": "休养生息",
+      "pinyin": "xiu1 yang3 sheng1 xi1"
+    },
+    {
+      "wrong": "修茸一新",
+      "right": "修葺一新",
+      "pinyin": "xiu1 qi4 yi1 xin1"
+    },
+    {
+      "wrong": "秀外惠中",
+      "right": "秀外慧中",
+      "pinyin": "xiu4 wai4 hui4 zhong1"
+    },
+    {
+      "wrong": "白头携老",
+      "right": "白头偕老",
+      "pinyin": "bai2 tou2 xie2 lao3"
+    },
+    {
+      "wrong": "一望无银",
+      "right": "一望无垠",
+      "pinyin": "yi1 wang4 wu2 yin2"
+    },
+    {
+      "wrong": "不拘小结",
+      "right": "不拘小节",
+      "pinyin": "bu4 ju1 xiao3 jie2"
+    },
+    {
+      "wrong": "响彻云宵",
+      "right": "响彻云霄",
+      "pinyin": "xiang3 che4 yun2 xiao1"
+    },
+    {
+      "wrong": "相形见拙",
+      "right": "相形见绌",
+      "pinyin": "xiang1 xing2 jian4 chu4"
+    },
+    {
+      "wrong": "喜出往外",
+      "right": "喜出望外",
+      "pinyin": "xi3 chu1 wang4 wai4"
+    },
+    {
+      "wrong": "无泄可击",
+      "right": "无懈可击",
+      "pinyin": "wu2 xie4 ke3 ji1"
+    },
+    {
+      "wrong": "无所是从",
+      "right": "无所适从",
+      "pinyin": "wu2 suo3 shi4 cong2"
+    },
+    {
+      "wrong": "无尚光荣",
+      "right": "无上光荣",
+      "pinyin": "wu2 shang4 guang1 rong2"
+    },
+    {
+      "wrong": "天翻地复",
+      "right": "天翻地覆",
+      "pinyin": "tian1 fan1 di4 fu4"
+    },
+    {
+      "wrong": "震憾人心",
+      "right": "震撼人心",
+      "pinyin": "zhen4 han4 ren2 xin1"
+    },
+    {
+      "wrong": "娇揉造作",
+      "right": "矫揉造作",
+      "pinyin": "jiao3 rou2 zao4 zuo4"
+    },
+    {
+      "wrong": "不落巢臼",
+      "right": "不落窠臼",
+      "pinyin": "bu4 luo4 ke1 jiu4"
+    },
+    {
+      "wrong": "烩炙人口",
+      "right": "脍炙人口",
+      "pinyin": "kuai4 zhi4 ren2 kou3"
+    },
+    {
+      "wrong": "黄梁美梦",
+      "right": "黄粱美梦",
+      "pinyin": "huang2 liang2 mei3 meng4"
+    },
+    {
+      "wrong": "美仑美奂",
+      "right": "美轮美奂",
+      "pinyin": "mei3 lun2 mei3 huan4"
+    },
+    {
+      "wrong": "默守成规",
+      "right": "墨守成规",
+      "pinyin": "mo4 shou3 cheng2 gui1"
+    },
+    {
+      "wrong": "鞠躬尽粹",
+      "right": "鞠躬尽瘁",
+      "pinyin": "ju1 gong1 jin4 cui4"
+    },
+    {
+      "wrong": "明辩是非",
+      "right": "明辨是非",
+      "pinyin": "ming2 bian4 shi4 fei1"
+    },
+    {
+      "wrong": "脉博微弱",
+      "right": "脉搏微弱",
+      "pinyin": "mai4 bo2 wei1 ruo4"
+    },
+    {
+      "wrong": "浪废金钱",
+      "right": "浪费金钱",
+      "pinyin": "lang4 fei4 jin1 qian2"
+    },
+    {
+      "wrong": "官运享通",
+      "right": "官运亨通",
+      "pinyin": "guan1 yun4 heng1 tong1"
+    },
+    {
+      "wrong": "心恢意懒",
+      "right": "心灰意懒",
+      "pinyin": "xin1 hui1 yi4 lan3"
+    },
+    {
+      "wrong": "临摩书法",
+      "right": "临摹书法",
+      "pinyin": "lin2 mo2 shu1 fa3"
+    },
+    {
+      "wrong": "事过景迁",
+      "right": "事过境迁",
+      "pinyin": "shi4 guo4 jing4 qian1"
+    },
+    {
+      "wrong": "精精业业",
+      "right": "兢兢业业",
+      "pinyin": "jing1 jing1 ye4 ye4"
+    },
+    {
+      "wrong": "安兵不动",
+      "right": "按兵不动",
+      "pinyin": "an4 bing1 bu4 dong4"
+    },
+    {
+      "wrong": "肺腹之言",
+      "right": "肺腑之言",
+      "pinyin": "fei4 fu3 zhi1 yan2"
+    },
+    {
+      "wrong": "如梗在喉",
+      "right": "如鲠在喉",
+      "pinyin": "ru2 geng3 zai4 hou2"
+    },
+    {
+      "wrong": "浮想连翩",
+      "right": "浮想联翩",
+      "pinyin": "fu2 xiang3 lian2 pian1"
+    },
+    {
+      "wrong": "名珠暗投",
+      "right": "明珠暗投",
+      "pinyin": "ming2 zhu1 an4 tou2"
+    },
+    {
+      "wrong": "各书己见",
+      "right": "各抒己见",
+      "pinyin": "ge4 shu1 ji3 jian4"
+    },
+    {
+      "wrong": "应接不遐",
+      "right": "应接不暇",
+      "pinyin": "ying4 jie1 bu4 xia2"
+    },
+    {
+      "wrong": "察颜观色",
+      "right": "察言观色",
+      "pinyin": "cha2 yan2 guan1 se4"
+    },
+    {
+      "wrong": "万马齐暗",
+      "right": "万马齐喑",
+      "pinyin": "wan4 ma3 qi2 yin1"
+    },
+    {
+      "wrong": "以身作责",
+      "right": "以身作则",
+      "pinyin": "yi3 shen1 zuo4 ze2"
+    },
+    {
+      "wrong": "闲情逸志",
+      "right": "闲情逸致",
+      "pinyin": "xian2 qing2 yi4 zhi4"
+    },
+    {
+      "wrong": "一见衷情",
+      "right": "一见钟情",
+      "pinyin": "yi1 jian4 zhong1 qing2"
+    },
+    {
+      "wrong": "揣揣不安",
+      "right": "惴惴不安",
+      "pinyin": "zhui4 zhui4 bu4 an1"
+    },
+    {
+      "wrong": "摇摇欲堕",
+      "right": "摇摇欲坠",
+      "pinyin": "yao2 yao2 yu4 zhui4"
+    },
+    {
+      "wrong": "原形必露",
+      "right": "原形毕露",
+      "pinyin": "yuan2 xing2 bi4 lu4"
+    },
+    {
+      "wrong": "远大报负",
+      "right": "远大抱负",
+      "pinyin": "yuan3 da4 bao4 fu4"
+    },
+    {
+      "wrong": "蓄意抱复",
+      "right": "蓄意报复",
+      "pinyin": "xu4 yi4 bao4 fu4"
+    },
+    {
+      "wrong": "以德抱怨",
+      "right": "以德报怨",
+      "pinyin": "yi3 de2 bao4 yuan4"
+    },
+    {
+      "wrong": "深受蒙敝",
+      "right": "深受蒙蔽",
+      "pinyin": "shen1 shou4 meng2 bi4"
+    },
+    {
+      "wrong": "蔽帚自珍",
+      "right": "敝帚自珍",
+      "pinyin": "bi4 zhou3 zi4 zhen1"
+    },
+    {
+      "wrong": "良晨美景",
+      "right": "良辰美景",
+      "pinyin": "liang2 chen2 mei3 jing3"
+    },
+    {
+      "wrong": "璀烂夺目",
+      "right": "璀璨夺目",
+      "pinyin": "cui3 can4 duo2 mu4"
+    },
+    {
+      "wrong": "神彩飞扬",
+      "right": "神采飞扬",
+      "pinyin": "shen2 cai3 fei1 yang2"
+    },
+    {
+      "wrong": "连篇累椟",
+      "right": "连篇累牍",
+      "pinyin": "lian2 pian1 lei3 du2"
+    },
+    {
+      "wrong": "买牍还珠",
+      "right": "买椟还珠",
+      "pinyin": "mai3 du2 huan2 zhu1"
+    },
+    {
+      "wrong": "老实本份",
+      "right": "老实本分",
+      "pinyin": "lao3 shi2 ben3 fen4"
+    },
+    {
+      "wrong": "认罪服法",
+      "right": "认罪伏法",
+      "pinyin": "ren4 zui4 fu2 fa3"
+    }
+  ]
+}

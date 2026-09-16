@@ -1,0 +1,138 @@
+{
+  "schema_version": "feedback-skill-v1",
+  "id": "chinese-primary4-question",
+  "version": "1.0.0",
+  "kind": "specialized",
+  "compatible_schema": "feedback-context-v2",
+  "subject_scope": [
+    "chinese"
+  ],
+  "education_scope": [
+    "primary"
+  ],
+  "material_scope": [
+    "homework",
+    "exam"
+  ],
+  "unit_scope": [
+    "question"
+  ],
+  "grades": [
+    4
+  ],
+  "priority": 10,
+  "coverage_status": "offline_only",
+  "rules": [
+    {
+      "id": "chinese-grade-rules",
+      "stages": [
+        "grade",
+        "cross_page"
+      ],
+      "condition": "always",
+      "text_key": "chinese-grade-rules",
+      "evaluation_item": "chinese-grade-rules",
+      "refines": [],
+      "conflicts": [],
+      "source": "subject_prompt_rules.py:CHINESE_GRADE_RULES"
+    },
+    {
+      "id": "chinese-slash-tianzige-rules",
+      "stages": [
+        "grade",
+        "review"
+      ],
+      "condition": "always",
+      "text_key": "chinese-slash-tianzige-rules",
+      "evaluation_item": "chinese-slash-tianzige-rules",
+      "refines": [],
+      "conflicts": [],
+      "source": "subject_prompt_rules.py:CHINESE_SLASH_TIANZIGE_RULES"
+    },
+    {
+      "id": "chinese-pronunciation-selection-detect-rules",
+      "stages": [
+        "detect"
+      ],
+      "condition": "always",
+      "text_key": "chinese-pronunciation-selection-detect-rules",
+      "evaluation_item": "chinese-pronunciation-selection-detect-rules",
+      "refines": [],
+      "conflicts": [],
+      "source": "subject_prompt_rules.py:CHINESE_PRONUNCIATION_SELECTION_DETECT_RULES"
+    },
+    {
+      "id": "chinese-pronunciation-selection-grade-rules",
+      "stages": [
+        "grade"
+      ],
+      "condition": "chinese_pronunciation_slots",
+      "text_key": "chinese-pronunciation-selection-grade-rules",
+      "evaluation_item": "chinese-pronunciation-selection-grade-rules",
+      "refines": [],
+      "conflicts": [],
+      "source": "subject_prompt_rules.py:CHINESE_PRONUNCIATION_SELECTION_GRADE_RULES"
+    },
+    {
+      "id": "chinese-sentence-contraction-page-rules",
+      "stages": [
+        "grade"
+      ],
+      "condition": "chinese_sentence_contraction",
+      "text_key": "chinese-sentence-contraction-page-rules",
+      "evaluation_item": "chinese-sentence-contraction-page-rules",
+      "refines": [],
+      "conflicts": [],
+      "source": "subject_prompt_rules.py:CHINESE_SENTENCE_CONTRACTION_PAGE_RULES"
+    },
+    {
+      "id": "chinese-review-rules",
+      "stages": [
+        "review"
+      ],
+      "condition": "always",
+      "text_key": "chinese-review-rules",
+      "evaluation_item": "chinese-review-rules",
+      "refines": [],
+      "conflicts": [],
+      "source": "subject_prompt_rules.py:CHINESE_REVIEW_RULES"
+    },
+    {
+      "id": "chinese-cross-page-suffix",
+      "stages": [
+        "detect"
+      ],
+      "condition": "always",
+      "text_key": "chinese-cross-page-suffix",
+      "evaluation_item": "chinese-cross-page-suffix",
+      "refines": [],
+      "conflicts": [],
+      "source": "prompts.py:CHINESE_CROSS_PAGE_SUFFIX"
+    },
+    {
+      "id": "-uncertain-rules[chinese]",
+      "stages": [
+        "grade"
+      ],
+      "condition": "always",
+      "text_key": "-uncertain-rules[chinese]",
+      "evaluation_item": "-uncertain-rules[chinese]",
+      "refines": [],
+      "conflicts": [],
+      "source": "prompts.py:_UNCERTAIN_RULES[chinese]"
+    },
+    {
+      "id": "-subject-hints[chinese]",
+      "stages": [
+        "grade",
+        "review"
+      ],
+      "condition": "always",
+      "text_key": "-subject-hints[chinese]",
+      "evaluation_item": "-subject-hints[chinese]",
+      "refines": [],
+      "conflicts": [],
+      "source": "prompts.py:_SUBJECT_HINTS[chinese]"
+    }
+  ]
+}

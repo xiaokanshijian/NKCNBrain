@@ -1,0 +1,363 @@
+from django.urls import path, re_path
+
+from app_chat import views
+from app_chat import interrupt_views
+from app_chat import document_todo_views
+from app_chat import views_fuse_keywords
+from app_chat import views_generate_output_article
+from app_chat import views_tribal_knowledge
+from app_chat import views_group_twin_gxx
+from app_chat import views_card_image
+from app_chat import views_card_html
+from app_chat import views_continuous_image
+from app_chat import views_ci_feedback
+from app_chat import bodyhealth_edge_views
+from app_chat import views_feishu_ta_qa
+from app_chat import views_seed_gongsheng
+from app_chat import views_semantic_reorganize
+from app_chat import views_task_cluster
+from app_chat import views_scene_cluster_semantic
+from app_chat import views_notebook_memory
+from app_chat.feedback_material_settings import material_settings
+
+urlpatterns = [
+    re_path(r'^test$', views.test),  # 必须精确匹配路径 "test"，避免 task_id 含 "test" 时误匹配（如 tribal_testlyf_xxx）
+    re_path('upload_audio', views.test_upload_audio),
+    re_path('get_speech_text', views.test_get_speech_text),
+    re_path('asr_chat_send$', views.asr_chat_send),
+    re_path('asr_chat_send_unicast', views.asr_chat_send_unicast),
+    re_path('get_next_segment', views.get_next_segment),
+    re_path('audio_stream', views.audio_stream),
+    # re_path('send_like', views.send_like),
+    # re_path('request_abstract', views.get_model_stats),
+    re_path('request_base_info', views.get_model_base_info),
+    re_path('request_model_list', views.request_model_list),
+    re_path('update_model_list', views.update_model_list),
+    re_path('delete_model', views.delete_model),
+    re_path('force_chroma_unlock', views.force_chroma_unlock),
+    re_path('get_chroma_status', views.get_chroma_status),
+    re_path('get_chroma_logs', views.get_chroma_logs),
+
+    # re_path('chat_send$', views.chat_send),
+    re_path('question_enhance', views.question_enhance),
+
+    re_path('normal_chat_send$', views.normal_chat_send),
+    re_path('normal_chat_send_up$', views.normal_chat_send_up),
+    re_path('normal_chat_send_down$', views.normal_chat_send_down),
+
+    re_path('GPT4_chat_send$', views.gpt_chat_send),
+    re_path('Gemini_chat_send$', views.gemini_chat_send),
+    re_path('Claude3.5_chat_send$', views.claude_chat_send),
+    re_path('Deepseek_chat_send$', views.deepseek_chat_send),
+    re_path('Llama3_chat_send$', views.llama_chat_send),
+    re_path('Kimi_chat_send$', views.kimi_chat_send),
+    re_path('Deepseek-reasoner_chat_send$', views.dsreasoner_chat_send),
+    re_path('Qwq_chat_send$', views.qwq_chat_send),
+
+    # 重做模型回答API接口
+    re_path('retry_model_response$', views.retry_model_response),
+    re_path('update_chat_history$', views.update_chat_history),
+    
+    re_path('rel_questions_request$', views.rel_questions_request),
+    re_path('card_rel_questions_request$', views.card_rel_questions_request),
+    re_path('get_depth_suggestion$', views.get_depth_suggestion),
+    
+    re_path('chat_upload', views.chat_upload),
+    re_path('check_pdf_image_processing_status$', views.check_pdf_image_processing_status),
+    re_path('prompt_upload', views.prompt_upload),
+    re_path('card_upload', views.card_upload),
+    re_path('card_fill_semantic_keywords$', views.card_fill_semantic_keywords),
+    re_path('card_updateContentById', views.card_updateContentById),
+    re_path('card_tidyUpById', views.card_tidyUpById),
+    re_path('card_backVersionById', views.card_backVersionById),
+    re_path('card_score', views.card_score),
+    re_path('card_getAllUserFiles', views.card_getAllUserFiles),
+    re_path('card_getFileByName', views.card_getFileByName),
+    re_path('get_file_summary', views.get_file_summary),
+    re_path('get_model_eval', views.get_model_eval),
+    re_path('card_getImgText', views.card_getImgText),
+    re_path('update_img_text_stream', views.update_img_text_stream),
+    re_path('card_updateImgText', views.card_updateImgText),
+    re_path('card_getTextByName', views.card_getTextByName),
+    re_path('card_getAllUserCards', views.card_getAllUserCards),
+    re_path('card_getFilteredCards', views.card_getFilteredCards),
+    re_path('card_getCardById', views.card_getCardById),
+    re_path('card_setCardById', views.card_setCardById),
+    re_path('card_updatePostIndex', views.card_updatePostIndex),
+    re_path('card_updateType', views.card_updateType),
+    re_path('getCardsContentByIds', views.getCardsContentByIds),
+    re_path('getCardHistory', views.getCardHistory),
+    re_path('getLastContent', views.getLastContent),
+
+    re_path('card_html_exists', views_card_html.card_html_exists),
+    re_path('card_html_generate', views_card_html.card_html_generate),
+    re_path('card_html_view', views_card_html.card_html_view),
+    re_path('card_html_raw', views_card_html.card_html_raw),
+    re_path('card_html_feedback_submit$', views_card_html.card_html_feedback_submit),
+    re_path('card_html_feedback_summary$', views_card_html.card_html_feedback_summary),
+    re_path('card_html_telemetry.js$', views_card_html.card_html_telemetry_js),
+    re_path('card_html_telemetry_diag$', views_card_html.card_html_telemetry_diag),
+    re_path('card_feedback_html_view$', views_card_html.card_feedback_html_view),
+    re_path('card_ta_feedback$', views_card_html.card_ta_feedback),
+    re_path('card_html_ta_feedback.js$', views_card_html.card_html_ta_feedback_js),
+    re_path('card_html_group_feedback$', views_card_html.card_html_group_feedback),
+    re_path('card_html_iterate$', views_card_html.card_html_iterate),
+    re_path('card_html_revert$', views_card_html.card_html_revert),
+
+    re_path('card_generate_four_color_images', views_card_image.card_generate_four_color_images),
+    re_path('card_get_image_generating_status', views_card_image.card_get_image_generating_status),
+    re_path('card_generate_single_card_image', views_card_image.card_generate_single_card_image),
+    re_path('card_iterate_card_image', views_card_image.card_iterate_card_image),
+    re_path('card_generate_overlay_test_layer', views_card_image.card_generate_overlay_test_layer),
+    re_path('card_get_overlay_test_layer_status', views_card_image.card_get_overlay_test_layer_status),
+    re_path('card_overlay_submit_qa_composite', views_card_image.card_overlay_submit_qa_composite),
+    re_path('card_overlay_skip_qa_composite', views_card_image.card_overlay_skip_qa_composite),
+    re_path('card_get_overlay_test_base_image', views_card_image.card_get_overlay_test_base_image),
+    re_path('card_get_overlay_test_history', views_card_image.card_get_overlay_test_history),
+    re_path('card_save_overlay_custom_base_image', views_card_image.card_save_overlay_custom_base_image),
+    re_path('card_save_overlay_layer_file', views_card_image.card_save_overlay_layer_file),
+    re_path('card_overlay_detect_red_boxes_json', views_card_image.card_overlay_detect_red_boxes_json),
+    re_path('card_dmt_overlay_prompt_stream', views_card_image.card_dmt_overlay_prompt_stream),
+    re_path('card_iterate_overlay_test_layer', views_card_image.card_iterate_overlay_test_layer),
+    re_path('card_apply_overlay_test_layer', views_card_image.card_apply_overlay_test_layer),
+    re_path('card_revert_iterate_card_image', views_card_image.card_revert_iterate_card_image),
+    re_path('card_list_ci_analyses_for_feedback', views_ci_feedback.card_list_ci_analyses_for_feedback),
+    re_path('card_ci_feedback_iterate_content', views_ci_feedback.card_ci_feedback_iterate_content),
+    
+    re_path('chat_switch', views.chat_switch),
+    re_path('chat_sendParams', views.chat_sendParams),
+    re_path('chat_sendSuperParams', views.chat_sendSuperParams),
+    
+    re_path('qa_upload', views.qa_upload),
+    re_path('good_data_upload', views.good_data_upload),
+    re_path('get_backdata', views.get_backdata),
+    re_path('img_getTopics', views.img_getTopics),
+    re_path('topic_getRelQuestions', views.topic_getRelQuestions),
+    re_path('user_getSceneParams', views.user_getSceneParams),
+    re_path('user_setSceneParams', views.user_setSceneParams),
+    # re_path('pdf/', views.pdf_stream_handler, name='pdf_stream_handler'),
+    re_path('pdf/', views.serve_pdf, name='serve_pdf'),
+    re_path('check_ocr_origin_converted_pdf', views.check_ocr_origin_converted_pdf),
+    re_path('check_ocr_converted_pdf', views.check_ocr_converted_pdf),
+    re_path('check-translation/', views.check_translation_status, name='check_translation_status'),
+    re_path('agent_LUI1', views.agent_LUI1),
+    re_path('agent_LUI2', views.agent_LUI2),
+    re_path('reget_topics', views.reget_topics),
+    re_path('reget_ques', views.reget_ques),
+    re_path('generate_bgc', views.generate_bgc),
+    re_path('send_bgc_card', views.send_bgc_card),
+    re_path('get_bgc_card', views.get_bgc_card),
+    re_path('update_bgc_card', views.update_bgc_card),
+    re_path('delete_bgc_card', views.delete_bgc_card),
+    re_path('save_deleted_files', views.save_deleted_files),
+    re_path('get_deleted_files', views.get_deleted_files),
+    re_path(r'^upload_progress/(?P<task_id>[a-zA-Z0-9-]+)/$', views.upload_progress),
+    re_path('init_file_upload', views.init_file_upload),
+    re_path('add_card_directly', views.add_card_directly),
+    re_path('get_multiQA_score$', views.get_multiQA_score),
+    re_path('get_multiQA_score_plus$', views.get_multiQA_score_plus),
+    re_path('updateComment', views.updateComment),
+    re_path('getComment', views.getComment),
+    re_path(r'^update_context$', views.update_context),
+    re_path(r'^get_context$', views.get_context),
+    re_path('coacher_comment', views.coacher_comment),
+    re_path('nkcn_continue', views.nkcn_continue),
+    re_path('check_continue', views.check_continue),
+    
+    re_path('execute_commands$', views.execute_commands),
+    re_path('execute_commands_stream$', views.execute_commands_stream),
+    re_path('execute_commands_stream_sessionId$', views.execute_commands_stream_sessionId),
+    
+    re_path('card_eval$', views.card_eval),
+    re_path('card_evalSFT$', views.card_evalSFT),
+    re_path('getUseToFinetune', views.getUseToFinetune),
+    re_path('AIWork', views.AIWork),
+    
+    re_path('shootCardAnalysis', views.shootCardAnalysis),
+    re_path('BodyCardAnalysis', views.BodyCardAnalysis),
+    re_path('BodyStreamAnalysis', views.BodyStreamAnalysis),
+    re_path('esp32_memory_upload', views.esp32_memory_upload),
+    re_path(r'^bodyhealth_edge_sync$', bodyhealth_edge_views.bodyhealth_edge_sync),
+    re_path(r'^bodyhealth_edge_feedback$', bodyhealth_edge_views.bodyhealth_edge_feedback),
+    re_path('PulseAnalysis', views.PulseAnalysis),
+    re_path('HLAnalysis', views.HLAnalysis),
+    re_path('feishu_ta_qa', views_feishu_ta_qa.feishu_ta_qa),
+    re_path('feishu_seed_gongsheng$', views_seed_gongsheng.feishu_seed_gongsheng),
+    re_path('feishu_seed_gongsheng_group_rule$', views_seed_gongsheng.feishu_seed_gongsheng_group_rule),
+    re_path('feishu_object_score$', views_seed_gongsheng.feishu_object_score),
+
+    re_path('chat_send_onlytext$', views.chat_send_onlytext),
+    re_path('chat_send_onlytext_stream$', views.chat_send_onlytext_stream),
+
+    re_path('save_automation_records', views.save_automation_records),
+    re_path('start_automation', views.start_automation),
+    re_path('stop_automation', views.stop_automation),
+    re_path('reset_automation', views.reset_automation),
+    re_path('get_automation_status', views.get_automation_status),
+    re_path('check_has_records', views.check_has_records),
+    re_path('get_file_automation_status', views.get_file_automation_status),
+    re_path('save_file_automation_status', views.save_file_automation_status),
+    re_path('save_audio_block_summary', views.save_audio_block_summary),
+    re_path('get_audio_block_summary', views.get_audio_block_summary),
+    re_path('list_audio_block_summaries', views.list_audio_block_summaries),
+    re_path('get_memory_tier_context', views.get_memory_tier_context),
+
+    re_path('check_todo_card', document_todo_views.check_todo_card),
+    re_path('start_document_todo', document_todo_views.start_document_todo),
+    re_path('get_todo_progress', document_todo_views.get_todo_progress),
+    re_path('stop_document_todo', document_todo_views.stop_document_todo),
+
+    re_path('export_user_data/', views.export_user_data, name='export_user_data'),
+    re_path('import_user_data/', views.import_user_data, name='import_user_data'),
+
+    re_path('set_redirect_config$', views.set_redirect_config),
+    re_path('get_redirect_config$', views.get_redirect_config),
+
+    re_path('set_user_redirect_config$', views.set_user_redirect_config),
+    re_path('get_user_redirect_config$', views.get_user_redirect_config),
+    re_path('get_all_user_redirect_configs$', views.get_all_user_redirect_configs),
+
+    re_path('start_dmt_analysis$', views.start_dmt_analysis),
+    re_path('get_dmt_analysis_status$', views.get_dmt_analysis_status),
+    re_path('get_dmt_analysis_result$', views.get_dmt_analysis_result),
+    re_path('stop_dmt_analysis$', views.stop_dmt_analysis),
+    re_path('check_dmt_config$', views.check_dmt_config),
+
+    re_path('get_lui2_prompt$', views.get_lui2_prompt),
+    re_path('get_document_content$', views.get_document_content),
+    re_path('save_question_comment$', views.save_question_comment),
+
+    re_path('get_document_confidence$', views.get_document_confidence),
+
+    re_path('save_default_models_config$', views.save_default_models_config),
+    re_path('get_default_models_config$', views.get_default_models_config),
+    re_path('save_scene_models_config$', views.save_scene_models_config),
+    re_path('get_scene_models_config$', views.get_scene_models_config),
+
+    # 新增：响应中断相关的API
+    re_path('interrupt_response$', interrupt_views.interrupt_response),
+    re_path('get_active_sessions$', interrupt_views.get_active_sessions),
+    re_path('force_cleanup_sessions$', interrupt_views.force_cleanup_sessions),
+    re_path('interrupt_all_on_new_message$', interrupt_views.interrupt_all_on_new_message),  # 新增：新消息全局中断
+
+    re_path('batch_update_card_attributes$', views.batch_update_card_attributes),
+    re_path('generate_cross_document_suggestion_card$', views.generate_cross_document_suggestion_card),
+    re_path('update_cross_document_suggestion_card$', views.update_cross_document_suggestion_card),
+    re_path('enhance_question_with_small_model$', views.enhance_question_with_small_model_api),
+
+    re_path('rename_keyword$', views.rename_keyword),
+    re_path('fuse_keywords$', views_fuse_keywords.fuse_keywords),
+    re_path('regenerate_fuse_keywords$', views_fuse_keywords.regenerate_fuse_keywords),
+    re_path('regenerate_single_fuse_keyword$', views_fuse_keywords.regenerate_single_fuse_keyword),
+    re_path('confirm_fuse_keyword$', views_fuse_keywords.confirm_fuse_keyword),
+    re_path('analyze_keyword_four_color_dmt$', views.analyze_keyword_four_color_dmt_api),
+    re_path('update_keyword_four_color_dmt$', views.update_keyword_four_color_dmt_api),
+    re_path('update_document_four_color_dmt$', views.update_document_four_color_dmt_api),
+
+    re_path('semantic_reorganize_start', views_semantic_reorganize.semantic_reorganize_start),
+    re_path('semantic_reorganize_status', views_semantic_reorganize.semantic_reorganize_status),
+    re_path('semantic_reorganize_rollback', views_semantic_reorganize.semantic_reorganize_rollback),
+    re_path('update_hierarchy_link_strength$', views_semantic_reorganize.update_hierarchy_link_strength_api),
+
+    re_path('scene_cluster_semantic_start$', views_scene_cluster_semantic.scene_cluster_semantic_start),
+    re_path('scene_cluster_semantic_status$', views_scene_cluster_semantic.scene_cluster_semantic_status),
+    re_path('scene_cluster_semantic_rollback$', views_scene_cluster_semantic.scene_cluster_semantic_rollback),
+    re_path('scene_cluster_semantic_result$', views_scene_cluster_semantic.scene_cluster_semantic_result),
+    re_path('scene_cluster_update_link_strength$', views_scene_cluster_semantic.scene_cluster_update_link_strength),
+    re_path('scene_cluster_update_keyword_attrs$', views_scene_cluster_semantic.scene_cluster_update_keyword_attrs),
+    re_path('scene_cluster_rename_keyword$', views_scene_cluster_semantic.scene_cluster_rename_keyword),
+
+    re_path('task_cluster_get$', views_task_cluster.task_cluster_get),
+    re_path('task_cluster_analyze$', views_task_cluster.task_cluster_analyze),
+    re_path('task_cluster_progress$', views_task_cluster.task_cluster_progress),
+    re_path('task_cluster_update_meta$', views_task_cluster.task_cluster_update_meta),
+    re_path('task_cluster_adjust_notebook$', views_task_cluster.task_cluster_adjust_notebook),
+    re_path('task_cluster_create$', views_task_cluster.task_cluster_create),
+    re_path('task_cluster_delete$', views_task_cluster.task_cluster_delete),
+
+    re_path('update_card_three_window_models$', views.update_card_three_window_models),
+
+    re_path('generate_permanent_card$', views.generate_permanent_card),
+    re_path('delete_permanent_card$', views.delete_permanent_card),
+    re_path('analyze_cognitive_state$', views.analyze_cognitive_state),
+
+    re_path('smart_sort_questions$', views.smart_sort_questions),
+
+    re_path('check_and_update_directory_card$', views_generate_output_article.check_and_update_directory_card),
+    re_path('generate_output_article$', views_generate_output_article.generate_output_article),
+    re_path(r'^article_generation_progress/(?P<task_id>[a-zA-Z0-9-_]+)/$', views_generate_output_article.article_generation_progress),
+
+    re_path('extract_tribal_knowledge$', views_tribal_knowledge.extract_tribal_knowledge),
+    re_path(r'^tribal_knowledge_progress/(?P<task_id>[a-zA-Z0-9-_]+)/$', views_tribal_knowledge.tribal_knowledge_progress),
+
+    re_path('group_twin_gxx_start$', views_group_twin_gxx.group_twin_gxx_start),
+    re_path(r'^group_twin_gxx_progress/(?P<task_id>[a-zA-Z0-9-_]+)/$', views_group_twin_gxx.group_twin_gxx_progress),
+    re_path('group_twin_gxx_list$', views_group_twin_gxx.group_twin_gxx_list),
+    re_path('group_twin_gxx_content$', views_group_twin_gxx.group_twin_gxx_content),
+
+    re_path('start_continuous_image_analysis$', views_continuous_image.start_continuous_image_analysis),
+    re_path(r'^continuous_image_analysis_progress/(?P<task_id>[a-zA-Z0-9-_]+)/$', views_continuous_image.continuous_image_analysis_progress),
+    re_path('get_continuous_image_analysis_result$', views_continuous_image.get_continuous_image_analysis_result),
+    re_path('serve_layout_visual$', views_continuous_image.serve_layout_visual),
+
+    # 长短记忆
+    re_path('notebook_memory_autodream$', views_notebook_memory.notebook_memory_autodream),
+    re_path('notebook_memory_status$', views_notebook_memory.notebook_memory_status),
+
+    # 新架构 CI 接口
+    re_path('ci/query$', views_continuous_image.ci_query),
+    re_path('ci/material-settings$', material_settings),
+    re_path('ci/start$', views_continuous_image.ci_start),
+    re_path(r'^ci/progress/(?P<task_id>[a-zA-Z0-9-_]+)/$', views_continuous_image.ci_progress),
+    re_path('ci/result$', views_continuous_image.ci_result),
+    re_path('ci/pass3/pairs$', views_continuous_image.ci_pass3_pairs),
+    re_path('ci/pass3/start$', views_continuous_image.ci_pass3_start),
+    re_path('ci/redo$', views_continuous_image.ci_redo),
+    re_path('ci/homework/versions$', views_continuous_image.ci_homework_versions),
+    re_path('ci/homework/version_key$', views_continuous_image.ci_homework_version_key),
+    re_path('ci/homework/rerun$', views_continuous_image.ci_homework_rerun),
+    re_path('ci/homework/red_blue/retry$', views_continuous_image.ci_homework_red_blue_retry),
+    re_path('ci/sketch_r/quickstart$', views_continuous_image.ci_sketch_r_quickstart),
+    re_path('ci/reproduction/start$', views_continuous_image.ci_reproduction_start),
+    re_path('ci/reproduction/update_context$', views_continuous_image.ci_reproduction_update_context),
+    re_path('ci/reproduction/iterate$', views_continuous_image.ci_reproduction_iterate),
+    re_path('ci/reproduction/iterate_layout_regions$', views_continuous_image.ci_reproduction_iterate_layout_regions),
+    re_path('ci/reproduction/auto_iterate_preview$', views_continuous_image.ci_reproduction_auto_iterate_preview),
+    re_path('ci/reproduction/auto_iterate_round$', views_continuous_image.ci_reproduction_auto_iterate_round),
+    re_path('ci/reproduction/apply_lite_bundle$', views_continuous_image.ci_reproduction_apply_lite_bundle),
+    re_path('ci/reproduction/recognize_d_region$', views_continuous_image.ci_reproduction_recognize_d_region),
+    re_path('ci/reproduction/d_confidence_batch$', views_continuous_image.ci_reproduction_d_confidence_batch),
+    re_path('ci/reproduction/d_confidence_result$', views_continuous_image.ci_reproduction_d_confidence_result),
+    re_path('ci/reproduction/d_confidence_pick_auto_regions$', views_continuous_image.ci_reproduction_d_confidence_pick_auto_regions),
+    re_path('ci/reproduction/d_confidence_mark_used$', views_continuous_image.ci_reproduction_d_confidence_mark_used),
+    re_path('ci/reproduction/rollback$', views_continuous_image.ci_reproduction_rollback),
+    re_path('ci/reproduction/save$', views_continuous_image.ci_reproduction_save),
+    re_path('ci/overlay/prompt_stream$', views_continuous_image.ci_overlay_prompt_stream),
+    re_path('ci/overlay/estimate_handwriting$', views_continuous_image.ci_overlay_estimate_handwriting),
+    re_path('ci/overlay/generate$', views_continuous_image.ci_overlay_generate),
+    re_path('ci/overlay/status$', views_continuous_image.ci_overlay_status),
+    re_path('ci/overlay/history$', views_continuous_image.ci_overlay_history),
+    re_path('ci/overlay/save$', views_continuous_image.ci_overlay_save),
+    re_path('ci/overlay/iterate$', views_continuous_image.ci_overlay_iterate),
+    re_path('ci/layout_visual$', views_continuous_image.ci_layout_visual),
+    re_path('ci/pdf_page_count$', views_continuous_image.ci_pdf_page_count),
+    re_path('ci/single/refine_t_layer$', views_continuous_image.ci_single_refine_t_layer),
+    re_path('ci/single/refine_t_layer_rollback$', views_continuous_image.ci_single_refine_t_layer_rollback),
+    re_path('ci/single/refine_image_understanding_preview$', views_continuous_image.ci_single_refine_image_understanding_preview),
+    re_path('ci/single/refine_image_understanding_apply$', views_continuous_image.ci_single_refine_image_understanding_apply),
+    re_path('ci/single/refine_t_layer_from_d_lite_preview$', views_continuous_image.ci_single_refine_t_layer_from_d_lite_preview),
+    re_path('ci/single/refine_t_layer_from_d_lite_apply$', views_continuous_image.ci_single_refine_t_layer_from_d_lite_apply),
+    re_path('ci/single/refine_image_understanding_preview_from_d_lite$', views_continuous_image.ci_single_refine_image_understanding_preview_from_d_lite),
+    re_path('ci/single/d_lite_image_understanding_preview_cache$', views_continuous_image.ci_single_d_lite_image_understanding_preview_cache),
+    re_path('ci/grade_understanding$', views_continuous_image.ci_grade_understanding),
+
+    # 私货
+    re_path('analyze_thinking_state$', views.analyze_thinking_state),
+    re_path('generate_context_navigation$', views.generate_context_navigation),
+    re_path('get_action_suggestions$', views.get_action_suggestions),
+    re_path('get_real_chat_history$', views.get_real_chat_history),
+
+    re_path('analyze_thought_network$', views.analyze_thought_network),
+    re_path('propagate_thought_signals$', views.propagate_thought_signals),
+    re_path('generate_thought_insights$', views.generate_thought_insights),
+]

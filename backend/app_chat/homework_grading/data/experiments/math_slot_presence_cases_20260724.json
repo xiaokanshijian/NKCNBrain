@@ -1,0 +1,118 @@
+{
+  "experiment_mode": "math_slot_presence_apply_v2",
+  "description": "数学槽位级作答存在性固定回归。evaluation 仅供离线评测和正式应用门禁，绝不进入模型请求。",
+  "sample": {
+    "source_file": "数学1.pdf",
+    "sample_id": "db2d0b12",
+    "source_document_sha256": "83a954cb09d9b8ac6dd7c416941445f51c52b87d1db0899b52ddda6e55ddf62b",
+    "legacy_sample_ids": [
+      "db2d0b12"
+    ]
+  },
+  "apply_approved_page_stems": [
+    "math_db2d0b12_page12",
+    "math_db2d0b12_page15"
+  ],
+  "cases": [
+    {
+      "case_id": "math1_p12_q1_red_connection_absent",
+      "page": 12,
+      "question_id": "1",
+      "evaluation": {
+        "answer_presence": "absent",
+        "slots": [
+          {
+            "slot_id": "1:s1",
+            "slot_type": "connection_area",
+            "presence": "absent",
+            "note": "全部连线均为教师红笔，学生没有黑笔连线。"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "math1_p15_q2_1_mixed_empty_and_written",
+      "page": 15,
+      "question_id": "2-1",
+      "evaluation": {
+        "answer_presence": "partial",
+        "slots": [
+          {
+            "slot_id": "2-1:s1",
+            "slot_type": "fill_blank",
+            "presence": "absent",
+            "note": "第一个数值框没有学生黑笔，原图中只有教师红笔订正。"
+          },
+          {
+            "slot_id": "2-1:s2",
+            "slot_type": "fill_blank",
+            "presence": "present",
+            "note": "第二个运算律名称槽位存在学生黑笔作答。"
+          },
+          {
+            "slot_id": "2-1:s3",
+            "slot_type": "fill_blank",
+            "presence": "present",
+            "note": "题目跨左右栏续排；右上方字母公式槽位存在学生黑笔作答，虽超出单一 detect 题框，仍属于题2-1。"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "math1_p15_q2_2_two_empty_two_written",
+      "page": 15,
+      "question_id": "2-2",
+      "evaluation": {
+        "answer_presence": "partial",
+        "slots": [
+          {
+            "slot_id": "2-2:s1",
+            "slot_type": "fill_blank",
+            "presence": "absent",
+            "note": "第一个数值框没有学生黑笔。"
+          },
+          {
+            "slot_id": "2-2:s2",
+            "slot_type": "fill_blank",
+            "presence": "absent",
+            "note": "第二个数值框没有学生黑笔。"
+          },
+          {
+            "slot_id": "2-2:s3",
+            "slot_type": "fill_blank",
+            "presence": "present",
+            "note": "运算律名称槽位存在学生黑笔。"
+          },
+          {
+            "slot_id": "2-2:s4",
+            "slot_type": "fill_blank",
+            "presence": "present",
+            "note": "字母公式槽位存在学生黑笔。"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "math1_p15_q2_3_black_work_present",
+      "page": 15,
+      "question_id": "2-3",
+      "evaluation": {
+        "answer_presence": "present",
+        "slots": [
+          {
+            "slot_id": "2-3:s1",
+            "slot_type": "work_area",
+            "presence": "present",
+            "note": "第一道算式区域存在学生黑笔。"
+          },
+          {
+            "slot_id": "2-3:s2",
+            "slot_type": "work_area",
+            "presence": "present",
+            "note": "第二道算式区域存在学生黑笔。"
+          }
+        ]
+      }
+    }
+  ]
+}

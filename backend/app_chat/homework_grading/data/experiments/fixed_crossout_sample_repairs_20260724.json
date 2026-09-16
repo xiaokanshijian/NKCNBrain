@@ -1,0 +1,228 @@
+{
+  "version": "fixed_crossout_samples_v3",
+  "description": "仅对白名单中的数学1与语文1删除线或教师残留固定样例生成模型判读图；原clean图不覆盖，版面检测与渲染继续使用原图。",
+  "cases": [
+    {
+      "case_id": "math1_page15_q1_three_rows",
+      "subject": "math",
+      "page": 15,
+      "source_sha256": "bcd7f7666c312d988a96353f4ad14e793fdcbdf3fc33e2de81a4df73de807e81",
+      "image_size_wh": [
+        2480,
+        3509
+      ],
+      "expected_output_sha256": "415fc0477095382b45d5fa71c5168425732b77ce6ef81fc6c1813a368c88dd47",
+      "expected_changed_pixel_count": 2763,
+      "operations": [
+        {
+          "type": "whiteout",
+          "question_id": "1",
+          "sample_part": "row1_crossed_out_f",
+          "bbox_xyxy": [
+            530,
+            2221,
+            610,
+            2331
+          ]
+        },
+        {
+          "type": "whiteout",
+          "question_id": "1",
+          "sample_part": "row2_crossed_out_ampersand",
+          "bbox_xyxy": [
+            461,
+            2446,
+            533,
+            2527
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "math1_page17_q2_2_q2_3",
+      "subject": "math",
+      "page": 17,
+      "source_sha256": "04568ed9481c621e9e1b70c5fb92b2bf2bde65428dd8ce32d4f43ec4ce3338b4",
+      "image_size_wh": [
+        2480,
+        3509
+      ],
+      "expected_output_sha256": "e27ee4c4e0cf0baa614ef40fe81a7451b576493241e247132493a4e3b641affa",
+      "expected_changed_pixel_count": 4375,
+      "operations": [
+        {
+          "type": "whiteout",
+          "question_id": "2-2",
+          "sample_part": "crossed_out_b",
+          "bbox_xyxy": [
+            1036,
+            1828,
+            1131,
+            1942
+          ]
+        },
+        {
+          "type": "whiteout",
+          "question_id": "2-3",
+          "sample_part": "crossed_out_a",
+          "bbox_xyxy": [
+            909,
+            2135,
+            991,
+            2233
+          ]
+        },
+        {
+          "type": "move_ink",
+          "question_id": "2-2",
+          "sample_part": "replacement_c_into_parentheses",
+          "source_bbox_xyxy": [
+            1059,
+            1749,
+            1106,
+            1814
+          ],
+          "source_clear_bbox_xyxy": [
+            1053,
+            1743,
+            1112,
+            1820
+          ],
+          "destination_bbox_xyxy": [
+            1067,
+            1848,
+            1114,
+            1913
+          ],
+          "ink_threshold_gray_lt": 250,
+          "expected_ink_pixel_count": 756
+        }
+      ]
+    },
+    {
+      "case_id": "chinese1_page3_q3_1_incomplete_xiang",
+      "subject": "chinese",
+      "page": 3,
+      "source_sha256": "ac28c43ecbf1e83d7359e196d1f0702fb21b65cef283da855b8e844ae73e2b94",
+      "image_size_wh": [
+        2480,
+        3509
+      ],
+      "expected_output_sha256": "6b74bd241409206dac8ab0ee7815a6e3baa8470222e695ad3ff983048dd1e9e3",
+      "expected_changed_pixel_count": 1154,
+      "operations": [
+        {
+          "type": "whiteout",
+          "question_id": "3-1",
+          "sample_part": "incomplete_teacher_xiang_residual",
+          "bbox_xyxy": [
+            579,
+            1844,
+            626,
+            1940
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "chinese1_page11_q4_4",
+      "subject": "chinese",
+      "page": 11,
+      "source_sha256": "1a14e360e5e50a2e17a54e3efb39cc3d743484b7487e95abfac9dc444d9a9219",
+      "image_size_wh": [
+        2480,
+        3509
+      ],
+      "expected_output_sha256": "687131f97355ed0206bbbdeff39e54245f3427bb837c0a4d77740fa00b46f276",
+      "expected_changed_pixel_count": 2349,
+      "operations": [
+        {
+          "type": "whiteout",
+          "question_id": "4-4",
+          "sample_part": "crossed_out_trailing_lai",
+          "bbox_xyxy": [
+            2186,
+            2695,
+            2245,
+            2805
+          ]
+        },
+        {
+          "type": "whiteout_line",
+          "question_id": "4-4",
+          "sample_part": "crossed_out_trailing_lai_overlap",
+          "start_xy": [
+            2164,
+            2778
+          ],
+          "end_xy": [
+            2191,
+            2743
+          ],
+          "thickness": 14
+        }
+      ]
+    },
+    {
+      "case_id": "chinese1_page13_q4_2",
+      "subject": "chinese",
+      "page": 13,
+      "source_sha256": "2ee416955680780e1c6ace62005547ef9861da68a17e2ca18f7718c5846a2337",
+      "image_size_wh": [
+        2480,
+        3509
+      ],
+      "expected_output_sha256": "40890d462168e7002b3b1b15dff987f06ab9c0c1dbead2a4850ee10304e77b01",
+      "expected_changed_pixel_count": 1874,
+      "operations": [
+        {
+          "type": "whiteout",
+          "question_id": "4-2",
+          "sample_part": "crossed_out_option_b",
+          "bbox_xyxy": [
+            1861,
+            2624,
+            1912,
+            2730
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "chinese1_page41_q3_2",
+      "subject": "chinese",
+      "page": 41,
+      "source_sha256": "c693010b93969d722e22df18521f6fe294efb5e74cfce0691187c069acf6f1ca",
+      "image_size_wh": [
+        2480,
+        3509
+      ],
+      "expected_output_sha256": "feedd29e54ffd0dcd9087a6cbdb7da6ab02cfeea4a64e0c5e26f7cd1cb49b400",
+      "expected_changed_pixel_count": 6679,
+      "operations": [
+        {
+          "type": "whiteout",
+          "question_id": "3-2",
+          "sample_part": "crossed_out_zhang",
+          "bbox_xyxy": [
+            907,
+            2985,
+            960,
+            3063
+          ]
+        },
+        {
+          "type": "whiteout",
+          "question_id": "3-2",
+          "sample_part": "crossed_out_repeated_zhizhu",
+          "bbox_xyxy": [
+            1078,
+            2988,
+            1224,
+            3067
+          ]
+        }
+      ]
+    }
+  ]
+}

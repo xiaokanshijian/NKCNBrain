@@ -1,0 +1,3473 @@
+{
+  "subject": "english",
+  "source": "义务教育英语课程标准（2022年版）",
+  "extracted_at": "2026-05-31T18:36:15",
+  "stages": [
+    {
+      "stage": 1,
+      "grade_band": "1-2",
+      "domains": [
+        {
+          "name": "词汇",
+          "knowledge_points": [
+            {
+              "id": "EN_S1_001",
+              "label": "theme_categories",
+              "description": "了解英语课程主题的三大范畴：人与自我、人与社会、人与自然。",
+              "cognitive_level": "了解",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S1_002",
+              "label": "self_theme_groups",
+              "description": "理解人与自我范畴下的主题群：生活与学习、做人与做事。",
+              "cognitive_level": "理解",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S1_003",
+              "label": "self_subtopics_level1",
+              "description": "掌握一级中人与自我子主题：身边事物、时间管理、生活自理、个人喜好、家庭、学校、饮食健康。",
+              "cognitive_level": "掌握",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S1_004",
+              "label": "self_subtopics_level2",
+              "description": "掌握二级中人与自我子主题：自我管理、乐学善学、健康习惯、运动安全、自信乐观、情绪管理、解决问题、合理消费、劳动习惯。",
+              "cognitive_level": "掌握",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S1_005",
+              "label": "self_subtopics_level3",
+              "description": "掌握三级中人与自我子主题：积极生活、学校生活、身心健康、学习方法、自我提升、职业启蒙、劳动品质、理财意识、实践创新。",
+              "cognitive_level": "掌握",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S1_006",
+              "label": "society_theme_groups",
+              "description": "理解人与社会范畴下的主题群：社会服务与人际沟通、文学艺术体育、历史文化、科学技术。",
+              "cognitive_level": "理解",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S1_007",
+              "label": "society_subtopics_level1",
+              "description": "掌握一级中人与社会子主题：班级规则、团队活动、校园环境、同伴交往、尊长感恩、体育运动、交通法规、常见职业、节假日文化。",
+              "cognitive_level": "掌握",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S1_008",
+              "label": "society_subtopics_level2",
+              "description": "掌握二级中人与社会子主题：环境保护、文明礼貌、倾听包容、社团活动、杰出人物、名胜古迹、传统节日、科技改变生活。",
+              "cognitive_level": "掌握",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S1_009",
+              "label": "society_subtopics_level3",
+              "description": "掌握三级中人与社会子主题：人际关系、家庭社区、志愿服务、团队精神、社会变迁、跨文化沟通、艺术赏析、体育赛事、文学作品、文化习俗、杰出人物、法律法规、文化自信、社会热点、科技创新。",
+              "cognitive_level": "掌握",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S1_010",
+              "label": "nature_theme_groups",
+              "description": "理解人与自然范畴下的主题群：自然生态、环境保护、灾害防范、宇宙探索。",
+              "cognitive_level": "理解",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S1_011",
+              "label": "nature_subtopics_level1",
+              "description": "掌握一级中人与自然子主题：天气、季节、自然现象、常见动物。",
+              "cognitive_level": "掌握",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S1_012",
+              "label": "nature_subtopics_level2",
+              "description": "掌握二级中人与自然子主题：城市地理位置、国家名称景观、绿色生活、种植养殖、灾害防范、地球宇宙探索。",
+              "cognitive_level": "掌握",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S1_013",
+              "label": "nature_subtopics_level3",
+              "description": "掌握三级中人与自然子主题：国家地理生态、敬畏自然、环保行为、灾害防范、宇宙探秘。",
+              "cognitive_level": "掌握",
+              "source_block": "主题"
+            }
+          ]
+        },
+        {
+          "name": "语篇",
+          "knowledge_points": [
+            {
+              "id": "EN_S1_014",
+              "label": "nursery_rhymes_songs_chants",
+              "description": "认识歌谣、歌曲和韵文等语篇形式。",
+              "cognitive_level": "了解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S1_015",
+              "label": "short_dialogues_monologues",
+              "description": "认识日常简短对话和独白等语篇形式。",
+              "cognitive_level": "了解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S1_016",
+              "label": "illustrated_stories_diaries",
+              "description": "认识配图故事和叙事性日记等语篇形式。",
+              "cognitive_level": "了解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S1_017",
+              "label": "introductions_people_objects_places",
+              "description": "认识人物、物品和地点介绍等语篇形式。",
+              "cognitive_level": "了解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S1_018",
+              "label": "letters_notices_instructions_cards",
+              "description": "认识书信、通知、指令和贺卡等语篇形式。",
+              "cognitive_level": "了解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S1_019",
+              "label": "other_text_types",
+              "description": "认识提示牌、菜单、图表、图片和视频等其他语篇类型。",
+              "cognitive_level": "了解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S1_020",
+              "label": "greeting_differences",
+              "description": "了解英语和汉语在问候、姓名、称谓等表达方式上的不同。",
+              "cognitive_level": "了解",
+              "source_block": "文化知识"
+            },
+            {
+              "id": "EN_S1_021",
+              "label": "life_style_comparison",
+              "description": "了解不同国家在学校、家庭生活和饮食习惯上的异同。",
+              "cognitive_level": "了解",
+              "source_block": "文化知识"
+            },
+            {
+              "id": "EN_S1_022",
+              "label": "cultural_symbols_festivals",
+              "description": "了解中外典型文化标志物和传统节日的简单信息。",
+              "cognitive_level": "了解",
+              "source_block": "文化知识"
+            }
+          ]
+        },
+        {
+          "name": "语音",
+          "knowledge_points": [
+            {
+              "id": "EN_S1_023",
+              "label": "letter_recognition",
+              "description": "识别并读出26个大、小写字母",
+              "cognitive_level": "掌握",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_024",
+              "label": "letter_sound_perception",
+              "description": "感知字母在单词中的发音",
+              "cognitive_level": "了解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_025",
+              "label": "phonics_rules",
+              "description": "感知简单拼读规则并尝试拼读单词",
+              "cognitive_level": "了解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_026",
+              "label": "intonation_imitation",
+              "description": "感知并模仿英语的重音和句子的升降调",
+              "cognitive_level": "了解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_027",
+              "label": "word_composition",
+              "description": "知道单词由字母构成",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_028",
+              "label": "vocabulary_comprehension",
+              "description": "借助图片、实物理解词汇意思",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_029",
+              "label": "word_phrase_production",
+              "description": "根据视觉或听觉提示说出单词和短语",
+              "cognitive_level": "掌握",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_030",
+              "label": "vocabulary_learning_strategy",
+              "description": "根据音形义学习词汇并体会语境中的意思",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_031",
+              "label": "sentence_function_perception",
+              "description": "在语境中感知常用简单句的表意功能",
+              "cognitive_level": "了解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_032",
+              "label": "tense_understanding",
+              "description": "理解一般现在时和现在进行时的形式、意义和用法",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_033",
+              "label": "grammar_application",
+              "description": "运用所学语法描述人和物并进行简单交流",
+              "cognitive_level": "应用",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_034",
+              "label": "turn_taking_recognition",
+              "description": "识别对话中的话轮转换",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_035",
+              "label": "text_type_awareness",
+              "description": "知道语篇有不同类型如对话和配图故事",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_036",
+              "label": "image_text_relationship",
+              "description": "体会语篇中图片与文字之间的关系",
+              "cognitive_level": "了解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_037",
+              "label": "social_etiquette",
+              "description": "使用称谓语、问候语和告别语进行得体交流",
+              "cognitive_level": "应用",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_038",
+              "label": "polite_expressions",
+              "description": "在语境中使用基本礼貌用语与他人交流",
+              "cognitive_level": "应用",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S1_039",
+              "label": "response_to_social_acts",
+              "description": "对他人的赞扬、道歉、致谢等作出恰当回应",
+              "cognitive_level": "应用",
+              "source_block": "语言知识/语音"
+            }
+          ]
+        },
+        {
+          "name": "写作",
+          "knowledge_points": [
+            {
+              "id": "EN_S1_040",
+              "label": "understanding_skills",
+              "description": "理解听、读、看等理解性技能的基本概念和作用。",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_041",
+              "label": "expressive_skills",
+              "description": "理解说、写等表达性技能的基本概念和作用。",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_042",
+              "label": "multimodal_understanding",
+              "description": "理解多模态语篇中图形、表格、动画、符号和视频的意义。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_043",
+              "label": "follow_instructions",
+              "description": "能理解课堂中的简单指令并作出反应。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_044",
+              "label": "predict_theme",
+              "description": "能根据图片和标题推测语篇的主题、语境及主要信息。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_045",
+              "label": "extract_information",
+              "description": "能在听、读、看过程中有目的地提取和梳理所需信息。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_046",
+              "label": "infer_multimodal_meaning",
+              "description": "能推断多模态语篇中画面、图像、声音、色彩等传达的意义。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_047",
+              "label": "infer_emotion",
+              "description": "能借助语气、语调、手势和表情推断说话者的情绪和态度。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_048",
+              "label": "weekly_listening",
+              "description": "课外视听活动每周不少于30分钟。",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_049",
+              "label": "reading_volume_1",
+              "description": "课外阅读量累计达到1500-2000词。",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_050",
+              "label": "simple_greetings",
+              "description": "能在语境中与他人互致简单的问候或道别。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_051",
+              "label": "sing_songs",
+              "description": "能演唱所学的简单英语歌曲。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_052",
+              "label": "read_aloud",
+              "description": "能大声跟读音视频材料，正确朗读学过的对话、故事和文段。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_053",
+              "label": "personal_info",
+              "description": "能交流简单的个人和家庭信息。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_054",
+              "label": "express_feelings",
+              "description": "能表达简单的情感和喜好。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_055",
+              "label": "daily_routine",
+              "description": "能简单介绍自己的日常起居和生活。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_056",
+              "label": "school_life",
+              "description": "能简单介绍自己的学校和学校生活。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_057",
+              "label": "describe_animals",
+              "description": "能简单介绍自己喜欢的动物。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_058",
+              "label": "describe_pictures",
+              "description": "能用简单的语句描述图片或事物。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_059",
+              "label": "role_play",
+              "description": "能在教师指导下进行简单的角色扮演。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_060",
+              "label": "write_letters",
+              "description": "能正确书写字母、单词和句子。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_061",
+              "label": "imitate_sentences",
+              "description": "能根据图片或语境仿写简单的句子。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_062",
+              "label": "dub_stories",
+              "description": "能在画面提示下为对话、故事或动画片段配音。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_063",
+              "label": "oral_narration",
+              "description": "能口头描述事件或讲述小故事。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_064",
+              "label": "follow_complex_instructions",
+              "description": "能理解日常学习和生活中的简单指令并完成任务。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_065",
+              "label": "extract_info_with_images",
+              "description": "能借助图片、图像理解常见主题的语篇，提取、梳理、归纳主要信息。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_066",
+              "label": "guess_meaning",
+              "description": "能根据上下文线索和非文字信息猜测语篇中词汇的意思。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_067",
+              "label": "summarize_plot",
+              "description": "能归纳故事类语篇中主要情节的发生、发展与结局。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_068",
+              "label": "classify_information",
+              "description": "能对语篇中的信息进行分类。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_069",
+              "label": "compare_perspectives",
+              "description": "能比较语篇中人物、事物或观点间的相似性和差异性。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_070",
+              "label": "summarize_main_idea",
+              "description": "能概括语篇的主要内容，体会主要信息之间的关联。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_071",
+              "label": "extract_multimodal_info",
+              "description": "能理解多模态语篇传达的意义，提取关键信息。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_072",
+              "label": "reading_volume_2",
+              "description": "课外阅读量累计达到4000-5000词。",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_073",
+              "label": "read_chapter_books",
+              "description": "能阅读有配图的简单章节书，理解大意并进行口头概括。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_074",
+              "label": "simple_conversation",
+              "description": "能运用日常用语与他人进行简单交流。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_075",
+              "label": "fluent_reading",
+              "description": "能完整、连贯地朗读所学语篇，简单复述大意。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_076",
+              "label": "narrate_topics",
+              "description": "能围绕相关主题进行简短叙述或交流，表达情感和观点。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_077",
+              "label": "perform_skits",
+              "description": "能在教师帮助下表演小故事或短剧。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_078",
+              "label": "describe_events",
+              "description": "能简单描述事件或讲述简单的小故事。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_079",
+              "label": "write_coherent_sentences",
+              "description": "能围绕图片内容写出几句意思连贯的描述。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_080",
+              "label": "imitate_structure",
+              "description": "能模仿范文的结构和内容写几句意思连贯的话，并使用描述性词语。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_081",
+              "label": "use_punctuation",
+              "description": "能正确使用大小写字母和常见标点符号，单词拼写基本正确。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_082",
+              "label": "creative_expression",
+              "description": "能运用图表、海报、自制绘本等方式创造性地表达意义。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_083",
+              "label": "short_speech",
+              "description": "能进行简短的主题演讲，观点基本明确，逻辑清楚。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_084",
+              "label": "oral_story_creation",
+              "description": "能结合主题图或连环画口头创编故事。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_085",
+              "label": "respond_to_instructions",
+              "description": "能根据连续指令和问题作出适当反应。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_086",
+              "label": "identify_oral_theme",
+              "description": "能识别口语语篇的主题、大意和要点。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_087",
+              "label": "identify_speaker",
+              "description": "能识别口语语篇的情境，判定说话者的身份。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_088",
+              "label": "intonation_meaning",
+              "description": "能识别口语语篇中说话者的语调变化，判断意义变化。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_089",
+              "label": "visual_aids",
+              "description": "能借助图片、影像等视觉信息理解收听和观看的内容。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_090",
+              "label": "comprehend_written_text",
+              "description": "能理解书面语篇的整体意义和主要内容。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_091",
+              "label": "predict_content",
+              "description": "能根据标题或图片预测书面语篇的大概内容或情节发展。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_092",
+              "label": "extract_key_info",
+              "description": "能提取、梳理、分析和整合书面语篇的主要或关键信息。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_093",
+              "label": "logical_relations",
+              "description": "能识别和判断书面语篇中句子之间的逻辑关系。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_094",
+              "label": "infer_word_meaning",
+              "description": "能根据书面语篇的上下文推断生词意义。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_095",
+              "label": "evaluate_stories",
+              "description": "能阅读故事，整体理解主要内容，并进行简要概括、描述与评价。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_096",
+              "label": "reading_volume_3",
+              "description": "课外阅读量累计达到4万词以上。",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_097",
+              "label": "sing_poems",
+              "description": "能演唱英语歌曲，诵读英语诗歌。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_098",
+              "label": "fluent_reading_short",
+              "description": "能完整、连贯地朗读短文，简单复述短文大意。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_099",
+              "label": "role_play_guided",
+              "description": "能在教师指导下进行简单的角色扮演。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_100",
+              "label": "oral_communication",
+              "description": "能围绕相关主题用简短的表达方式进行口头交流，完成交际任务。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_101",
+              "label": "accurate_expression",
+              "description": "能在口头表达中使用较为准确的词语和表达法，语音语调基本正确。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_102",
+              "label": "write_meaningful_sentences",
+              "description": "能自选主题，独立写出几个意义连贯、表意清楚的语句。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_103",
+              "label": "write_with_prompts",
+              "description": "能利用所给提示写出简单文段或编写小故事。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_104",
+              "label": "introduce_self",
+              "description": "能用简单的书面语篇介绍个人情况和个人经历。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_105",
+              "label": "write_greetings",
+              "description": "能写出或回复简单的问候和邀请。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_106",
+              "label": "correct_punctuation",
+              "description": "能在书面表达中正确使用常用标点符号，用词基本准确。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_107",
+              "label": "extract_oral_details",
+              "description": "能获取和梳理口语语篇的主旨要义和关键细节。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_108",
+              "label": "infer_relationship",
+              "description": "能识别说话者的措辞、语气，推断对话者之间的关系。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_109",
+              "label": "judge_emotion_change",
+              "description": "能根据语音语调变化判断情感和态度的变化。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_110",
+              "label": "identify_topic_shift",
+              "description": "能识别用语较正式的简短对话中谈话内容的递进和转换。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_111",
+              "label": "understand_media",
+              "description": "能收听或观看主题相关、语速较慢的广播、电视、网络节目，识别主题，获取主要信息。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_112",
+              "label": "organize_written_info",
+              "description": "能梳理书面语篇的脉络、梗概和发展变化，提取关键信息，归纳内容要点。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_113",
+              "label": "distinguish_fact_opinion",
+              "description": "能区分书面语篇中的事实性信息和非事实性信息。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_114",
+              "label": "interpret_charts",
+              "description": "能理解并解释书面语篇中图表提供的信息。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_115",
+              "label": "logical_relations_advanced",
+              "description": "能识别和判断书面语篇中上下文之间的逻辑关系。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_116",
+              "label": "infer_implicit_meaning",
+              "description": "能理解和推测书面语篇中隐含的信息和意义。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_117",
+              "label": "read_novels_articles",
+              "description": "能阅读短篇小说和简单的报刊文章，整体理解主要内容并进行概括、描述与评价。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_118",
+              "label": "reading_volume_4",
+              "description": "课外阅读量累计达到10万词以上。",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_119",
+              "label": "fluent_reading_logical",
+              "description": "能正确、流利地朗读短文，有逻辑地讲述主要内容。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_120",
+              "label": "independent_role_play",
+              "description": "能独立或小组合作完成角色扮演等活动。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_121",
+              "label": "initiate_conversation",
+              "description": "能在特定情境中引出主题，用所学语言进行口头交流，有效询问，恰当表达。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_122",
+              "label": "accurate_oral_expression",
+              "description": "能在口头表达中结合主题使用正确的词汇、句式和语法，表意准确得体。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_123",
+              "label": "paraphrase_content",
+              "description": "能以口语或书面的形式简单转述语篇的主要内容和观点。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_124",
+              "label": "describe_experiences",
+              "description": "能用简单的书面语篇描写他人的经历或熟悉的事物。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_125",
+              "label": "thematic_speech",
+              "description": "能结合相关主题进行主题演讲，观点基本明确，逻辑清楚。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_126",
+              "label": "draft_revise",
+              "description": "能在教师指导下起草和修改作文。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_127",
+              "label": "accurate_writing",
+              "description": "能在书面表达中正确使用标点符号，用词准确，表达通顺，格式规范。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_128",
+              "label": "infer_intention",
+              "description": "能理解和推断日常生活中说话者的意图。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_129",
+              "label": "overcome_vocabulary",
+              "description": "能借助语境克服生词障碍，理解口语语篇的信息和意义。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_130",
+              "label": "predict_plot",
+              "description": "能获取和梳理口语语篇中一系列事件的主题和因果关系，预测情节发展。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_131",
+              "label": "analyze_structure",
+              "description": "能分析和梳理常见书面语篇的基本结构特征和内容的主次关系。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_132",
+              "label": "infer_author_view",
+              "description": "能从书面语篇中判断和归纳作者的观点及主旨要义。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_133",
+              "label": "identify_cohesion",
+              "description": "能辨别语篇中的衔接手段，判断句子之间、段落之间的逻辑关系。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_134",
+              "label": "infer_word_formation",
+              "description": "能根据上下文和构词法推断书面语篇中生词的含义。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_135",
+              "label": "selective_note_taking",
+              "description": "能在听、读、看过程中有选择地记录信息和要点。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_136",
+              "label": "reading_strategies",
+              "description": "能根据不同目的运用各种阅读策略有效获取语篇信息。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_137",
+              "label": "read_biographies",
+              "description": "能阅读名人传记和报刊文章，整体理解和简要概括所读内容。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_138",
+              "label": "connect_texts",
+              "description": "能建立语篇与语篇、语篇与个人、语篇与世界的关联，探究现实意义。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_139",
+              "label": "reading_volume_5",
+              "description": "课外阅读量累计达到15万词以上。",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_140",
+              "label": "identify_logic_relations",
+              "description": "能理解语篇中显性或隐性的逻辑关系。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_141",
+              "label": "understand_discourse_phenomena",
+              "description": "能根据话语中的重复、解释、停顿等现象理解话语的意义。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_142",
+              "label": "understand_nonverbal_resources",
+              "description": "能理解多模态语篇中非文字资源传达的意义。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_143",
+              "label": "polite_communication",
+              "description": "能沟通信息，参与讨论，恰当运用礼貌用语。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_144",
+              "label": "oral_summary",
+              "description": "能口头概括所读故事或短文的大意，转述他人简单的谈话。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_145",
+              "label": "express_opinion",
+              "description": "能围绕相关主题口头表达个人的观点和态度，并说明理由。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_146",
+              "label": "evaluate_content",
+              "description": "能就口语或书面语篇的内容、观点和态度作出简单的口头评价并说明理由。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_147",
+              "label": "use_intonation_stress",
+              "description": "能借助语调和重音突出需要强调的意义。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_148",
+              "label": "adapt_texts",
+              "description": "能根据所读语篇内容和所给条件进行简单的口头或书面改编、创编。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_149",
+              "label": "independent_writing",
+              "description": "能根据写作要求收集、准备素材，独立起草、修改和完成语篇。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_150",
+              "label": "describe_charts",
+              "description": "能为所给图表或自己创作的图片写出简单的说明。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_151",
+              "label": "written_description",
+              "description": "能围绕相关主题用书面语篇描述和介绍身边的人和事物，表达情感、态度和观点。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_152",
+              "label": "use_connectors",
+              "description": "能在口头和书面表达中使用常见的连接词表示顺序和逻辑关系。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_153",
+              "label": "self_correction",
+              "description": "能在口头和书面表达中进行适当的自我修正，用语得当。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_154",
+              "label": "maintain_conversation",
+              "description": "能根据交际需要发起谈话并维持交谈。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_155",
+              "label": "describe_multimodal",
+              "description": "能使用文字和非文字手段描述个人经历、事件和事物特征。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_156",
+              "label": "question_content",
+              "description": "能恰当质疑语篇的内容、观点，解释不合理之处。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S1_157",
+              "label": "concentrate_in_learning",
+              "description": "在学习时集中注意力",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S1_158",
+              "label": "listen_and_think",
+              "description": "在交流中注意倾听、积极思考",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S1_159",
+              "label": "use_multiple_ways",
+              "description": "尝试运用多种途径学习英语，遇到问题主动请教",
+              "cognitive_level": "应用",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S1_160",
+              "label": "make_learning_plan",
+              "description": "在教师指导下制订简单的学习计划并付诸行动",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S1_161",
+              "label": "reflect_on_progress",
+              "description": "能意识到自己英语学习中的进步与不足并调整",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S1_162",
+              "label": "connect_words_objects",
+              "description": "在词语与相应事物之间建立联系",
+              "cognitive_level": "理解",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S1_163",
+              "label": "connect_old_new_knowledge",
+              "description": "在新旧语言知识之间建立联系",
+              "cognitive_level": "理解",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S1_164",
+              "label": "learn_in_context",
+              "description": "在语境中学习词汇和语法",
+              "cognitive_level": "理解",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S1_165",
+              "label": "classify_to_remember",
+              "description": "通过分类等方法加深对词汇的理解和记忆",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S1_166",
+              "label": "use_english_actively",
+              "description": "积极运用所学英语进行表达和交流",
+              "cognitive_level": "应用",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S1_167",
+              "label": "observe_english_in_life",
+              "description": "注意观察生活和媒体中使用的简单英语",
+              "cognitive_level": "了解",
+              "source_block": "学习策略"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": 2,
+      "grade_band": "3-4",
+      "domains": [
+        {
+          "name": "词汇",
+          "knowledge_points": [
+            {
+              "id": "EN_S2_001",
+              "label": "topic_vocabulary",
+              "description": "了解英语主题词汇，包括人与自然、人与社会、人与自然三大范畴下的子主题内容。",
+              "cognitive_level": "了解",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S2_002",
+              "label": "occupation_vocab",
+              "description": "掌握常见职业的英语词汇，如教师、医生等，并能用于简单交流。",
+              "cognitive_level": "掌握",
+              "source_block": "主题"
+            }
+          ]
+        },
+        {
+          "name": "语篇",
+          "knowledge_points": [
+            {
+              "id": "EN_S2_003",
+              "label": "nursery_rhymes",
+              "description": "了解歌谣、歌曲、韵文等语篇类型",
+              "cognitive_level": "了解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S2_004",
+              "label": "dialogue_comprehension",
+              "description": "理解日常简短对话和独白",
+              "cognitive_level": "理解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S2_005",
+              "label": "reading_comprehension",
+              "description": "理解配图故事和叙事性日记",
+              "cognitive_level": "理解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S2_006",
+              "label": "introduction_texts",
+              "description": "理解人物、物品、地点介绍类语篇",
+              "cognitive_level": "理解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S2_007",
+              "label": "practical_writing",
+              "description": "理解书信、通知、贺卡等应用文",
+              "cognitive_level": "理解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S2_008",
+              "label": "other_text_types",
+              "description": "认识提示牌、图表、图片等语篇类型",
+              "cognitive_level": "了解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S2_009",
+              "label": "cultural_differences_greetings",
+              "description": "了解英语和汉语在姓名、称谓、问候等表达方式上的异同。",
+              "cognitive_level": "了解",
+              "source_block": "文化知识"
+            },
+            {
+              "id": "EN_S2_010",
+              "label": "cultural_differences_daily_life",
+              "description": "了解不同国家在学校生活、家庭生活、饮食习惯等方面的异同。",
+              "cognitive_level": "了解",
+              "source_block": "文化知识"
+            },
+            {
+              "id": "EN_S2_011",
+              "label": "cultural_symbols_festivals",
+              "description": "了解中外典型文化标志物和传统节日的简单信息。",
+              "cognitive_level": "了解",
+              "source_block": "文化知识"
+            }
+          ]
+        },
+        {
+          "name": "语音",
+          "knowledge_points": [
+            {
+              "id": "EN_S2_012",
+              "label": "letter_recognition",
+              "description": "识别并读出26个英文字母的大小写形式",
+              "cognitive_level": "掌握",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_013",
+              "label": "phonics",
+              "description": "感知字母在单词中的发音规律",
+              "cognitive_level": "了解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_014",
+              "label": "spelling_rule",
+              "description": "尝试运用拼读规则拼读单词",
+              "cognitive_level": "应用",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_015",
+              "label": "intonation_awareness",
+              "description": "感知英语的重音和句子的升降调",
+              "cognitive_level": "了解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_016",
+              "label": "word_structure",
+              "description": "知道单词由字母构成",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_017",
+              "label": "vocabulary_understanding",
+              "description": "借助图片或实物理解词汇意思",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_018",
+              "label": "word_production",
+              "description": "根据视觉或听觉提示说出单词和短语",
+              "cognitive_level": "掌握",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_019",
+              "label": "vocabulary_learning_strategy",
+              "description": "根据音形义学习词汇并体会语境含义",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_020",
+              "label": "sentence_function",
+              "description": "在语境中感知常用简单句的表意功能",
+              "cognitive_level": "了解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_021",
+              "label": "tense_usage",
+              "description": "理解一般现在时和现在进行时的形式、意义和用法",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_022",
+              "label": "grammar_application",
+              "description": "运用所学语法描述人和物并进行简单交流",
+              "cognitive_level": "应用",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_023",
+              "label": "turn_taking",
+              "description": "识别对话中的话轮转换",
+              "cognitive_level": "了解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_024",
+              "label": "text_type",
+              "description": "知道语篇有不同类型如对话和配图故事",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_025",
+              "label": "image_text_relation",
+              "description": "体会语篇中图片与文字的关系",
+              "cognitive_level": "了解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_026",
+              "label": "social_etiquette",
+              "description": "使用称谓语、问候语和告别语得体交流",
+              "cognitive_level": "应用",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_027",
+              "label": "polite_expressions",
+              "description": "在语境中使用基本礼貌用语",
+              "cognitive_level": "掌握",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S2_028",
+              "label": "response_to_emotions",
+              "description": "对赞扬、道歉、致谢等作出恰当回应",
+              "cognitive_level": "应用",
+              "source_block": "语言知识/语音"
+            }
+          ]
+        },
+        {
+          "name": "写作",
+          "knowledge_points": [
+            {
+              "id": "EN_S2_029",
+              "label": "understanding_instructions",
+              "description": "理解课堂中的简单指令并做出反应",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_030",
+              "label": "predicting_from_pictures",
+              "description": "根据图片和标题推测语篇主题和主要信息",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_031",
+              "label": "extracting_information",
+              "description": "在听、读、看中有目的地提取和梳理信息",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_032",
+              "label": "inferring_multimodal_meaning",
+              "description": "推断多模态语篇中画面、图像等传达的意义",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_033",
+              "label": "inferring_emotion_from_tone",
+              "description": "借助语气、语调等推断说话者的情绪和态度",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_034",
+              "label": "weekly_audiovisual_activity",
+              "description": "每周进行不少于30分钟的课外视听活动",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_035",
+              "label": "extensive_reading",
+              "description": "课外阅读量累计达到1500-2000词",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_036",
+              "label": "greeting_and_farewell",
+              "description": "在语境中与他人互致简单问候或道别",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_037",
+              "label": "singing_songs",
+              "description": "演唱所学的简单英语歌曲",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_038",
+              "label": "reading_aloud",
+              "description": "大声跟读音视频材料，正确朗读学过的内容",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_039",
+              "label": "personal_info_exchange",
+              "description": "交流简单的个人和家庭信息",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_040",
+              "label": "expressing_feelings",
+              "description": "表达简单的情感和喜好",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_041",
+              "label": "describing_daily_life",
+              "description": "简单介绍自己的日常起居和生活",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_042",
+              "label": "describing_school_life",
+              "description": "简单介绍自己的学校和学校生活",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_043",
+              "label": "describing_animals",
+              "description": "简单介绍自己喜欢的动物",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_044",
+              "label": "describing_pictures",
+              "description": "用简单的语句描述图片或事物",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_045",
+              "label": "role_play",
+              "description": "在教师指导下进行简单的角色扮演",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_046",
+              "label": "correct_writing",
+              "description": "正确书写字母、单词和句子",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_047",
+              "label": "sentence_copying",
+              "description": "根据图片或语境仿写简单的句子",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_048",
+              "label": "dubbing",
+              "description": "在画面提示下为对话、故事或动画配音",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_049",
+              "label": "oral_narration",
+              "description": "口头描述事件或讲述小故事",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_050",
+              "label": "understanding_instructions_advanced",
+              "description": "理解日常学习和生活中的简单指令并完成任务",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_051",
+              "label": "extracting_main_info",
+              "description": "借助图片理解常见主题语篇，提取主要信息",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_052",
+              "label": "guessing_words_from_context",
+              "description": "根据上下文线索猜测词汇意思和未知信息",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_053",
+              "label": "summarizing_story_plot",
+              "description": "归纳故事类语篇的主要情节",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_054",
+              "label": "classifying_information",
+              "description": "对语篇中的信息进行分类",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_055",
+              "label": "comparing_perspectives",
+              "description": "比较语篇中人物或事物的相似性和差异性",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_056",
+              "label": "summarizing_content",
+              "description": "概括语篇的主要内容并体会信息关联",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_057",
+              "label": "understanding_multimodal_advanced",
+              "description": "理解多模态语篇传达的意义并提取关键信息",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_058",
+              "label": "weekly_audiovisual_advanced",
+              "description": "每周进行不少于30分钟的课外视听活动",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_059",
+              "label": "extensive_reading_advanced",
+              "description": "课外阅读量累计达到4000-5000词",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_060",
+              "label": "reading_chapter_books",
+              "description": "阅读有配图的简单章节书并概括大意",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_061",
+              "label": "daily_conversation",
+              "description": "运用日常用语进行简单交流",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_062",
+              "label": "fluent_reading",
+              "description": "完整连贯地朗读语篇并复述大意",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_063",
+              "label": "expressing_opinions",
+              "description": "围绕主题进行简短叙述，表达情感和观点",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_064",
+              "label": "performing_short_plays",
+              "description": "在教师帮助下表演小故事或短剧",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_065",
+              "label": "describing_events",
+              "description": "简单描述事件或讲述小故事",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_066",
+              "label": "writing_descriptions",
+              "description": "围绕图片写出几句意思连贯的描述",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_067",
+              "label": "imitative_writing",
+              "description": "模仿范文结构和内容写几句连贯的话",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_068",
+              "label": "correct_punctuation",
+              "description": "正确使用大小写字母和常见标点符号",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_069",
+              "label": "creative_expression",
+              "description": "运用图表、海报等方式创造性地表达意义",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_070",
+              "label": "themed_speech",
+              "description": "进行简短的主题演讲，观点明确、逻辑清楚",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_071",
+              "label": "story_creation",
+              "description": "结合主题图口头创编故事",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_072",
+              "label": "responding_to_instructions",
+              "description": "根据连续指令和问题作出适当反应",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_073",
+              "label": "identifying_theme",
+              "description": "识别口语语篇的主题、大意和要点",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_074",
+              "label": "identifying_context",
+              "description": "识别口语语篇的情境和说话者身份",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_075",
+              "label": "understanding_intonation",
+              "description": "识别语调变化判断意义变化",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_076",
+              "label": "using_visuals",
+              "description": "借助图片等视觉信息理解收听内容",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_077",
+              "label": "understanding_written_text",
+              "description": "理解书面语篇的整体意义和主要内容",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_078",
+              "label": "predicting_from_title",
+              "description": "根据标题或图片预测语篇内容和情节发展",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_079",
+              "label": "extracting_key_info",
+              "description": "提取、梳理、分析和整合书面语篇的关键信息",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_080",
+              "label": "identifying_logical_relations",
+              "description": "识别和判断书面语篇中句子之间的逻辑关系",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_081",
+              "label": "inferring_word_meaning",
+              "description": "根据上下文推断生词意义",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_082",
+              "label": "reading_stories",
+              "description": "阅读故事并概括、描述与评价",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_083",
+              "label": "weekly_audiovisual_grade7",
+              "description": "每周进行不少于30分钟的课外视听活动",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_084",
+              "label": "extensive_reading_grade7",
+              "description": "课外阅读量累计达到4万词以上",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_085",
+              "label": "singing_poems",
+              "description": "演唱英语歌曲，诵读英语诗歌",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_086",
+              "label": "fluent_reading_grade7",
+              "description": "完整连贯地朗读短文并复述大意",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_087",
+              "label": "role_play_grade7",
+              "description": "在教师指导下进行简单的角色扮演",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_088",
+              "label": "oral_communication",
+              "description": "围绕主题用简短表达进行口头交流",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_089",
+              "label": "accurate_expression",
+              "description": "在口头表达中使用准确的词语和语音语调",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_090",
+              "label": "independent_writing",
+              "description": "独立写出几个意义连贯的语句",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_091",
+              "label": "writing_with_prompts",
+              "description": "利用提示写出简单文段或小故事",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_092",
+              "label": "writing_personal_info",
+              "description": "用书面语篇介绍个人情况和个人经历",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_093",
+              "label": "writing_invitations",
+              "description": "写出或回复简单的问候和邀请",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_094",
+              "label": "correct_punctuation_grade7",
+              "description": "在书面表达中正确使用标点符号，用词准确",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_095",
+              "label": "extracting_key_details",
+              "description": "获取和梳理口语语篇的主旨要义和关键细节",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_096",
+              "label": "inferring_relationship",
+              "description": "识别说话者措辞和语气，推断对话者关系",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_097",
+              "label": "judging_emotion_change",
+              "description": "根据语音语调变化判断情感和态度变化",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_098",
+              "label": "identifying_discourse_progression",
+              "description": "识别正式对话中谈话内容的递进和转换",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_099",
+              "label": "understanding_media",
+              "description": "收听或观看主题相关节目，识别主题获取信息",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_100",
+              "label": "organizing_text_structure",
+              "description": "梳理书面语篇的脉络和梗概，归纳要点",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_101",
+              "label": "distinguishing_fact_opinion",
+              "description": "区分书面语篇中的事实性信息和非事实性信息",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_102",
+              "label": "interpreting_charts",
+              "description": "理解并解释书面语篇中图表提供的信息",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_103",
+              "label": "identifying_logical_relations_grade8",
+              "description": "识别和判断书面语篇中上下文之间的逻辑关系",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_104",
+              "label": "inferring_implied_meaning",
+              "description": "理解和推测书面语篇中隐含的信息和意义",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_105",
+              "label": "reading_short_stories",
+              "description": "阅读短篇小说和简单报刊文章并概括评价",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_106",
+              "label": "weekly_audiovisual_grade8",
+              "description": "每周进行不少于30分钟的课外视听活动",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_107",
+              "label": "extensive_reading_grade8",
+              "description": "课外阅读量累计达到10万词以上",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_108",
+              "label": "fluent_reading_grade8",
+              "description": "正确流利朗读短文并有逻辑地讲述主要内容",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_109",
+              "label": "group_role_play",
+              "description": "独立或小组合作完成角色扮演等活动",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_110",
+              "label": "effective_communication",
+              "description": "在特定情境中引出主题并进行有效口头交流",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_111",
+              "label": "accurate_oral_expression",
+              "description": "在口头表达中使用正确的词汇、句式和语法",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_112",
+              "label": "paraphrasing",
+              "description": "以口语或书面形式简单转述语篇主要内容和观点",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_113",
+              "label": "describing_experiences",
+              "description": "用书面语篇描写他人经历或熟悉的事物",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_114",
+              "label": "themed_speech_grade8",
+              "description": "进行主题演讲，观点明确、逻辑清楚",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_115",
+              "label": "drafting_revising",
+              "description": "在教师指导下起草和修改作文",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_116",
+              "label": "correct_punctuation_grade8",
+              "description": "在书面表达中正确使用标点符号，用词准确",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_117",
+              "label": "inferring_intention",
+              "description": "理解和推断日常生活中说话者的意图",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_118",
+              "label": "overcoming_word_barriers",
+              "description": "借助语境克服生词障碍理解口语信息",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_119",
+              "label": "predicting_plot",
+              "description": "获取口语语篇中事件的主题和因果关系，预测情节",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_120",
+              "label": "analyzing_structure",
+              "description": "分析和梳理常见书面语篇的基本结构特征",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_121",
+              "label": "judging_author_view",
+              "description": "从书面语篇中判断和归纳作者观点及主旨",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_122",
+              "label": "identifying_cohesion",
+              "description": "辨别语篇中的衔接手段和逻辑关系",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_123",
+              "label": "inferring_word_formation",
+              "description": "根据上下文和构词法推断生词含义",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_124",
+              "label": "selective_note_taking",
+              "description": "在听读看过程中有选择地记录信息和要点",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_125",
+              "label": "using_reading_strategies",
+              "description": "根据不同目的运用阅读策略获取信息",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_126",
+              "label": "reading_biographies",
+              "description": "阅读名人传记和报刊文章并概括内容",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_127",
+              "label": "connecting_texts",
+              "description": "建立语篇与语篇、个人、世界的关联",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_128",
+              "label": "weekly_audiovisual_grade9",
+              "description": "每周进行不少于30分钟的课外视听活动",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_129",
+              "label": "extensive_reading_grade9",
+              "description": "课外阅读量累计达到15万词以上",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_130",
+              "label": "understanding_logical_relations",
+              "description": "理解语篇中显性或隐性的逻辑关系",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_131",
+              "label": "understanding_discourse_markers",
+              "description": "根据话语中的重复、解释等理解意义",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_132",
+              "label": "understanding_non_text_resources",
+              "description": "理解多模态语篇中非文字资源传达的意义",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_133",
+              "label": "polite_communication",
+              "description": "沟通信息，恰当运用礼貌用语",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_134",
+              "label": "oral_summary",
+              "description": "口头概括故事或短文大意，转述他人谈话",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_135",
+              "label": "expressing_opinions_with_reasons",
+              "description": "围绕主题口头表达个人观点并说明理由",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_136",
+              "label": "oral_evaluation",
+              "description": "对语篇内容、观点作出简单口头评价并说明理由",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_137",
+              "label": "using_intonation_stress",
+              "description": "借助语调和重音突出需要强调的意义",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_138",
+              "label": "adapting_texts",
+              "description": "根据所读语篇内容和条件进行口头或书面改编",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_139",
+              "label": "independent_writing_process",
+              "description": "根据写作要求收集素材，独立起草、修改和完成",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_140",
+              "label": "writing_captions",
+              "description": "为图表或图片写出简单的说明",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_141",
+              "label": "describing_people_things",
+              "description": "用书面语篇描述和介绍身边的人和事物",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_142",
+              "label": "using_connectors",
+              "description": "在表达中使用常见连接词表示顺序和逻辑关系",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_143",
+              "label": "self_correction",
+              "description": "在表达中进行适当的自我修正，做到得体有效",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_144",
+              "label": "initiating_conversation",
+              "description": "根据交际需要发起谈话并维持交谈",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_145",
+              "label": "multimodal_description",
+              "description": "使用文字和非文字手段描述经历和事物",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_146",
+              "label": "critical_questioning",
+              "description": "恰当质疑语篇的内容和观点，解释不合理之处",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S2_147",
+              "label": "focus_attention",
+              "description": "在学习时集中注意力",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S2_148",
+              "label": "listening_and_thinking",
+              "description": "在交流中注意倾听并积极思考",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S2_149",
+              "label": "multiple_learning_ways",
+              "description": "尝试运用多种途径学习英语，主动请教",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S2_150",
+              "label": "simple_learning_plan",
+              "description": "在教师指导下制订简单的学习计划并执行",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S2_151",
+              "label": "self_assessment",
+              "description": "意识到英语学习中的进步与不足并调整",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S2_152",
+              "label": "word_object_connection",
+              "description": "在词语与相应事物之间建立联系",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S2_153",
+              "label": "new_old_knowledge_connection",
+              "description": "在新旧语言知识之间建立联系",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S2_154",
+              "label": "contextual_learning",
+              "description": "在语境中学习词汇和语法",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S2_155",
+              "label": "vocabulary_classification",
+              "description": "通过分类等方法加深对词汇的理解和记忆",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S2_156",
+              "label": "active_expression",
+              "description": "积极运用所学英语进行表达和交流",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S2_157",
+              "label": "simple_english_observation",
+              "description": "注意观察生活和媒体中使用的简单英语",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": 3,
+      "grade_band": "5-6",
+      "domains": [
+        {
+          "name": "词汇",
+          "knowledge_points": [
+            {
+              "id": "EN_S3_001",
+              "label": "extended_topic_vocab",
+              "description": "理解英语主题词汇，涵盖人与自然、人与社会、人与自我三大范畴及其子主题。",
+              "cognitive_level": "理解",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S3_002",
+              "label": "self_life_study",
+              "description": "掌握与个人生活、学习相关的主题词汇，如时间管理、学校生活等。",
+              "cognitive_level": "掌握",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S3_003",
+              "label": "self_character_growth",
+              "description": "理解与个人品格、成长相关的主题词汇，如自信、同理心等。",
+              "cognitive_level": "理解",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S3_004",
+              "label": "social_communication",
+              "description": "掌握与社会交往、服务相关的主题词汇，如规则、互助等。",
+              "cognitive_level": "掌握",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S3_005",
+              "label": "social_culture_arts",
+              "description": "理解与文化、艺术、体育相关的主题词汇，如节日、运动等。",
+              "cognitive_level": "理解",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S3_006",
+              "label": "social_science_tech",
+              "description": "了解与科学技术相关的主题词汇，如发明、创新等。",
+              "cognitive_level": "了解",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S3_007",
+              "label": "nature_ecology",
+              "description": "掌握与自然生态、环境相关的主题词汇，如天气、动物等。",
+              "cognitive_level": "掌握",
+              "source_block": "主题"
+            },
+            {
+              "id": "EN_S3_008",
+              "label": "nature_disaster_space",
+              "description": "了解与灾害防范、宇宙探索相关的主题词汇，如安全、航天等。",
+              "cognitive_level": "了解",
+              "source_block": "主题"
+            }
+          ]
+        },
+        {
+          "name": "语篇",
+          "knowledge_points": [
+            {
+              "id": "EN_S3_009",
+              "label": "dialogue_monologue",
+              "description": "识别日常简单对话和独白的基本特征",
+              "cognitive_level": "了解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S3_010",
+              "label": "narrative_text",
+              "description": "理解记叙文如配图故事、日记、寓言等的基本结构",
+              "cognitive_level": "理解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S3_011",
+              "label": "expository_text",
+              "description": "掌握说明文如介绍类、科普类短文的特点",
+              "cognitive_level": "掌握",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S3_012",
+              "label": "applied_text",
+              "description": "应用应用文如贺卡、邀请卡、书信等进行简单交流",
+              "cognitive_level": "应用",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S3_013",
+              "label": "new_media_text",
+              "description": "了解新媒体语篇如社交媒体信息、网页等的基本形式",
+              "cognitive_level": "了解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S3_014",
+              "label": "other_text_types",
+              "description": "了解歌曲、韵文、剧本等其他语篇类型",
+              "cognitive_level": "了解",
+              "source_block": "语篇"
+            },
+            {
+              "id": "EN_S3_015",
+              "label": "cultural_etiquette",
+              "description": "了解不同文化中的行为、习俗、礼仪和谈话禁忌。",
+              "cognitive_level": "了解",
+              "source_block": "文化知识"
+            },
+            {
+              "id": "EN_S3_016",
+              "label": "festivals",
+              "description": "了解中外重大节日的名称、时间、庆祝方式和意义。",
+              "cognitive_level": "了解",
+              "source_block": "文化知识"
+            },
+            {
+              "id": "EN_S3_017",
+              "label": "literary_works",
+              "description": "理解简单英语文学作品及其蕴含的人生哲理或价值观。",
+              "cognitive_level": "理解",
+              "source_block": "文化知识"
+            },
+            {
+              "id": "EN_S3_018",
+              "label": "historical_figures",
+              "description": "了解中外杰出人物的成长经历及其贡献。",
+              "cognitive_level": "了解",
+              "source_block": "文化知识"
+            },
+            {
+              "id": "EN_S3_019",
+              "label": "sports_culture",
+              "description": "了解中外体育项目、赛事、优秀运动员和体育精神。",
+              "cognitive_level": "了解",
+              "source_block": "文化知识"
+            },
+            {
+              "id": "EN_S3_020",
+              "label": "art_figures",
+              "description": "了解中外艺术领域有造诣的人物及其作品。",
+              "cognitive_level": "了解",
+              "source_block": "文化知识"
+            },
+            {
+              "id": "EN_S3_021",
+              "label": "world_cultures",
+              "description": "了解世界主要国家的基本信息、旅游文化和风土人情。",
+              "cognitive_level": "了解",
+              "source_block": "文化知识"
+            },
+            {
+              "id": "EN_S3_022",
+              "label": "cultural_diversity",
+              "description": "感知和体验文化多样性。",
+              "cognitive_level": "了解",
+              "source_block": "文化知识"
+            }
+          ]
+        },
+        {
+          "name": "语音",
+          "knowledge_points": [
+            {
+              "id": "EN_S3_023",
+              "label": "phonics_rules",
+              "description": "借助拼读规则拼读单词",
+              "cognitive_level": "掌握",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_024",
+              "label": "stress_intonation",
+              "description": "使用正确的语音、语调朗读对话和短文",
+              "cognitive_level": "掌握",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_025",
+              "label": "word_stress_attitude",
+              "description": "借助单词重读表达态度与情感",
+              "cognitive_level": "应用",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_026",
+              "label": "intonation_rhythm",
+              "description": "感知并模仿英语的意群、语调与节奏",
+              "cognitive_level": "了解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_027",
+              "label": "oral_fluency",
+              "description": "口头表达中语音基本正确，语调自然流畅",
+              "cognitive_level": "掌握",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_028",
+              "label": "vocabulary_context",
+              "description": "在语境中理解词汇含义并逐步积累",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_029",
+              "label": "vocabulary_use",
+              "description": "运用词汇描述事物、行为、过程和特征",
+              "cognitive_level": "应用",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_030",
+              "label": "basic_vocabulary",
+              "description": "初步运用500个左右单词进行主题交流",
+              "cognitive_level": "掌握",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_031",
+              "label": "sentence_structure",
+              "description": "理解常用简单句的基本结构和表意功能",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_032",
+              "label": "past_future_tense",
+              "description": "理解一般过去时和一般将来时的形式、意义和用法",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_033",
+              "label": "grammar_application",
+              "description": "运用语法知识描述比较人和物、事件发展等",
+              "cognitive_level": "应用",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_034",
+              "label": "text_structure",
+              "description": "判断故事类语篇的开头、中间和结尾",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_035",
+              "label": "topic_sentence",
+              "description": "发现段落主题句与段落内容的关系",
+              "cognitive_level": "理解",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_036",
+              "label": "text_clues",
+              "description": "利用标题、图片等信息辅助语篇理解",
+              "cognitive_level": "掌握",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_037",
+              "label": "appropriate_expression",
+              "description": "根据语境得体表达情感、态度和观点",
+              "cognitive_level": "应用",
+              "source_block": "语言知识/语音"
+            },
+            {
+              "id": "EN_S3_038",
+              "label": "response_appropriately",
+              "description": "对邀请、祝愿等作出恰当回应",
+              "cognitive_level": "掌握",
+              "source_block": "语言知识/语音"
+            }
+          ]
+        },
+        {
+          "name": "写作",
+          "knowledge_points": [
+            {
+              "id": "EN_S3_039",
+              "label": "understanding_skills",
+              "description": "理解性技能包括听、读、看，用于获取和理解信息。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_040",
+              "label": "expressive_skills",
+              "description": "表达性技能包括说和写，用于输出和表达信息。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_041",
+              "label": "viewing_skill",
+              "description": "利用多模态语篇中的图形、表格、动画等理解意义。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_042",
+              "label": "comprehend_multimodal_text",
+              "description": "观察图表信息，理解符号和动画的意义。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_043",
+              "label": "listening_instruction",
+              "description": "理解课堂中的简单指令并作出反应。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_044",
+              "label": "predict_theme",
+              "description": "根据图片和标题推测语篇的主题、语境及主要信息。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_045",
+              "label": "extract_information",
+              "description": "在听、读、看过程中有目的地提取、梳理所需信息。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_046",
+              "label": "infer_multimodal_meaning",
+              "description": "推断多模态语篇中画面、图像、声音等传达的意义。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_047",
+              "label": "infer_emotion",
+              "description": "借助语气、语调、手势等推断说话者的情绪和态度。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_048",
+              "label": "extracurricular_listening",
+              "description": "课外视听活动每周不少于30分钟。",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_049",
+              "label": "extracurricular_reading",
+              "description": "课外阅读量累计达到1500-2000词。",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_050",
+              "label": "greeting",
+              "description": "在语境中与他人互致简单的问候或道别。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_051",
+              "label": "sing_songs",
+              "description": "演唱所学的简单英语歌曲。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_052",
+              "label": "read_aloud",
+              "description": "大声跟读音视频材料，正确朗读对话、故事和文段。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_053",
+              "label": "personal_info_exchange",
+              "description": "交流简单的个人和家庭信息。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_054",
+              "label": "express_feelings",
+              "description": "表达简单的情感和喜好。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_055",
+              "label": "describe_daily_routine",
+              "description": "简单介绍自己的日常起居和生活。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_056",
+              "label": "describe_school_life",
+              "description": "简单介绍自己的学校和学校生活。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_057",
+              "label": "describe_animals",
+              "description": "简单介绍自己喜欢的动物。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_058",
+              "label": "describe_pictures",
+              "description": "用简单的语句描述图片或事物。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_059",
+              "label": "role_play",
+              "description": "在教师指导下进行简单的角色扮演。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_060",
+              "label": "write_letters_words_sentences",
+              "description": "正确书写字母、单词和句子。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_061",
+              "label": "imitate_sentences",
+              "description": "根据图片或语境仿写简单的句子。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_062",
+              "label": "dubbing",
+              "description": "在画面提示下为对话、故事或动画片段配音。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_063",
+              "label": "oral_description",
+              "description": "口头描述事件或讲述小故事。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_064",
+              "label": "understand_instructions",
+              "description": "理解日常学习和生活中的简单指令，完成任务。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_065",
+              "label": "extract_main_info",
+              "description": "借助图片理解常见主题语篇，提取、梳理、归纳主要信息。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_066",
+              "label": "guess_word_meaning",
+              "description": "根据上下文线索和非文字信息猜测词汇意思，推测未知信息。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_067",
+              "label": "summarize_plot",
+              "description": "归纳故事类语篇中主要情节的发生、发展与结局。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_068",
+              "label": "classify_information",
+              "description": "对语篇中的信息进行分类。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_069",
+              "label": "compare_perspectives",
+              "description": "比较语篇中人物、事物或观点间的相似性和差异性。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_070",
+              "label": "summarize_content",
+              "description": "概括语篇的主要内容，体会主要信息之间的关联。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_071",
+              "label": "extract_key_info_multimodal",
+              "description": "理解多模态语篇传达的意义，提取关键信息。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_072",
+              "label": "extracurricular_reading_4000",
+              "description": "课外阅读量累计达到4000-5000词。",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_073",
+              "label": "read_chapter_books",
+              "description": "阅读有配图的简单章节书，理解大意并进行口头概括。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_074",
+              "label": "daily_conversation",
+              "description": "运用日常用语与他人进行简单交流。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_075",
+              "label": "fluent_reading",
+              "description": "完整、连贯地朗读所学语篇，简单复述大意。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_076",
+              "label": "narrate_topics",
+              "description": "围绕相关主题进行简短叙述或交流，表达情感和观点。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_077",
+              "label": "perform_short_plays",
+              "description": "在教师帮助下表演小故事或短剧。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_078",
+              "label": "describe_events",
+              "description": "简单描述事件或讲述简单的小故事。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_079",
+              "label": "write_coherent_description",
+              "description": "围绕图片内容写出几句意思连贯的描述。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_080",
+              "label": "imitate_structure",
+              "description": "模仿范文的结构和内容写几句意思连贯的话，使用描述性词语。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_081",
+              "label": "correct_punctuation",
+              "description": "正确使用大小写字母和常见标点符号，单词拼写基本正确。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_082",
+              "label": "creative_expression",
+              "description": "运用图表、海报、自制绘本等方式创造性地表达意义。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_083",
+              "label": "short_speech",
+              "description": "进行简短的主题演讲，观点基本明确，逻辑清楚。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_084",
+              "label": "oral_story_creation",
+              "description": "结合主题图或连环画口头创编故事，语言基本准确。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_085",
+              "label": "respond_to_instructions",
+              "description": "根据连续指令和问题作出适当反应。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_086",
+              "label": "identify_oral_theme",
+              "description": "识别口语语篇的主题、大意和要点。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_087",
+              "label": "identify_speaker",
+              "description": "识别口语语篇的情境，判定说话者的身份。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_088",
+              "label": "identify_tone_change",
+              "description": "识别口语语篇中说话者的语调变化，判断意义变化。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_089",
+              "label": "use_visuals",
+              "description": "借助图片、影像等视觉信息理解收听和观看的内容。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_090",
+              "label": "comprehend_written_text",
+              "description": "理解书面语篇的整体意义和主要内容。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_091",
+              "label": "predict_content",
+              "description": "根据标题或图片预测书面语篇的大概内容或情节发展。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_092",
+              "label": "extract_analyze_info",
+              "description": "提取、梳理、分析和整合书面语篇的主要或关键信息。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_093",
+              "label": "identify_logical_relations",
+              "description": "识别和判断书面语篇中句子之间的逻辑关系。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_094",
+              "label": "infer_word_meaning_context",
+              "description": "根据书面语篇的上下文推断生词意义。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_095",
+              "label": "evaluate_story",
+              "description": "阅读故事，整体理解主要内容，进行简要概括、描述与评价。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_096",
+              "label": "extracurricular_reading_40000",
+              "description": "课外阅读量累计达到4万词以上。",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_097",
+              "label": "sing_poems",
+              "description": "演唱英语歌曲，诵读英语诗歌。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_098",
+              "label": "fluent_reading_retell",
+              "description": "完整、连贯地朗读短文，简单复述短文大意。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_099",
+              "label": "oral_communication",
+              "description": "围绕相关主题用简短表达进行口头交流，完成交际任务。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_100",
+              "label": "accurate_expression",
+              "description": "在口头表达中使用较为准确的词语和表达法，语音语调基本正确。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_101",
+              "label": "independent_writing",
+              "description": "自选主题，独立写出几个意义连贯、表意清楚的语句。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_102",
+              "label": "write_simple_text",
+              "description": "利用所给提示写出简单文段传达信息，编写小故事。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_103",
+              "label": "introduce_personal_experience",
+              "description": "用简单的书面语篇介绍个人情况和个人经历。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_104",
+              "label": "write_greetings",
+              "description": "写出或回复简单的问候和邀请。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_105",
+              "label": "correct_punctuation_writing",
+              "description": "在书面表达中正确使用常用标点符号，用词基本准确。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_106",
+              "label": "extract_key_details",
+              "description": "获取和梳理口语语篇的主旨要义和关键细节。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_107",
+              "label": "infer_relationship",
+              "description": "识别说话者的措辞、语气等，推断对话者之间的关系。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_108",
+              "label": "judge_emotion_tone",
+              "description": "根据语音语调变化判断情感和态度的变化。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_109",
+              "label": "identify_discourse_progression",
+              "description": "识别用语较正式的简短对话中谈话内容的递进和转换。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_110",
+              "label": "understand_media",
+              "description": "收听或观看主题相关、语速较慢的广播、电视节目，识别主题，理解大意。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_111",
+              "label": "outline_text",
+              "description": "梳理书面语篇的脉络、梗概和发展变化，提取关键信息，归纳要点。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_112",
+              "label": "distinguish_fact_opinion",
+              "description": "区分书面语篇中的事实性信息和非事实性信息。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_113",
+              "label": "interpret_charts",
+              "description": "理解并解释书面语篇中图表提供的信息。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_114",
+              "label": "infer_implicit_meaning",
+              "description": "理解和推测书面语篇中隐含的信息和意义。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_115",
+              "label": "read_short_stories",
+              "description": "阅读短篇小说和简单的报刊文章，整体理解主要内容，进行概括、描述与评价。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_116",
+              "label": "extracurricular_reading_100000",
+              "description": "课外阅读量累计达到10万词以上。",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_117",
+              "label": "fluent_reading_logical",
+              "description": "正确、流利地朗读短文，有逻辑地讲述主要内容。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_118",
+              "label": "group_role_play",
+              "description": "独立或小组合作完成角色扮演等活动。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_119",
+              "label": "initiate_topic",
+              "description": "在特定情境中引出主题，用所学语言进行口头交流，有效询问，恰当表达。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_120",
+              "label": "accurate_vocabulary_grammar",
+              "description": "在口头表达中使用正确的词汇、句式和语法，表意准确得体。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_121",
+              "label": "paraphrase_content",
+              "description": "以口语或书面形式简单转述语篇的主要内容和观点。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_122",
+              "label": "describe_experiences",
+              "description": "用简单的书面语篇描写他人的经历或熟悉的事物。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_123",
+              "label": "topic_speech",
+              "description": "结合相关主题进行主题演讲，观点基本明确，逻辑清楚。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_124",
+              "label": "draft_revise",
+              "description": "在教师指导下起草和修改作文。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_125",
+              "label": "standard_writing",
+              "description": "在书面表达中正确使用标点符号，用词准确，表达通顺，格式规范。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_126",
+              "label": "infer_intention",
+              "description": "理解和推断日常生活中说话者的意图。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_127",
+              "label": "overcome_unknown_words",
+              "description": "借助语境克服生词障碍，理解口语语篇的信息和意义。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_128",
+              "label": "predict_plot",
+              "description": "获取和梳理口语语篇中事件的主题和因果关系，预测情节发展。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_129",
+              "label": "analyze_structure",
+              "description": "分析和梳理常见书面语篇的基本结构特征和内容的主次关系。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_130",
+              "label": "judge_author_view",
+              "description": "从书面语篇中判断和归纳作者的观点及主旨要义。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_131",
+              "label": "identify_cohesion",
+              "description": "辨别语篇中的衔接手段，判断句子之间、段落之间的逻辑关系。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_132",
+              "label": "infer_word_formation",
+              "description": "根据上下文和构词法推断书面语篇中生词的含义。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_133",
+              "label": "selective_note_taking",
+              "description": "在听、读、看过程中针对语篇内容有选择地记录信息和要点。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_134",
+              "label": "use_reading_strategies",
+              "description": "根据不同目的运用各种阅读策略有效获取语篇信息。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_135",
+              "label": "read_biographies",
+              "description": "阅读名人传记和报刊文章，整体理解和简要概括所读内容。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_136",
+              "label": "connect_texts",
+              "description": "建立语篇与语篇、语篇与个人、语篇与世界的关联，探究现实意义。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_137",
+              "label": "extracurricular_reading_150000",
+              "description": "课外阅读量累计达到15万词以上。",
+              "cognitive_level": "了解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_138",
+              "label": "understand_logical_relations",
+              "description": "理解语篇中显性或隐性的逻辑关系。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_139",
+              "label": "understand_discourse_pauses",
+              "description": "根据话语中的重复、解释、停顿等现象理解话语意义。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_140",
+              "label": "understand_nonverbal_resources",
+              "description": "理解多模态语篇中非文字资源传达的意义。",
+              "cognitive_level": "理解",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_141",
+              "label": "polite_communication",
+              "description": "沟通信息，参与讨论，恰当运用礼貌用语。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_142",
+              "label": "oral_summary",
+              "description": "口头概括所读故事或短文的大意，转述他人简单的谈话。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_143",
+              "label": "express_opinions",
+              "description": "围绕相关主题口头表达个人观点和态度，并说明理由。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_144",
+              "label": "evaluate_content",
+              "description": "就口语或书面语篇的内容、观点和态度作出简单口头评价，并说明理由。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_145",
+              "label": "use_intonation_stress",
+              "description": "借助语调和重音突出需要强调的意义。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_146",
+              "label": "adapt_create",
+              "description": "根据所读语篇内容和所给条件进行简单的口头或书面改编、创编。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_147",
+              "label": "independent_writing_process",
+              "description": "根据写作要求收集、准备素材，独立起草、修改和完成语篇。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_148",
+              "label": "write_captions",
+              "description": "为所给图表或自己创作的图片写出简单的说明。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_149",
+              "label": "describe_people_things",
+              "description": "围绕相关主题用书面语篇描述和介绍身边的人和事物，表达情感、态度和观点。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_150",
+              "label": "use_connectors",
+              "description": "在口头和书面表达中使用常见的连接词表示顺序和逻辑关系，做到意义连贯。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_151",
+              "label": "self_correction",
+              "description": "在口头和书面表达中进行适当的自我修正，用语得当，沟通有效。",
+              "cognitive_level": "掌握",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_152",
+              "label": "initiate_conversation",
+              "description": "根据交际需要发起谈话并维持交谈。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_153",
+              "label": "describe_multimodal",
+              "description": "使用文字和非文字手段描述个人经历、事件和事物特征。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_154",
+              "label": "question_content",
+              "description": "恰当质疑语篇的内容、观点，解释不合理之处。",
+              "cognitive_level": "应用",
+              "source_block": "语言技能"
+            },
+            {
+              "id": "EN_S3_155",
+              "label": "preview_and_review",
+              "description": "根据需要进行预习，主动复习和归纳所学内容。",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S3_156",
+              "label": "make_study_plan",
+              "description": "在教师指导下制定简单的学习计划，合理安排时间。",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S3_157",
+              "label": "use_resources",
+              "description": "主动利用图书馆和相关资源进行拓展学习。",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S3_158",
+              "label": "use_dictionary",
+              "description": "初步借助词典等工具书学习英语。",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S3_159",
+              "label": "explore_learning_methods",
+              "description": "主动了解英语学习方法，探索适合自己的方法。",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            },
+            {
+              "id": "EN_S3_160",
+              "label": "self_evaluation",
+              "description": "对学习过程和效果进行自我评价和反思，调整计划。",
+              "cognitive_level": "掌握",
+              "source_block": "学习策略"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

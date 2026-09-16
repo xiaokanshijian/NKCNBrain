@@ -1,0 +1,45 @@
+{
+  "schema_version": "feedback-skill-v1",
+  "id": "general-feedback",
+  "version": "1.0.0",
+  "kind": "general",
+  "compatible_schema": "feedback-context-v2",
+  "subject_scope": [
+    "*"
+  ],
+  "education_scope": [
+    "*"
+  ],
+  "material_scope": [
+    "*"
+  ],
+  "unit_scope": [
+    "*"
+  ],
+  "grades": [],
+  "priority": 0,
+  "coverage_status": "offline_only",
+  "rules": [
+    {
+      "id": "general-evidence",
+      "stages": [
+        "detect",
+        "grade",
+        "cross_page",
+        "review",
+        "sessions",
+        "memory",
+        "profile",
+        "ontology",
+        "pass2",
+        "filter",
+        "quality"
+      ],
+      "condition": "always",
+      "text_key": "general-evidence",
+      "evaluation_item": "evidence",
+      "refines": [],
+      "conflicts": []
+    }
+  ]
+}

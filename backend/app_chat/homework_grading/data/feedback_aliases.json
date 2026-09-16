@@ -1,0 +1,27 @@
+{
+  "version": "feedback-aliases-v1",
+  "source": "改造设计书v2.0第4、5节；仅协议别名，不表示专项或课程已支持",
+  "education_level": {
+    "小学": "primary", "初中": "junior", "高中": "senior", "大学": "university",
+    "primary": "primary", "junior": "junior", "senior": "senior", "university": "university",
+    "vocational": "vocational", "postgraduate": "postgraduate", "adult": "adult", "other": "other"
+  },
+  "subject": {
+    "数学": "math", "语文": "chinese", "英语": "english", "物理": "physics",
+    "化学": "chemistry", "生物": "biology", "历史": "history", "地理": "geography",
+    "math": "math", "chinese": "chinese", "english": "english", "physics": "physics"
+  },
+  "subject_names": {
+    "math": "数学", "chinese": "语文", "english": "英语", "physics": "物理",
+    "chemistry": "化学", "biology": "生物", "history": "历史", "geography": "地理"
+  },
+  "material_type": {
+    "作业": "homework", "试卷": "exam", "测验卷": "exam", "笔记": "notes",
+    "作文": "composition", "写作": "composition", "写话": "composition",
+    "阅读日志": "reading_journal", "日志": "journal", "日记": "diary"
+  },
+  "material_names": {
+    "homework": "作业", "exam": "试卷", "notes": "笔记", "composition": "作文",
+    "reading_journal": "阅读日志", "journal": "日志", "diary": "日记"
+  }
+}

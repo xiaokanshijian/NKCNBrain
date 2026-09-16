@@ -1,0 +1,45 @@
+{
+  "texts": {
+    "chinese-grade-rules": "\n【语文专项批改规则】\n1. 阅读理解、仿写、概括、表达理由类题，若阅读材料在本页可见且学生回答能围绕文本或生活经验自圆其说、言之有理，应判 correct；不要仅因「无唯一标准答案」设为 uncertain。\n2. 这类题只有在材料缺失、回答离题、答非所问、关键依据明显错误或字迹大面积不可辨时，才判 wrong/partial/uncertain。\n3. 对于「读拼音，写词语」「读拼音，结合语境写字词」「看拼音写词语」这类根据拼音写字词的题，需要额外关注学生最终保留手写词是否写成明显错别字；若写错，要在 error_type 写明「字形错误」或「错别字」。\n4. 其它语文题按题意和答案内容批改，不需要刻意做汉字部件级字形审查。",
+    "chinese-slash-tianzige-rules": "\n【语文手写涂改 / 斜杠划掉 / 田字格】\n1. 斜杠删除线多为从左上到右下方向的斜线(也不排除其他可能)；被杠掉的部分可能是偏旁/部首、单个字或多个字，以图像实际划线范围为准，被杠掉即作废。\n2. 「读拼音写词」常用田字格；学生涂改或斜杠修正后的最终字，常写在田字格外（格子上/下/左/右、格缝旁），仍应计入最终作答。\n3. 转写 student_answer / visual_answer 时，只写最终保留、未被划掉的有效手写；若格内被斜杠划掉而在格外重写，以格外的修正字为准。",
+    "chinese-pronunciation-selection-detect-rules": "\n【“给加点字选择正确读音”题内作答槽位（仅该题型）】\n1. 若题干要求“给加点字（或给加点的字）选择正确的读音”，保持整道题一个 questions 记录和原题 id，不得拆成多个题目。\n2. 除题目总 position 外，必须额外输出 answer_slots；每个加点字一项，按页面阅读顺序排列。其它语文题不要输出 answer_slots。\n3. 每个 answer_slots 项严格使用以下字段：\n   - slot_id：\"<题目id>:<加点字>\"；\n   - target：对应的加点字；\n   - slot_position：紧凑包围该字的全部候选拼音及学生黑色勾选标记；\n   - candidate_regions：逐个候选拼音的印刷区域，每项为 {\"label\": \"带声调拼音\", \"position\": [x1,y1,x2,y2]}；\n   - mark_position：只紧密包围学生黑色勾/圈选笔迹，允许与候选拼音重叠；\n   - layout_confidence：该槽位坐标置信度（0–100）。\n4. 所有坐标均相对整页归一化到 0–1000。candidate_regions 通常恰有两个候选；必须保留声调，候选标签和坐标一一对应。\n5. 本阶段不得判断学生选择了哪个候选，不得输出 selected_answer，也不得按正确读音推测勾选位置；只做客观版面标记。",
+    "chinese-pronunciation-selection-grade-rules": "\n【本页含经坐标校验的读音选择槽位（仅约束客观转写）】\n1. 题目一类记录中的 answer_slots 是无损版面阶段给出的定位证据：candidate_regions 是印刷候选读音及其区域，mark_position 是学生黑色勾选笔迹区域，slot_position 是该字完整候选组。\n2. 必须按 target 顺序逐槽观察原图，结合 mark_position 与 candidate_regions 的空间重叠/落点，先确定学生实际勾选的印刷候选，再组成 student_answer。\n3. 不得根据词语的正确读音反推学生选择，不得忽略声调，不得把相邻槽位的勾串位；槽位与原图明显冲突时设 uncertain。\n4. student_answer 只输出按 target 顺序排列的纯拼音列表，例如 \"wēng, fǔ, mái\"；不得输出“嗡(wēng)√”、加点字、括号或勾号。",
+    "chinese-sentence-contraction-page-rules": "\n【本页含缩句题：句子主干专项核验（仅约束 correct_answer 与判分）】\n1. 先从印刷原句独立提取句子主干，再比较各选项；不得因为学生选择了某项，就反向把该项解释为正确缩句。\n2. 缩句可以删除定语、状语、补语等修饰限制成分，但必须保留主语中心语、全部核心谓语和必要宾语；不得把“主谓宾”误解为每句只保留一个谓语。\n3. 同一主语支配两个或以上由“和、并、又、且、同时”等连接的并列核心动词时，这些动词共同承担谓语功能，缩句后必须全部保留，并保留表达并列关系所需的连接词；漏掉任一核心动词都不是完整主干。\n4. 例如“探索精神，极大地震撼和鼓舞着人们”的主干是“精神震撼和鼓舞着人们”，不能缩成只含“鼓舞”的“精神鼓舞着人们”。\n5. 本规则不得改写 student_answer：选择题括号内学生最终保留的黑笔字母必须按图转写；教师红笔圈改、浅色残影和正确选项只能用于判分，不能混入学生答案。",
+    "chinese-review-rules": "\n【语文复核重点】\n1. 对「读拼音，写词语」「读拼音，结合语境写字词」「看拼音写词语」这类根据拼音写字词的题，先从图像中重新转写学生最终保留的手写字，不要直接相信 student_answer；再检查是否明显写成错别字。\n2. 仅当明显错别字（缺偏旁、写成另一常用字、整词与拼音/语境明显不符）时，才 ok=false，fix.verdict 设为 wrong 或 partial，并在 fix.error_type 写明「字形错误」或「错别字」。\n3. 注意涂改、斜杠划掉后在上方/旁边/田字格外修正等情况：斜杠多为左上→右下，被杠掉的可能是部首或一字或多字等等；田字格题修正字常在格外，以未划掉的最终保留内容为准；若修正后字词正确，必须 ok=true，不得改判。\n4. 笔迹略糊、结构略挤但可辨认是目标字时，保持 correct；无法确定时 ok=true，不要矫枉过正。\n5. 对阅读理解和表达理由题，若答案言之有理且材料可见，可把原 uncertain 修正为 correct。",
+    "chinese-cross-page-suffix": "\n【语文阅读题特别提示】\n若本页包含阅读理解题，请判断：\n- 阅读材料（短文/诗歌/段落）是否完整出现在本页？\n  若短文开头或结尾明显缺失，请设置 boundary.continues_from_prev 或 continues_to_next。\n- 阅读小题是否有前续题目缺失（如题号从第2题开始、第1题不见）？\n  若有，设置 continues_from_prev，对缺少前文的小题设 cross_page = true, verdict = \"uncertain\"。\n仅标记你确实观察到截断证据的情形，不要过度标记。",
+    "-uncertain-rules[chinese]": "\n【uncertain 触发条件（语文）】\n以下情形必须将 verdict 设为 \"uncertain\"：\n1. 习作/看图写话/主观写作题（无标准答案，无法机器判定）。\n2. 阅读理解题依赖的原文不在本页（跨页缺失）。\n3. 连线/画线/标注类操作题。\n4. 朗读/背诵类任务（本质为口头评价，图片无法呈现完整信息）。\n5. 学生答案严重模糊（≥50% 无法辨认）。",
+    "-subject-hints[chinese]": "阅读理解类题以言之有理、贴合文本为主要判定标准；遇到读拼音/看拼音写词语类题时，再关注最终保留手写词是否明显错别字；阅读材料多为印刷体，student_answer 只转写学生手写部分。"
+  },
+  "verifiers": [
+    "chinese",
+    "fixed_document"
+  ],
+  "fixed_documents": {
+    "version": "fixed-document-special-cases-20260726-v3",
+    "description": "固定测试文档的特例身份清单。新任务只按原始 PDF SHA-256 匹配；legacy_sample_ids 仅供缺少源文件指纹的历史产物回放。",
+    "cases": [
+      {
+        "case_id": "primary_chinese_sample_1",
+        "subject": "chinese",
+        "source_document_sha256": "9c44fc825cff56855eb4710f3370022ad30ea9db74c9bd45c5d59bb1ae2cb9ab",
+        "legacy_sample_ids": [
+          "2918ec3f"
+        ],
+        "actions": {
+          "chinese_fixed_answer": [
+            12
+          ],
+          "chinese_personification_verifier": [
+            41
+          ],
+          "skip_self_review": [
+            12,
+            15,
+            19,
+            21
+          ]
+        }
+      }
+    ]
+  }
+}

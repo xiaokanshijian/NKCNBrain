@@ -1,0 +1,1611 @@
+{
+  "subject": "math",
+  "source": "义务教育数学课程标准（2022年版）",
+  "extracted_at": "2026-05-31T18:35:27",
+  "stages": [
+    {
+      "stage": 1,
+      "grade_band": "1-2",
+      "domains": [
+        {
+          "name": "数与代数",
+          "knowledge_points": [
+            {
+              "id": "MA_S1_001",
+              "label": "number_within_10000",
+              "description": "理解万以内数的意义和数位含义，知道用算盘表示多位数。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_002",
+              "label": "comparison_symbols",
+              "description": "了解<、=、>的含义，会比较万以内数的大小。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_003",
+              "label": "magnitude_comparison",
+              "description": "通过数的大小比较，感悟相等和不等关系。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_004",
+              "label": "four_operations_meaning",
+              "description": "在具体情境中了解四则运算的意义，感悟运算之间的关系。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_005",
+              "label": "add_sub_algorithm",
+              "description": "探索加法和减法的算理与算法，会整数加减法。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_006",
+              "label": "mul_div_algorithm",
+              "description": "探索乘法和除法的算理与算法，会简单的整数乘除法。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_007",
+              "label": "number_operation_application",
+              "description": "在解决生活情境问题中体会数和运算的意义，形成初步的符号意识、数感、运算能力和推理意识。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_008",
+              "label": "problem_solving_application",
+              "description": "在简单生活情境中运用数和运算解决问题，能解释结果的实际意义，形成初步的应用意识。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_009",
+              "label": "pattern_expression",
+              "description": "探索用数或符号表达简单情境中的变化规律。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_010",
+              "label": "place_value",
+              "description": "能说出不同数位上的数表示的数值",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_011",
+              "label": "compare_numbers",
+              "description": "能用符号表示数的大小关系",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_012",
+              "label": "meaning_of_operations",
+              "description": "能描述四则运算的含义，知道加减乘除的关系",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_013",
+              "label": "simple_add_sub",
+              "description": "能熟练口算20以内数的加减法",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_014",
+              "label": "multiplication_division_within_table",
+              "description": "能熟练口算表内乘除法",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_015",
+              "label": "add_sub_within_100",
+              "description": "能口算简单的百以内数的加减法",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_016",
+              "label": "add_sub_two_three_digit",
+              "description": "能计算两位数和三位数的加减法",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_017",
+              "label": "solve_simple_problems",
+              "description": "能在生活情境中运用数和运算解决简单问题",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_018",
+              "label": "explain_result_meaning",
+              "description": "能解释计算结果的实际意义，体会解决问题的道理",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            }
+          ]
+        },
+        {
+          "name": "图形与几何",
+          "knowledge_points": [
+            {
+              "id": "MA_S1_019",
+              "label": "shape_recognition",
+              "description": "通过实物和模型辨认简单的立体图形和平面图形",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_020",
+              "label": "shape_classification",
+              "description": "能对图形进行分类",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_021",
+              "label": "shape_puzzle",
+              "description": "会用简单图形拼图",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_022",
+              "label": "unit_importance",
+              "description": "体会建立统一度量单位的重要性",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_023",
+              "label": "length_unit",
+              "description": "认识长度单位米和厘米",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_024",
+              "label": "length_estimation",
+              "description": "能估测一些物体的长度",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_025",
+              "label": "length_measurement",
+              "description": "能进行长度测量",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_026",
+              "label": "spatial_sense",
+              "description": "形成初步的空间观念",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_027",
+              "label": "measurement_sense",
+              "description": "形成初步的量感",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_028",
+              "label": "solid_shape_recognition",
+              "description": "能辨认长方体、正方体、圆柱、球等立体图形，并直观描述其特征。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_029",
+              "label": "plane_shape_recognition",
+              "description": "能辨认长方形、正方形、平行四边形、三角形、圆等平面图形，并直观描述其特征。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_030",
+              "label": "shape_composition",
+              "description": "会用简单图形拼图，能在组合图形中说出各组成部分图形的名称。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_031",
+              "label": "solid_face_plane_mapping",
+              "description": "能说出立体图形中某一个面对应的平面图形。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_032",
+              "label": "length_unit_importance",
+              "description": "感悟统一单位的重要性。",
+              "cognitive_level": "了解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_033",
+              "label": "length_unit_selection",
+              "description": "能恰当选择长度单位米、厘米描述常见物体长度。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_034",
+              "label": "length_unit_conversion",
+              "description": "能进行米和厘米之间的单位换算。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            }
+          ]
+        },
+        {
+          "name": "统计与概率",
+          "knowledge_points": [
+            {
+              "id": "MA_S1_035",
+              "label": "simple_classify",
+              "description": "能对物体、图形或数据进行分类，并初步了解分类与分类标准的关系。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_036",
+              "label": "classify_by_standard",
+              "description": "能发现事物特征并制定分类标准，依据标准对事物分类。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_037",
+              "label": "describe_classification",
+              "description": "能用语言简单描述分类的过程。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_038",
+              "label": "perceive_commonality_difference",
+              "description": "能感知事物的共性和差异，形成初步的数据意识。",
+              "cognitive_level": "了解",
+              "source_block": "学业要求"
+            }
+          ]
+        },
+        {
+          "name": "综合与实践",
+          "knowledge_points": [
+            {
+              "id": "MA_S1_039",
+              "label": "money_basic",
+              "description": "认识人民币，能进行简单单位换算，了解货币意义，培养节约意识和金融素养。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_040",
+              "label": "time_basic",
+              "description": "认识时、分、秒，体会时间长短，了解时间意义，懂得遵守时间。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_041",
+              "label": "direction_basic",
+              "description": "会用上下左右前后描述相对位置，认识东南西北四个方向。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_042",
+              "label": "measurement_body",
+              "description": "运用身体上的长度作为单位测量物体，积累测量经验，发展量感。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_043",
+              "label": "math_story",
+              "description": "用数学知识记录经历或讲故事，表达对数量关系的理解。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_044",
+              "label": "math_habit",
+              "description": "回顾学前数学活动，激发兴趣，尝试使用数学词语，养成良好学习习惯。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S1_045",
+              "label": "money_usage",
+              "description": "在真实或模拟情境中合理使用人民币。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_046",
+              "label": "time_relation",
+              "description": "了解时、分、秒之间的关系，体会时间长短。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_047",
+              "label": "time_application",
+              "description": "将生活事件与时间建立联系，感悟时间与过程的关系。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_048",
+              "label": "position_relative",
+              "description": "用上、下、左、右、前、后描述物体的相对位置。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_049",
+              "label": "position_relative_concept",
+              "description": "了解物体间位置、方向的相对性，形成空间观念。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_050",
+              "label": "body_measurement",
+              "description": "了解身体上的长度，并用其测量物体。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S1_051",
+              "label": "math_storytelling",
+              "description": "编写含有数学知识的小故事，表达数学意义和数量关系。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": 2,
+      "grade_band": "3-4",
+      "domains": [
+        {
+          "name": "数与代数",
+          "knowledge_points": [
+            {
+              "id": "MA_S2_001",
+              "label": "big_number",
+              "description": "认识万以上的数，了解十进制计数法。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_002",
+              "label": "multiplication_division",
+              "description": "探索并掌握多位数的乘除法，感悟从未知到已知的转化。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_003",
+              "label": "fraction_basic",
+              "description": "初步认识小数和分数，感悟分数单位。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_004",
+              "label": "fraction_operations",
+              "description": "会进行同分母分数加减法和一位小数加减法。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_005",
+              "label": "mixed_operations",
+              "description": "理解四则运算的意义，能进行整数四则混合运算。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_006",
+              "label": "operation_law",
+              "description": "探索并理解加法交换律、结合律和乘法分配律，能用字母表示。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_007",
+              "label": "number_application",
+              "description": "运用数描述生活情境中事物的特征，形成数感、运算能力和推理意识。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_008",
+              "label": "estimation",
+              "description": "在具体情境中，选择合适的单位进行简单估算，体会估算作用。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_009",
+              "label": "calculator_use",
+              "description": "借助计算器进行计算，解决简单实际问题，探索简单规律。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_010",
+              "label": "quantity_relation",
+              "description": "认识总量=分量+分量、总价=单价×数量、路程=速度×时间等常见数量关系，并解决实际问题。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_011",
+              "label": "equal_quantity",
+              "description": "了解等量的等量相等。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_012",
+              "label": "problem_solving",
+              "description": "解决生活中的简单问题，解释结果实际意义，经历探索规律过程，形成模型意识和应用意识。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_013",
+              "label": "decimal_operations",
+              "description": "会进行同分母分数加减和一位小数加减运算。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_014",
+              "label": "algebra_expression",
+              "description": "能在实际情境中运用四则混合运算解决问题。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_015",
+              "label": "decimal_meaning",
+              "description": "能借助计算器计算并解释结果的实际意义。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            }
+          ]
+        },
+        {
+          "name": "图形与几何",
+          "knowledge_points": [
+            {
+              "id": "MA_S2_016",
+              "label": "line_segment_ray_line",
+              "description": "认识线段、射线和直线，知道它们的特征。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_017",
+              "label": "shortest_path",
+              "description": "知道两点间所有连线中线段最短，理解两点间距离。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_018",
+              "label": "construct_equal_segment",
+              "description": "会用直尺和圆规作一条线段等于已知线段。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_019",
+              "label": "parallel_perpendicular",
+              "description": "了解同一平面内两条直线的位置关系（平行、相交）。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_020",
+              "label": "angle_measure",
+              "description": "认识角，知道角的大小关系，会用量角器量角和画角。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_021",
+              "label": "length_unit",
+              "description": "认识长度单位千米、分米、毫米，能进行简单换算。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_022",
+              "label": "area_unit",
+              "description": "认识面积单位平方厘米、平方分米、平方米，能进行简单换算。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_023",
+              "label": "estimate_measure",
+              "description": "能恰当选择单位估测物体长度和面积，会进行测量。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_024",
+              "label": "triangle_classify",
+              "description": "认识三角形和四边形，会根据特征进行分类。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_025",
+              "label": "perimeter_area_concept",
+              "description": "结合实例认识周长和面积的概念。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_026",
+              "label": "rectangle_square_perimeter_area",
+              "description": "探索并掌握长方形、正方形的周长和面积计算公式。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_027",
+              "label": "observe_from_angles",
+              "description": "能根据具体事物或照片辨认从不同角度观察到的简单物体。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_028",
+              "label": "spatial_sense_measure",
+              "description": "在图形认识与测量中增强空间观念和量感。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_029",
+              "label": "translation_rotation_reflection",
+              "description": "感受平移、旋转、轴对称现象。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_030",
+              "label": "geometric_intuition",
+              "description": "在图形位置与运动中形成空间观念和几何直观。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_031",
+              "label": "angle_comparison",
+              "description": "会比较角的大小。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_032",
+              "label": "angle_classify",
+              "description": "能说出直角、锐角、钝角的特征，能辨认平角和周角。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_033",
+              "label": "quadrilateral_features",
+              "description": "能说出长方形、正方形、平行四边形、梯形的特征及共性与区别。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_034",
+              "label": "length_unit_conversion",
+              "description": "能描述长度单位千米、分米、毫米，能进行长度单位之间的换算。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_035",
+              "label": "area_unit_conversion",
+              "description": "能通过具体事例描述面积单位厘米²、分米²、米²，能进行面积单位之间的换算。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_036",
+              "label": "perimeter_concept",
+              "description": "知道什么是图形的周长。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_037",
+              "label": "perimeter_measurement",
+              "description": "会测量三角形、长方形和正方形的周长。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_038",
+              "label": "rectangle_perimeter_area",
+              "description": "会计算长方形、正方形的周长和面积。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_039",
+              "label": "transformation_identification",
+              "description": "能在实际情境中辨认平移、旋转和轴对称现象，直观感知其特征。",
+              "cognitive_level": "了解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_040",
+              "label": "transformation_application",
+              "description": "能利用平移或旋转解释现实生活中的现象。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            }
+          ]
+        },
+        {
+          "name": "统计与概率",
+          "knowledge_points": [
+            {
+              "id": "MA_S2_041",
+              "label": "data_collection_method",
+              "description": "了解收集数据的简单方法，如调查、测量等。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_042",
+              "label": "data_presentation",
+              "description": "会呈现数据整理的结果，如表格、图表等。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_043",
+              "label": "data_analysis",
+              "description": "通过对数据的简单分析，感受数据蕴含的信息。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_044",
+              "label": "bar_chart",
+              "description": "认识条形统计图，会用条形统计图合理表示和分析数据。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_045",
+              "label": "reading_statistical_charts",
+              "description": "能读懂报纸、电视、互联网等媒体中的简单统计图表。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_046",
+              "label": "mean_concept",
+              "description": "探索平均数的意义，理解其代表一组数据的整体水平。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_047",
+              "label": "mean_application",
+              "description": "能解决有关平均数的简单实际问题。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_048",
+              "label": "data_awareness",
+              "description": "能在简单实际情境中合理应用统计图表和平均数，形成初步的数据意识和应用意识。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_049",
+              "label": "data_collection",
+              "description": "能收集和整理具体实例中的数据。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_050",
+              "label": "data_description",
+              "description": "能用合适的方式描述数据，分析并表达数据中的信息。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_051",
+              "label": "mean_range",
+              "description": "知道平均数是介于最大数与最小数之间的数，能描述平均数的范围。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            }
+          ]
+        },
+        {
+          "name": "综合与实践",
+          "knowledge_points": [
+            {
+              "id": "MA_S2_052",
+              "label": "twenty_four_hour_clock",
+              "description": "知道24时记时法，能区分上午和下午的时间表示。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_053",
+              "label": "year_month_day",
+              "description": "认识年、月、日，知道它们之间的关系。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_054",
+              "label": "apply_time_knowledge",
+              "description": "能运用年、月、日的知识解释生活中的问题。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_055",
+              "label": "ancient_seasons",
+              "description": "了解中国古代如何认识一年四季。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_056",
+              "label": "mass_units",
+              "description": "感受并认识克、千克、吨，以及它们之间的关系。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_057",
+              "label": "equal_quantities",
+              "description": "感受等量的等量相等。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_058",
+              "label": "directions",
+              "description": "认识东北、西北、东南、西南四个方向。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_059",
+              "label": "describe_direction",
+              "description": "会描绘物体所在的方向。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_060",
+              "label": "measurement_history",
+              "description": "知道中国在秦朝统一了度量衡。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_061",
+              "label": "measurement_meaning",
+              "description": "理解度量衡的意义，知道最初的度量方法。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S2_062",
+              "label": "activity_participation",
+              "description": "积极参与活动，独立思考并与他人交流，加深对数学及其关联的理解。",
+              "cognitive_level": "了解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_063",
+              "label": "seasons_and_gnomon",
+              "description": "知道一年四季的重要性，了解土圭之法确定四季，培养家国情怀。",
+              "cognitive_level": "了解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_064",
+              "label": "caochong_story",
+              "description": "知道曹冲称象的故事，形成问题意识。",
+              "cognitive_level": "了解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_065",
+              "label": "equal_quantity_principle",
+              "description": "理解等量的等量相等原理，能合作制订称重方案并反思。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_066",
+              "label": "cardinal_directions",
+              "description": "在平面图上认识东北、西北、东南、西南四个方向。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_067",
+              "label": "direction_description",
+              "description": "能描绘物体方向，判断方向关联，并在现实场景中正确判断方位。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_068",
+              "label": "spatial_orientation",
+              "description": "理解物体空间方位及位置关系，发展空间观念。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_069",
+              "label": "clock_direction",
+              "description": "了解用几点钟方向描述方向的方法，能在现实场景中应用。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_070",
+              "label": "treasure_map_design",
+              "description": "能设计藏宝图，从他人图中提取信息解决问题，提高推理意识。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_071",
+              "label": "measurement_essence",
+              "description": "了解度量借助日常用品，理解度量本质是表达量的多少，计量单位是人为规定。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_072",
+              "label": "unit_development",
+              "description": "了解计量单位发展历史，知道科学发展与度量精确的关系。",
+              "cognitive_level": "了解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S2_073",
+              "label": "quantity_classification",
+              "description": "能对不同的量进行分类、整理、比较，丰富并发展量感。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": 3,
+      "grade_band": "5-6",
+      "domains": [
+        {
+          "name": "数与代数",
+          "knowledge_points": [
+            {
+              "id": "MA_S3_001",
+              "label": "divisibility_features",
+              "description": "知道2、3、5的倍数的特征",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_002",
+              "label": "common_multiple",
+              "description": "了解公倍数和最小公倍数的概念",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_003",
+              "label": "common_factor",
+              "description": "了解公因数和最大公因数的概念",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_004",
+              "label": "odd_even_prime_composite",
+              "description": "了解奇数、偶数、质数和合数的概念",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_005",
+              "label": "decimal_fraction_meaning",
+              "description": "理解小数和分数的意义，感悟计数单位",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_006",
+              "label": "decimal_fraction_conversion",
+              "description": "会进行小数和分数的转化",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_007",
+              "label": "integer_division_fraction",
+              "description": "理解整数除法与分数的关系",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_008",
+              "label": "fraction_operations",
+              "description": "能进行简单的小数、分数四则运算和混合运算",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_009",
+              "label": "equation_properties",
+              "description": "理解等式的基本性质",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_010",
+              "label": "estimation",
+              "description": "会选择合适的方法进行估算",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_011",
+              "label": "letter_representation",
+              "description": "探索用字母表示事物的关系、性质和规律",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_012",
+              "label": "ratio_proportion",
+              "description": "理解比和比例以及按比例分配的含义，能解决简单问题",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_013",
+              "label": "proportional_relationship",
+              "description": "认识成正比的量，能探索规律或变化趋势",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_014",
+              "label": "problem_solving",
+              "description": "能运用常见的数量关系解决实际问题，合理解释结果",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_015",
+              "label": "multiples_factors",
+              "description": "能找出2、3、5的倍数，以及10以内数的倍数、公倍数、最小公倍数；能找出一个数的因数、公因数和最大公因数。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_016",
+              "label": "prime_composite",
+              "description": "能判断一个自然数是质数还是合数。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_017",
+              "label": "fraction_decimal_representation",
+              "description": "能用直观方式表示分数和小数，比较大小，并进行互化（不包括循环小数）。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_018",
+              "label": "fraction_decimal_application",
+              "description": "能在实际情境中运用小数和分数解决问题，发展符号意识和数感。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_019",
+              "label": "problem_solving_operations",
+              "description": "能在较复杂的真实情境中，选择恰当的运算方法解决问题，形成运算能力和推理意识。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_020",
+              "label": "algebraic_expression",
+              "description": "能在具体情境中，用字母或含有字母的式子表示数量之间的关系、性质和规律，感悟用字母表示具有一般性。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_021",
+              "label": "complex_problem_solving",
+              "description": "能解决较复杂的真实问题，形成几何直观和初步的应用意识，提高解决问题的能力。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            }
+          ]
+        },
+        {
+          "name": "图形与几何",
+          "knowledge_points": [
+            {
+              "id": "MA_S3_022",
+              "label": "triangle_inequality",
+              "description": "知道三角形任意两边之和大于第三边",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_023",
+              "label": "triangle_angle_sum",
+              "description": "知道三角形内角和是180度",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_024",
+              "label": "circle_and_sector",
+              "description": "认识圆和扇形，会用圆规画圆",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_025",
+              "label": "pi",
+              "description": "认识圆周率",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_026",
+              "label": "circle_circumference_area",
+              "description": "探索圆的周长和面积计算公式，能解决简单的实际问题",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_027",
+              "label": "area_units",
+              "description": "知道面积单位平方千米、公顷",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_028",
+              "label": "parallelogram_triangle_trapezoid_area",
+              "description": "探索并掌握平行四边形、三角形和梯形的面积计算公式",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_029",
+              "label": "irregular_area_estimation",
+              "description": "会估计不规则图形的面积",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_030",
+              "label": "volume_concept",
+              "description": "通过实例了解体积或容积的意义",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_031",
+              "label": "volume_units_conversion",
+              "description": "知道体积或容积的度量单位，能进行单位之间的换算",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_032",
+              "label": "irregular_volume_measurement",
+              "description": "体验不规则物体体积的测量方法",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_033",
+              "label": "cuboid_cube_cylinder",
+              "description": "认识长方体、正方体和圆柱，了解这些图形的展开图",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_034",
+              "label": "volume_surface_area_formulas",
+              "description": "探索并掌握长方体、正方体和圆柱的体积和表面积的计算公式",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_035",
+              "label": "cone_volume",
+              "description": "认识圆锥并探索其体积的计算公式",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_036",
+              "label": "solve_practical_problems_3d",
+              "description": "能用长方体、正方体、圆柱和圆锥的体积和表面积公式解决简单的实际问题",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_037",
+              "label": "shape_from_directions",
+              "description": "能辨认不同方向（前面、侧面、上面）的形状图",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_038",
+              "label": "position_by_direction_distance",
+              "description": "能根据参照点的方向和距离确定物体的位置",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_039",
+              "label": "route_description",
+              "description": "会在实际情境中描述简单的路线图",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_040",
+              "label": "ordered_pairs",
+              "description": "能用有序数对表示点的位置，理解有序数对与方格纸上点的对应关系",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_041",
+              "label": "scale",
+              "description": "了解比例尺，能利用方格纸按比例将简单图形放大或缩小",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_042",
+              "label": "translation_rotation",
+              "description": "能在方格纸上进行简单图形的平移和旋转",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_043",
+              "label": "axial_symmetry",
+              "description": "认识轴对称图形和对称轴，能在方格纸上补全简单的轴对称图形",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_044",
+              "label": "design_patterns",
+              "description": "能从平移、旋转和轴对称的角度欣赏生活中的图案，能借助方格纸设计简单图案",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_045",
+              "label": "area_parallelogram",
+              "description": "会计算平行四边形的面积，并能解决实际问题。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_046",
+              "label": "area_triangle",
+              "description": "会计算三角形的面积，并能解决实际问题。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_047",
+              "label": "area_trapezoid",
+              "description": "会计算梯形的面积，并能解决实际问题。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_048",
+              "label": "circle_drawing",
+              "description": "会用圆规画圆，能描述圆和扇形的特征。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_049",
+              "label": "circle_terms",
+              "description": "知道圆的周长、半径和直径，了解圆周率是周长与直径的比值。",
+              "cognitive_level": "了解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_050",
+              "label": "circle_circumference",
+              "description": "会计算圆的周长，并能解决简单的实际问题。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_051",
+              "label": "circle_area",
+              "description": "会计算圆的面积，并能解决简单的实际问题。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_052",
+              "label": "solid_features",
+              "description": "能说出长方体、正方体、圆柱和圆锥的特征，辨认展开图。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_053",
+              "label": "volume",
+              "description": "会计算长方体、正方体、圆柱的体积，并能解决实际问题。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_054",
+              "label": "surface_area",
+              "description": "会计算长方体、正方体、圆柱的表面积，并能解决实际问题。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_055",
+              "label": "unit_conversion_area_volume",
+              "description": "能说出面积单位（平方千米、公顷）和体积单位，并进行单位换算。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_056",
+              "label": "unit_conversion_capacity",
+              "description": "能说出容积单位（升、毫升），并进行单位换算。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_057",
+              "label": "choose_appropriate_unit",
+              "description": "能选择合适单位描述实际问题。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_058",
+              "label": "describe_position",
+              "description": "能根据参照点的方向和距离描述物体位置。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_059",
+              "label": "describe_route",
+              "description": "能在熟悉情境中描述简单的路线图。",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_060",
+              "label": "coordinate_points",
+              "description": "能用有序数对确定点的位置，理解其与点的对应关系。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_061",
+              "label": "scale_meaning",
+              "description": "认识比例尺，能说出比例尺的意义。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_062",
+              "label": "scale_conversion",
+              "description": "能按给定比例进行图上距离与实际距离的换算。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_063",
+              "label": "scale_drawing",
+              "description": "能按给定比例画出简单图形放大或缩小后的图形。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_064",
+              "label": "translation",
+              "description": "能画出简单图形沿水平或垂直方向平移后的图形。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_065",
+              "label": "rotation",
+              "description": "能画出简单图形旋转90度后的图形。",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_066",
+              "label": "transformation_features",
+              "description": "了解图形平移、旋转的变化特征。",
+              "cognitive_level": "了解",
+              "source_block": "学业要求"
+            }
+          ]
+        },
+        {
+          "name": "统计与概率",
+          "knowledge_points": [
+            {
+              "id": "MA_S3_067",
+              "label": "data_collection",
+              "description": "根据实际问题收集数据，经历收集、整理和分析过程。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_068",
+              "label": "data_analysis_conclusion",
+              "description": "能合理述说数据分析的结论。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_069",
+              "label": "line_chart",
+              "description": "认识折线统计图，会用其呈现数据并解释意义。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_070",
+              "label": "pie_chart",
+              "description": "认识扇形统计图，会用其呈现数据并解释意义。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_071",
+              "label": "bar_chart",
+              "description": "会用条形统计图呈现相关数据并解释意义。",
+              "cognitive_level": "掌握",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_072",
+              "label": "read_statistical_charts",
+              "description": "能从媒体中获取数据，读懂简单统计图表。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_073",
+              "label": "percentage_meaning",
+              "description": "探索百分数的意义，理解其统计意义。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_074",
+              "label": "percentage_problem_solving",
+              "description": "能解决与百分数有关的简单实际问题。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_075",
+              "label": "data_awareness",
+              "description": "应用统计图表或百分数，形成数据意识和应用意识。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_076",
+              "label": "random_phenomenon",
+              "description": "感受简单的随机现象及其结果发生的可能性。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_077",
+              "label": "possibility_qualitative",
+              "description": "对简单随机现象可能性的大小作出定性描述。",
+              "cognitive_level": "理解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_078",
+              "label": "bar_line_chart",
+              "description": "能把数据整理成条形统计图和折线统计图",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_079",
+              "label": "chart_functions",
+              "description": "知道条形、折线和扇形统计图的功能",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_080",
+              "label": "chart_interpretation",
+              "description": "会解释统计图表达的意义",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_081",
+              "label": "simple_judgment_prediction",
+              "description": "能根据统计结果作出简单判断和预测",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_082",
+              "label": "percentage_statistics",
+              "description": "在真实情境中理解百分数的统计意义",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_083",
+              "label": "percentage_problems",
+              "description": "解决与百分数有关的简单问题",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_084",
+              "label": "application_awareness",
+              "description": "在统计过程中发展应用意识",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_085",
+              "label": "random_phenomena_list",
+              "description": "能列举生活中的随机现象",
+              "cognitive_level": "了解",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_086",
+              "label": "possible_outcomes",
+              "description": "列出简单随机现象中所有可能发生的结果",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_087",
+              "label": "possibility_judgment",
+              "description": "判断简单随机现象发生可能性的大小",
+              "cognitive_level": "掌握",
+              "source_block": "学业要求"
+            },
+            {
+              "id": "MA_S3_088",
+              "label": "data_based_judgment",
+              "description": "根据数据信息判断随机现象发生的可能性",
+              "cognitive_level": "应用",
+              "source_block": "学业要求"
+            }
+          ]
+        },
+        {
+          "name": "综合与实践",
+          "knowledge_points": [
+            {
+              "id": "MA_S3_089",
+              "label": "negative_numbers",
+              "description": "了解负数表示与正数相反的量，能在情境中理解其具体意义。",
+              "cognitive_level": "了解",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_090",
+              "label": "scale_direction_position",
+              "description": "综合应用比例尺、方向、位置和测量知识绘制校园平面图。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_091",
+              "label": "problem_solving_sports",
+              "description": "收集体育数据，提出数学问题并设计解决方案。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_092",
+              "label": "nutrition_diet_design",
+              "description": "调查营养需求，设计合理午餐食谱，培养科学态度。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_093",
+              "label": "water_conservation",
+              "description": "调查用水信息，制定节水方案，增强环保意识。",
+              "cognitive_level": "应用",
+              "source_block": "内容要求"
+            },
+            {
+              "id": "MA_S3_094",
+              "label": "real_world_modeling",
+              "description": "在真实情境中通过具体事例体会相反意义的量，能表达负数的实际意义。",
+              "cognitive_level": "理解",
+              "source_block": "学业要求"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

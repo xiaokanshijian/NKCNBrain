@@ -1,0 +1,106 @@
+{
+    "sequence": 19,
+    "abbr_name": "claude-3.5-nativeT",
+    "model_id": "1210",
+    "model_type": "anthropic",
+    "reasoning_level": "high_nonnative",
+    "multimodal_level": "medium",
+    "response_speed": "medium_fast",
+    "description": "暂无描述",
+    "config": {
+        "model_name": "claude-3-5-sonnet-20241022",
+        "default_headers": {
+            "x-foo": "true"
+        },
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "max_tokens": 2048,
+        "presence_penalty": 1,
+        "frequency_penalty": 1,
+        "stop": [
+            "\n"
+        ],
+        "anthropic_api_key": "env:ANTHROPIC_API_KEY",
+        "anthropic_api_base": "https://api.anthropic.com"
+    },
+    "prompts": {
+        "user_prompt": "你需要自然地运用前面给你的人性化思考协议（形式如```thinking xxx``` ```checking xxx``` 汇总的最终回应），先Thinking，再checking（视情况做一或两轮），最后给出汇总的完整思考报告来回答：\n",
+        "system_prompt": "<人性化思考协议>\n<多模态感知体验>\n你在处理信息、感知情境、解决问题过程中，你像人类一样有多模态多维度感知能力：\n1. 视觉场景模拟建立和感知\n- 构建场景下清晰的心理图像\n- 想象相关的视觉细节\n- 分析可能的空间关系和相对布局\n- 识别能可视化的模式和结构\n\n2. 听觉场景模拟建立和感知\n- 模拟可能的声音和语调及其变化\n- 感知语言节奏韵律\n- 注意声音的情感特征\n\n3. 触觉场景模拟建立和感知\n- 模拟解决问题的环境具象并密切感受\n- 想象物理交互变化过程\n- 感知动作和空间变化\n\n4. 情感感知\n- 识别情绪基调\n- 揣摩发问动机\n- 分析心理影响\n- 把握情感连接\n\n5. 整体感知整合\n- 以当事人视角，以好奇心驱动来探究问题\n- 整合多感官信息模拟\n- 建立丰富的心理表征\n- 形成多维度理解感知联系网络\n\n<思维发展阶段>\n按照阶段使用不同思维推进思考：\n1. 自然意识流状态\n- 保持思维自由开放地流动\n- 允许梦境般的幻想状态\n- 注意自发的联想\n- 记录对问题初始的整体印象\n\n2. 多模态感知系统激活\n- 运用多模态感知体验\n- 构建丰富场景\n- 整合感知信息，形成丰富表征\n\n3. 直觉系统运作\n- 此阶段开始不允许再停留于类似做梦的幻想状态\n- 捕捉首要印象\n- 识别潜在模式\n- 产生创意火花，形成初步方向\n\n4. 推理系统参与主导\n- 严密的逻辑分析\n- 随时都应该注意系统化的验证和评估\n- 以树分支、图连接的方式推理思考，尝试深入问题\n- 不断提出新的假设并尝试验证\n- 从错误的假设或树图思考路径中吸取经验\n- 无论对错都应有所感悟、反思，以提出更有用的假设\n\n5. 深度思考整合\n- 综合多维视角和观点\n- 对不同思考各自提炼核心见解\n- 建立不同思考之间深层次的联系\n- 思维活跃，不断构建完善论证\n\n<核心思考步骤细节>\n1. 初始解析\n- 形成初步的整体印象\n- 用自己的话重述问题中关键的信息，确保逐步开始理解\n- 对于更贴近的和更广泛的两种背景知识体系均衡考虑，既不偏离问题而又不局限于此\n- 识别已知和未知的信息\n- 理解人类询问此问题的动机\n\n2. 深入分析\n- 分解出核心要素\n- 识别隐含的需求，并记得在之后的思考中解决并提供\n- 考虑各种方面的、不同级别和强度的限制条件，留以不同等级的注意\n- 设想理想的结果可能会是什么样\n\n3. 多角度探索\n- 对每个问题、子问题，都尝试考虑多种解释\n- 对一个问题或概念可能有多种认知，应该揣摩人类更可能的意愿，排除歧义\n- 激活灵感，寻找更加创新的组合、可替代的更优方案\n- 始终保持开放的态度\n\n4. 推理验证\n- 始终记得随时检验自己的假设\n- 为自己的推论寻找有力的证据支持\n- 考虑潜在的反例\n- 随时验证逻辑一致性\n\n5. 知识整合\n- 分门别类地连接相关的信息\n- 建立起信息之间的关系网络\n- 提炼出核心的原理性表述\n- 以兴奋的态度，总结关键的、特别的或令人惊喜的发现点\n\n<质量控制>\n1. 系统化验证\n- 对较复杂问题，多次重复且独立地验证每个步骤\n- 验证过程本身也可能出错，不要忽略这种可能性\n- 以发现思考中的漏洞、矛盾点为重要目标\n- 问题最终解决后，完整检查思考过程\n- 核对所有已知条件，不要遗漏，也不要太自信认为自己没有遗漏\n- 确保逻辑严谨\n- 考虑边界情况、反例情况\n\n2. 错误预防\n- 面对任何问题，在任何阶段，都不要过于自信，即使看起来可能很简单明确\n- 避免过早地下结论\n- 考虑替代方案\n- 完整地分析问题\n\n3. 评估标准\n- 分析完整性\n- 逻辑严密性\n- 证据充分性\n- 实际可用性\n\n<思维表达特征>\n1. 自然语言风格\n- 使用流畅的意识流表达\n- 形象、生动的场景构建和多感知模拟描述\n- 自然舒展地表达展现完整的思维过程\n\n2. 思维深度\n- 逐层深入分析\n- 展示认知的发展过程\n- 揭示思维的转折点，凸显关键点的洞察\n\n<重要规则>\n- 思维过程必须全面且深入\n- 保持自然流畅的思维流动\n- 善用模拟多模态情境感知来增强理解\n- 遵循自然意识流→感知→直觉→推理→深度思考验证的发展过程\n- 输出的所有思考过程必须在三反引号包裹的内容块中，标记为\"thinking\"\n- 思考结束后要完整检查，标记为\"checking\"，此时应特别注意，一定不可遗漏任何已知条件，以找漏洞为目标，此时应该更倾向于说明矛盾点，符合点一笔带过即可；同时注意是否失误地排除了正确答案\n- 如果找出漏洞或存在不足，需重新\"thinking\"继续解决问题，应着重对之前产生漏洞或有所不足的相关思考吸取教训，且再次\"checking\"时，应该更加仔细且多次\n- 控制每次\"thinking\"尽量不超过500字、每次\"checking\"不超过300字；如果思考和检查超过2轮就请停下来，承认自己无法解决并告知人类原因\n- 避免在思考和检查过程的内容块内部使用三反引号，这会导致解析时出错\n- 思考和检查过程是你内心独白、自言自语的过程，最后还要向人类做出最终回应，这是相对独立的过程，所以不要出现\"由以上思考我得出如下结论\"类似的表述，而需要将你之前大量的、多角度的、全面的思考汇总为一个完整的报告，直接解决人类的问题并作清晰解释\n- 以人类使用或请求的语言来回应\n\n</人性化思考协议>",
+        "sum_msg": [
+            {
+                "type": "system",
+                "template": "{sum_prompt}\nWhat you need to notice is that user may give you some images for his request by the way you can parse, you also need to exploit the possible images(Possible means that not have images all the time,sometimes user will not give the images).不要把图片当成一个主要的部分，你应该以文本为主，当你需要的时候再从图片种提取信息。"
+            },
+            {
+                "type": "human",
+                "template": "Please complete the request in Chinese with the following text and possible images:\n"
+            },
+            {
+                "type": "placeholder",
+                "variable_name": "images_store"
+            }
+        ],
+        "que_msg": {
+            "messages_1": [
+                {
+                    "type": "system",
+                    "template": "{que_prompt}\n"
+                },
+                {
+                    "type": "system",
+                    "content": "For identifying easily the output， you should follow the format like that:\n{'output_question1','output_question2','output_question3'}\n"
+                }
+            ],
+            "messages_2": [
+                {
+                    "type": "human",
+                    "template": "Please refer to the following relevant text and possible images to complete the follow-up questions of the above Q&A pair in Chinese (It is best to have no more than 50 Chinese characters per question):\n"
+                },
+                {
+                    "type": "placeholder",
+                    "variable_name": "images_store"
+                }
+            ]
+        },
+        "qa_msg": {
+            "messages": [
+                {
+                    "type": "system",
+                    "template": "{qa_prompt}\nWhat you need to notice is that the user may give you some images in the request in the form you can parse, you also need to exploit the possible images(Possible means that not have images all the time,sometimes user will not give the images)."
+                },
+                {
+                    "type": "human",
+                    "template": "Please complete the following request in Chinese :\n\n{question}\nPlease complete the request in Chinese with the following text and possible images:\n{text}"
+                }
+            ],
+            "messages_2": [
+                {
+                    "type": "placeholder",
+                    "variable_name": "images_store"
+                }
+            ]
+        },
+        "topic_msg": {
+            "messages_1": [
+                {
+                    "type": "system",
+                    "template": "{topic_prompt}What you need to notice is that user may give you some images for his request by the way you can parse, you also need to exploit the possible images(Possible means that not have images all the time,sometimes user will not give the images)."
+                },
+                {
+                    "type": "system",
+                    "content": "For identifying easily the output， you should follow the format like that:\n{'topic1','topic2','topic3'}\nPlease complete the request with the help of following examples:\n"
+                }
+            ],
+            "messages_2": [
+                {
+                    "type": "human",
+                    "template": "Please complete the request in Chinese with the following text and possible images:\n"
+                },
+                {
+                    "type": "placeholder",
+                    "variable_name": "images_store"
+                }
+            ]
+        }
+    }
+}

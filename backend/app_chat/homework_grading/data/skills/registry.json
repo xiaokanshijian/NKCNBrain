@@ -1,0 +1,41 @@
+{
+  "schema_version": "feedback-skill-v1",
+  "skills": [
+    {
+      "id": "general-feedback",
+      "version": "1.0.0",
+      "files": {
+        "manifest.json": "39bff4cd7e65cf7d018ab60a741441fe756bbbcb7e4cd845d34e1719f2617568",
+        "instructions.md": "0852eb827fe713c816a1e933e4524c7f37cb4f0723d33d48d797b6b07319e518",
+        "resources.json": "21d79a31d7444be154f291709e34b7f3bd99bc6aa8e264fff765d9a9c602cec8"
+      }
+    },
+    {
+      "id": "math-primary4-question",
+      "version": "1.0.0",
+      "files": {
+        "manifest.json": "4e7b7bf5216798b8f2012b505d612fab7925b3cc4873e90ceb8ec43a2ca4baaa",
+        "instructions.md": "2a021ce4d3bd07be347a87cd2eaf5c32a2f785d0c0032a0015cbbbd266488b9a",
+        "resources.json": "7b8826f1f134deed72357723981846d3a44aff04e1709172529814a2192e4eac"
+      }
+    },
+    {
+      "id": "chinese-primary4-question",
+      "version": "1.0.0",
+      "files": {
+        "manifest.json": "f43025a9a0b16768d7c38bbf1daccdbf6813ee66ed27a7d09afcde9b3dd66519",
+        "instructions.md": "882d8abc90ae7992a96c93fdd57650a1d82847c2ecd3451adae1aa1d5bc61767",
+        "resources.json": "d926836cd16ca7df3fa962451f264d21cf449eb4dc9b49e995bc0b8767a5e2f8"
+      }
+    },
+    {
+      "id": "english-primary4-question",
+      "version": "1.0.0",
+      "files": {
+        "manifest.json": "41602fa8233a83a3599d56538cacaec8b242be4db76e8b0e65678f8ee2ce9a4b",
+        "instructions.md": "b4f438adc78df73fc6c2b8055bb857b41125d67f41f4480d9c9c0039baa2ec32",
+        "resources.json": "737f7fdf21c44acbc7b75a03be56bf658db1bdf4f416159ad877b48b0a9bf13e"
+      }
+    }
+  ]
+}

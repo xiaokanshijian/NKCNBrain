@@ -1,0 +1,55 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+dist/
+.npm
+*.log
+
+# Django / data
+*.sqlite3
+db.sqlite3
+media/
+staticfiles/
+local_settings.py
+
+# Secrets and keys
+*.pem
+*.key
+credentials.json
+secrets.json
+
+# OCR / local dumps
+small_llm_deep_judge/**/ocr_output/
+small_llm_deep_judge/**/uploads/
+small_llm_deep_judge/**/*.log
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Model weights / large binaries
+*.bin
+*.pt
+*.safetensors
+*.gguf
+*.ckpt

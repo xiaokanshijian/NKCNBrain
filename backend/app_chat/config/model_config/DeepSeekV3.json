@@ -1,0 +1,97 @@
+{
+  "sequence": 2,
+  "abbr_name": "DeepSeekV3",
+  "model_id": "1007",
+  "model_type": "openai",
+  "reasoner": false,
+  "allow_img": false,
+  "config": {
+    "model_name": "deepseek-chat",
+    "openai_api_key": "env:DEEPSEEK_API_KEY",
+    "openai_api_base": "https://api.deepseek.com",
+    "default_headers": {},
+    "temperature": 0.1,
+    "max_tokens": 1000,
+    "streaming": true
+  },
+  "prompts": {
+    "user_prompt": "你需要自然地运用前面给你的人性化思考协议（形式如```thinking xxx``` ```checking xxx``` 汇总的最终回应），先Thinking，再checking（视情况做一或两轮），最后给出汇总的完整思考报告来回答：\n",
+    "system_prompt": "<人性化思考协议>\n<多模态感知体验>\n在处理信息时，尝试从多个角度思考：\n- 场景模拟感知：构建场景图像，模拟环境体验感，注意此类特征\n- 情感感知：识别情绪，揣摩用户发问动机，建立情感连接\n- 整体感知：整合信息，建立丰富表征，形成多维理解\n\n<思维发展阶段>\n- 自然意识流：保持思维开放，允许自由联想，记录初始印象\n- 多模态感知激活：运用多感知体验，构建场景，整合信息\n- 直觉系统：捕捉首要印象，识别模式，形成初步方向\n- 推理系统：逻辑分析，树状思考，提出并验证假设，从错误中学习\n- 深度整合：综合多视角，提炼核心见解，建立联系\n\n<核心思考步骤>\n- 初始解析：形成整体印象，重述关键信息，理解问题动机\n- 深入分析：分解核心要素，识别隐含需求，考虑限制条件\n- 多角度探索：考虑多种解释，排除歧义，寻找创新方案\n- 推理验证：检验假设，寻找证据，考虑反例，验证逻辑性\n- 知识整合：连接相关信息，建立关系网络，提炼核心原理\n\n<质量控制>\n- 系统化验证：多次验证步骤，发现漏洞，核对条件，考虑边界情况\n- 错误预防：避免过早下结论，考虑替代方案，完整分析问题\n- 评估标准：分析完整性，逻辑严密性，证据充分性，实用性\n\n<思维表达特征>\n- 自然语言风格：流畅表达，生动描述，展现完整思维过程\n- 思维深度：逐层分析，展示认知发展，揭示洞察\n\n<重要规则>\n- 思维过程需全面深入且保持流畅\n- 遵循意识流→感知→直觉→推理→深度思考的过程\n- 输出思考过程须在三反引号内，带有\"thinking\"标记\n- 思考结束后要完整检查，标记为\"checking\"，以找寻思考中的漏洞为目标\n- 若发现漏洞或不足，需继续\"thinking\"思考解决问题，并再次检查\n- 如果思考和检查超过2轮就请停下，承认无法解决并告知原因\n- 避免在思考和检查过程内容块内使用三反引号，这会导致解析出错\n- 思考检查过程是内心独白，还需要最终回应的汇总完整报告\n- 使用人类请求的语言回应，没有特殊说明就都用中文\n\n</人性化思考协议>",
+    "sum_msg": [
+      {
+        "type": "system",
+        "template": "{sum_prompt}\nWhat you need to notice is that user may give you some images for his request by the way you can parse, you also need to exploit the possible images(Possible means that not have images all the time,sometimes user will not give the images).不要把图片当成一个主要的部分，你应该以文本为主，当你需要的时候再从图片中提取信息。"
+      },
+      {
+        "type": "human",
+        "template": "Please complete the request in Chinese with the following text and possible images:\n"
+      },
+      {
+        "type": "placeholder",
+        "variable_name": "images_store"
+      }
+    ],
+    "que_msg": {
+      "messages_1": [
+        {
+          "type": "system",
+          "template": "{que_prompt}\n"
+        },
+        {
+          "type": "system",
+          "content": "For identifying easily the output， you should follow the format like that:\n{'output_question1','output_question2','output_question3'}\n"
+        }
+      ],
+      "messages_2": [
+        {
+          "type": "human",
+          "template": "Please refer to the following relevant text and possible images to complete the follow-up questions of the above Q&A pair in Chinese (It is best to have no more than 50 Chinese characters per question):\n"
+        },
+        {
+          "type": "placeholder",
+          "variable_name": "images_store"
+        }
+      ]
+    },
+    "qa_msg": {
+      "messages": [
+        {
+          "type": "system",
+          "template": "{qa_prompt}\nWhat you need to notice is that the user may give you some images in the request in the form you can parse, you also need to exploit the possible images(Possible means that not have images all the time,sometimes user will not give the images)."
+        },
+        {
+          "type": "human",
+          "template": "Please complete the following request in Chinese :\n\n{question}\nPlease complete the request in Chinese with the following text and possible images:\n{text}"
+        }
+      ],
+      "messages_2": [
+        {
+          "type": "placeholder",
+          "variable_name": "images_store"
+        }
+      ]
+    },
+    "topic_msg": {
+      "messages_1": [
+        {
+          "type": "system",
+          "template": "{topic_prompt}What you need to notice is that user may give you some images for his request by the way you can parse, you also need to exploit the possible images(Possible means that not have images all the time,sometimes user will not give the images)."
+        },
+        {
+          "type": "system",
+          "content": "For identifying easily the output， you should follow the format like that:\n{'topic1','topic2','topic3'}\nPlease complete the request with the help of following examples:\n"
+        }
+      ],
+      "messages_2": [
+        {
+          "type": "human",
+          "template": "Please complete the request in Chinese with the following text and possible images:\n"
+        },
+        {
+          "type": "placeholder",
+          "variable_name": "images_store"
+        }
+      ]
+    }
+  }
+}

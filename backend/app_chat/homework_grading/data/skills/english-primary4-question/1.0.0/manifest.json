@@ -1,0 +1,101 @@
+{
+  "schema_version": "feedback-skill-v1",
+  "id": "english-primary4-question",
+  "version": "1.0.0",
+  "kind": "specialized",
+  "compatible_schema": "feedback-context-v2",
+  "subject_scope": [
+    "english"
+  ],
+  "education_scope": [
+    "primary"
+  ],
+  "material_scope": [
+    "homework",
+    "exam"
+  ],
+  "unit_scope": [
+    "question"
+  ],
+  "grades": [
+    4
+  ],
+  "priority": 10,
+  "coverage_status": "offline_only",
+  "rules": [
+    {
+      "id": "english-grade-rules",
+      "stages": [
+        "grade",
+        "cross_page"
+      ],
+      "condition": "always",
+      "text_key": "english-grade-rules",
+      "evaluation_item": "english-grade-rules",
+      "refines": [],
+      "conflicts": [],
+      "source": "subject_prompt_rules.py:ENGLISH_GRADE_RULES"
+    },
+    {
+      "id": "english-review-rules",
+      "stages": [
+        "review"
+      ],
+      "condition": "always",
+      "text_key": "english-review-rules",
+      "evaluation_item": "english-review-rules",
+      "refines": [],
+      "conflicts": [],
+      "source": "subject_prompt_rules.py:ENGLISH_REVIEW_RULES"
+    },
+    {
+      "id": "english-page15-visual-transcription-lock",
+      "stages": [
+        "grade"
+      ],
+      "condition": "fixed_english_transcription",
+      "text_key": "english-page15-visual-transcription-lock",
+      "evaluation_item": "english-page15-visual-transcription-lock",
+      "refines": [],
+      "conflicts": [],
+      "source": "subject_prompt_rules.py:ENGLISH_PAGE15_VISUAL_TRANSCRIPTION_LOCK"
+    },
+    {
+      "id": "english-parenthesized-choice-slot-grade-rules",
+      "stages": [
+        "grade"
+      ],
+      "condition": "fixed_english_choice_slots",
+      "text_key": "english-parenthesized-choice-slot-grade-rules",
+      "evaluation_item": "english-parenthesized-choice-slot-grade-rules",
+      "refines": [],
+      "conflicts": [],
+      "source": "subject_prompt_rules.py:ENGLISH_PARENTHESIZED_CHOICE_SLOT_GRADE_RULES"
+    },
+    {
+      "id": "-uncertain-rules[english]",
+      "stages": [
+        "grade"
+      ],
+      "condition": "always",
+      "text_key": "-uncertain-rules[english]",
+      "evaluation_item": "-uncertain-rules[english]",
+      "refines": [],
+      "conflicts": [],
+      "source": "prompts.py:_UNCERTAIN_RULES[english]"
+    },
+    {
+      "id": "-subject-hints[english]",
+      "stages": [
+        "grade",
+        "review"
+      ],
+      "condition": "always",
+      "text_key": "-subject-hints[english]",
+      "evaluation_item": "-subject-hints[english]",
+      "refines": [],
+      "conflicts": [],
+      "source": "prompts.py:_SUBJECT_HINTS[english]"
+    }
+  ]
+}

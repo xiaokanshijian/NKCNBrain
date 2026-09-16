@@ -1,0 +1,974 @@
+{
+  "subject": "chinese",
+  "source": "义务教育语文课程标准（2022年版）",
+  "extracted_at": "2026-05-31T18:35:40",
+  "stages": [
+    {
+      "stage": 1,
+      "grade_band": "1-2",
+      "domains": [
+        {
+          "name": "识字与写字",
+          "knowledge_points": [
+            {
+              "id": "CH_S1_001",
+              "label": "literacy_1600",
+              "description": "认识常用汉字1600个左右",
+              "cognitive_level": "了解",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S1_002",
+              "label": "writing_800",
+              "description": "会写常用汉字800个左右",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S1_003",
+              "label": "pinyin_full",
+              "description": "学会汉语拼音，能读准声母、韵母、声调和整体认读音节",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S1_004",
+              "label": "pinyin_spelling",
+              "description": "能准确地拼读音节，正确书写声母、韵母和音节",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S1_005",
+              "label": "pinyin_alphabet",
+              "description": "认识大写字母，熟记《汉语拼音字母表》",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S1_006",
+              "label": "basic_strokes",
+              "description": "掌握汉字的基本笔画和常用偏旁部首",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S1_007",
+              "label": "stroke_order",
+              "description": "能按基本笔顺规则用硬笔写字，注意间架结构",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S1_008",
+              "label": "writing_habit",
+              "description": "养成良好的写字习惯，姿势正确，书写规范端正整洁",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S1_009",
+              "label": "independent_literacy",
+              "description": "学习独立识字，能借助拼音认读汉字",
+              "cognitive_level": "理解",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S1_010",
+              "label": "dictionary_use",
+              "description": "学会用音序检字法和部首检字法查字典",
+              "cognitive_level": "应用",
+              "source_block": "识字与写字"
+            }
+          ]
+        },
+        {
+          "name": "阅读",
+          "knowledge_points": [
+            {
+              "id": "CH_S1_011",
+              "label": "reading_interest",
+              "description": "喜欢阅读，感受阅读的乐趣",
+              "cognitive_level": "了解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S1_012",
+              "label": "read_aloud",
+              "description": "用普通话正确、流利、有感情地朗读课文",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S1_013",
+              "label": "silent_reading",
+              "description": "学习默读",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S1_014",
+              "label": "word_meaning",
+              "description": "结合上下文和生活实际了解词句意思",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S1_015",
+              "label": "vocabulary_accumulation",
+              "description": "在阅读中积累词语",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S1_016",
+              "label": "punctuation",
+              "description": "认识常用标点符号，体会句号、问号、感叹号的语气",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S1_017",
+              "label": "picture_reading",
+              "description": "借助图画阅读",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S1_018",
+              "label": "story_reading",
+              "description": "阅读浅近的童话、寓言、故事，交流感受",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S1_019",
+              "label": "poetry_recitation",
+              "description": "诵读儿歌、儿童诗和浅近古诗，获得情感体验",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S1_020",
+              "label": "whole_book_reading",
+              "description": "尝试阅读整本书，介绍读过的书",
+              "cognitive_level": "应用",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S1_021",
+              "label": "book_care",
+              "description": "养成爱护图书的习惯",
+              "cognitive_level": "了解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S1_022",
+              "label": "idiom_accumulation",
+              "description": "积累成语和格言警句",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S1_023",
+              "label": "recitation",
+              "description": "背诵优秀诗文50篇（段）",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S1_024",
+              "label": "total_reading_volume",
+              "description": "课外阅读总量不少于5万字",
+              "cognitive_level": "了解",
+              "source_block": "阅读与鉴赏"
+            }
+          ]
+        },
+        {
+          "name": "习作",
+          "knowledge_points": [
+            {
+              "id": "CH_S1_025",
+              "label": "speak_mandarin",
+              "description": "学说普通话，养成说普通话的习惯，增强表达自信心。",
+              "cognitive_level": "了解",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S1_026",
+              "label": "listen_attentively",
+              "description": "认真听他人讲话，理解主要内容。",
+              "cognitive_level": "理解",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S1_027",
+              "label": "retell_story",
+              "description": "复述故事大意和感兴趣的情节。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S1_028",
+              "label": "tell_story",
+              "description": "完整讲述小故事，简要讲述见闻。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S1_029",
+              "label": "communicate_politely",
+              "description": "与他人交谈态度自然大方，有礼貌。",
+              "cognitive_level": "了解",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S1_030",
+              "label": "participate_discussion",
+              "description": "积极参加讨论，敢于发表意见。",
+              "cognitive_level": "了解",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S1_031",
+              "label": "writing_warmup",
+              "description": "对写话有兴趣，留心周围事物，写想说的话和想象的事物。",
+              "cognitive_level": "了解",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S1_032",
+              "label": "use_words_writing",
+              "description": "在写话中运用阅读和生活中学到的词语。",
+              "cognitive_level": "应用",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S1_033",
+              "label": "use_punctuation",
+              "description": "学习使用逗号、句号、问号、感叹号。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            }
+          ]
+        },
+        {
+          "name": "语文园地",
+          "knowledge_points": [
+            {
+              "id": "CH_S1_034",
+              "label": "character_structure_observation",
+              "description": "观察字形，理解汉字部件之间的关系。",
+              "cognitive_level": "了解",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S1_035",
+              "label": "character_life_connection",
+              "description": "梳理学过的字，感知汉字与生活的联系。",
+              "cognitive_level": "了解",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S1_036",
+              "label": "nature_observation",
+              "description": "观察大自然，积累活动体验。",
+              "cognitive_level": "了解",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S1_037",
+              "label": "activity_participation",
+              "description": "热心参加校园、社区活动，积累活动体验。",
+              "cognitive_level": "了解",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S1_038",
+              "label": "expression_skills",
+              "description": "用口头或图文等方式整理、表达活动中的见闻和想法。",
+              "cognitive_level": "掌握",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S1_039",
+              "label": "question_raising",
+              "description": "对周围事物有好奇心，能就感兴趣的内容提出问题。",
+              "cognitive_level": "理解",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S1_040",
+              "label": "cross_disciplinary_discussion",
+              "description": "结合其他学科和生活经验交流讨论，尝试提出自己的看法。",
+              "cognitive_level": "应用",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S1_041",
+              "label": "traditional_culture_appreciation",
+              "description": "关注中华优秀传统文化在日常生活中的表现，感受其重要价值。",
+              "cognitive_level": "了解",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S1_042",
+              "label": "revolutionary_spirit_appreciation",
+              "description": "懂得幸福生活是革命前辈奋斗换来的，激发对革命领袖等的崇敬之情。",
+              "cognitive_level": "了解",
+              "source_block": "梳理与探究"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": 2,
+      "grade_band": "3-4",
+      "domains": [
+        {
+          "name": "识字与写字",
+          "knowledge_points": [
+            {
+              "id": "CH_S2_001",
+              "label": "interest_in_characters",
+              "description": "对学习汉字有浓厚兴趣，养成主动识字的习惯。",
+              "cognitive_level": "了解",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S2_002",
+              "label": "character_recognition",
+              "description": "累计认识常用汉字2500个左右。",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S2_003",
+              "label": "character_writing",
+              "description": "会写1600个左右常用汉字。",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S2_004",
+              "label": "independent_literacy",
+              "description": "有初步的独立识字能力。",
+              "cognitive_level": "理解",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S2_005",
+              "label": "dictionary_use",
+              "description": "能用音序和部首检字法查字典词典。",
+              "cognitive_level": "应用",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S2_006",
+              "label": "writing_posture",
+              "description": "写字姿势正确，养成良好的书写习惯。",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S2_007",
+              "label": "hard_pen_writing",
+              "description": "能用硬笔熟练书写正楷字，规范端正整洁。",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S2_008",
+              "label": "brush_copying",
+              "description": "用毛笔临摹正楷字帖，感受书写特点和形体美。",
+              "cognitive_level": "了解",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S2_009",
+              "label": "character_connections",
+              "description": "感知汉字形音义联系，建立与生活事物的联系，感受文化内涵。",
+              "cognitive_level": "理解",
+              "source_block": "识字与写字"
+            }
+          ]
+        },
+        {
+          "name": "阅读",
+          "knowledge_points": [
+            {
+              "id": "CH_S2_010",
+              "label": "reading_fluency",
+              "description": "能用普通话正确、流利、有感情地朗读课文。",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_011",
+              "label": "silent_reading",
+              "description": "初步学会默读，做到不出声、不指读。",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_012",
+              "label": "skimming",
+              "description": "学习略读，粗知文章大意。",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_013",
+              "label": "word_meaning",
+              "description": "能联系上下文理解词句意思，体会关键词句表达情意的作用。",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_014",
+              "label": "punctuation_usage",
+              "description": "体会句号与逗号的不同用法，了解冒号、引号的一般用法。",
+              "cognitive_level": "了解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_015",
+              "label": "paragraph_summary",
+              "description": "能初步把握文章主要内容，体会文章表达的思想感情。",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_016",
+              "label": "reading_methods",
+              "description": "学习圈点、批注等阅读方法。",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_017",
+              "label": "questioning",
+              "description": "能对不理解的地方提出疑问，乐于讨论交流。",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_018",
+              "label": "narrative_retelling",
+              "description": "能复述叙事性作品的大意，感受生动形象和优美语言。",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_019",
+              "label": "character_empathy",
+              "description": "关心作品中人物的命运和喜怒哀乐，交流阅读感受。",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_020",
+              "label": "poetry_recitation",
+              "description": "诵读优秀诗文，体验情感，展开想象，领悟诗文大意。",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_021",
+              "label": "book_reading",
+              "description": "阅读整本书，初步理解主要内容，分享阅读感受。",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_022",
+              "label": "vocabulary_accumulation",
+              "description": "积累课文中的优美词语、精彩句段及课外语言材料。",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_023",
+              "label": "poetry_recitation_count",
+              "description": "背诵优秀诗文50篇（段）。",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_024",
+              "label": "reading_habit",
+              "description": "养成读书看报的习惯，收藏图书资料，乐于交流。",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S2_025",
+              "label": "total_reading_volume",
+              "description": "课外阅读总量不少于40万字。",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            }
+          ]
+        },
+        {
+          "name": "习作",
+          "knowledge_points": [
+            {
+              "id": "CH_S2_026",
+              "label": "oral_communication",
+              "description": "乐于用口头和书面方式与人交流，愿意分享，增强表达自信心。",
+              "cognitive_level": "了解",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S2_027",
+              "label": "listening_skills",
+              "description": "用普通话交谈，认真倾听，把握主要内容并简要转述。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S2_028",
+              "label": "questioning_discussing",
+              "description": "就不理解的地方请教，就不同意见与人商讨。",
+              "cognitive_level": "理解",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S2_029",
+              "label": "narrative_expression",
+              "description": "清楚讲述见闻，说出感受和想法，力求具体生动。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S2_030",
+              "label": "cultural_participation",
+              "description": "主动参与文化活动，根据场合运用合适音量和语气交流。",
+              "cognitive_level": "应用",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S2_031",
+              "label": "written_expression",
+              "description": "不拘形式写下见闻、感受和想象，写清楚新奇有趣或印象深刻的内容。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S2_032",
+              "label": "practical_writing",
+              "description": "用便条、简短书信等进行交流。",
+              "cognitive_level": "应用",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S2_033",
+              "label": "language_accumulation",
+              "description": "尝试在习作中运用平时积累的语言材料，特别是有新鲜感的词句。",
+              "cognitive_level": "应用",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S2_034",
+              "label": "revision_skills",
+              "description": "学习修改习作中有明显错误的词句。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S2_035",
+              "label": "writing_frequency",
+              "description": "课内习作每学年16次左右。",
+              "cognitive_level": "了解",
+              "source_block": "表达与交流"
+            }
+          ]
+        },
+        {
+          "name": "语文园地",
+          "knowledge_points": [
+            {
+              "id": "CH_S2_036",
+              "label": "word_classification",
+              "description": "尝试分类整理学过的字词，发现汉字形音义特点。",
+              "cognitive_level": "应用",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S2_037",
+              "label": "language_practice_activity",
+              "description": "组织趣味语文实践活动，在活动中学习语文、学会合作。",
+              "cognitive_level": "应用",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S2_038",
+              "label": "observation_expression",
+              "description": "结合语文学习观察自然与社会，用书面或口头方式表达探究所得。",
+              "cognitive_level": "应用",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S2_039",
+              "label": "multimedia_presentation",
+              "description": "尝试用表格、图像、音频等多种媒介呈现观察与探究结果。",
+              "cognitive_level": "应用",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S2_040",
+              "label": "problem_solving",
+              "description": "提出学习生活中的问题，搜集资料，运用语文和跨学科知识解决问题。",
+              "cognitive_level": "应用",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S2_041",
+              "label": "cultural_heritage_appreciation",
+              "description": "感悟国家通用语言文字的文化内涵，认识中华优秀传统文化。",
+              "cognitive_level": "理解",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S2_042",
+              "label": "patriotic_education",
+              "description": "感悟革命英雄和模范人物的爱国情怀，激发向英雄学习的意愿。",
+              "cognitive_level": "理解",
+              "source_block": "梳理与探究"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": 3,
+      "grade_band": "5-6",
+      "domains": [
+        {
+          "name": "识字与写字",
+          "knowledge_points": [
+            {
+              "id": "CH_S3_001",
+              "label": "independent_literacy",
+              "description": "具备较强的独立识字能力，能自主认读和书写汉字。",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S3_002",
+              "label": "advanced_characters",
+              "description": "累计认识常用汉字3000个左右，其中2500个左右会写。",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S3_003",
+              "label": "character_structure",
+              "description": "感受汉字的构字组词特点，体会汉字蕴含的智慧。",
+              "cognitive_level": "了解",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S3_004",
+              "label": "writing_posture",
+              "description": "写字姿势正确，有良好的书写习惯。",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S3_005",
+              "label": "calligraphy_basic",
+              "description": "硬笔书写楷书，行款整齐，力求美观，有一定的速度。",
+              "cognitive_level": "掌握",
+              "source_block": "识字与写字"
+            },
+            {
+              "id": "CH_S3_006",
+              "label": "brush_calligraphy",
+              "description": "能用毛笔书写楷书，在书写中体会汉字的优美。",
+              "cognitive_level": "应用",
+              "source_block": "识字与写字"
+            }
+          ]
+        },
+        {
+          "name": "阅读",
+          "knowledge_points": [
+            {
+              "id": "CH_S3_007",
+              "label": "reading_fluency",
+              "description": "能用普通话正确、流利、有感情地朗读课文。",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S3_008",
+              "label": "silent_reading_speed",
+              "description": "默读每分钟不少于300字，有一定速度。",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S3_009",
+              "label": "browsing_skill",
+              "description": "学习浏览，扩大知识面，根据需要搜集信息。",
+              "cognitive_level": "了解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S3_010",
+              "label": "word_inference",
+              "description": "联系上下文和积累推想词句意思，辨别感情色彩，体会表达效果。",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S3_011",
+              "label": "punctuation_usage",
+              "description": "体会顿号与逗号、分号与句号的不同用法。",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S3_012",
+              "label": "paragraph_structure",
+              "description": "了解文章的表达顺序，体会作者思想感情，领悟基本表达方法。",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S3_013",
+              "label": "reading_inference",
+              "description": "在交流和讨论中敢于提出看法，作出自己的判断。",
+              "cognitive_level": "应用",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S3_014",
+              "label": "narrative_reading",
+              "description": "阅读叙事性作品，了解梗概，描述场景、人物、细节，表达感受。",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S3_015",
+              "label": "poetry_reading",
+              "description": "阅读诗歌，把握诗意，想象情境，体会情感。",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S3_016",
+              "label": "expository_reading",
+              "description": "阅读说明性文章，抓住要点，了解基本说明方法。",
+              "cognitive_level": "理解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S3_017",
+              "label": "non_continuous_text",
+              "description": "阅读简单的非连续性文本，从图文材料中找出有价值的信息。",
+              "cognitive_level": "应用",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S3_018",
+              "label": "multimedia_reading",
+              "description": "尝试使用多种媒介阅读。",
+              "cognitive_level": "了解",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S3_019",
+              "label": "whole_book_reading",
+              "description": "阅读整本书，把握主要内容，向同学推荐并说明理由。",
+              "cognitive_level": "应用",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S3_020",
+              "label": "recitation",
+              "description": "背诵优秀诗文60篇，通过语调、韵律、节奏体味内容和情感。",
+              "cognitive_level": "掌握",
+              "source_block": "阅读与鉴赏"
+            },
+            {
+              "id": "CH_S3_021",
+              "label": "extensive_reading",
+              "description": "课外阅读总量不少于100万字，扩展阅读面。",
+              "cognitive_level": "了解",
+              "source_block": "阅读与鉴赏"
+            }
+          ]
+        },
+        {
+          "name": "习作",
+          "knowledge_points": [
+            {
+              "id": "CH_S3_022",
+              "label": "listening_skills",
+              "description": "认真耐心听人说话，抓住要点并简要转述。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S3_023",
+              "label": "expression_skills",
+              "description": "乐于表达，尊重理解对方，注意语言美，抵制不文明语言。",
+              "cognitive_level": "理解",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S3_024",
+              "label": "organized_expression",
+              "description": "表达有条理，语气语调适当，敢于发表意见，说清观点。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S3_025",
+              "label": "prepared_speech",
+              "description": "根据对象和场合稍作准备，作简单发言。",
+              "cognitive_level": "应用",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S3_026",
+              "label": "writing_purpose",
+              "description": "懂得写作是为了自我表达和与人交流。",
+              "cognitive_level": "理解",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S3_027",
+              "label": "observation_habit",
+              "description": "养成留心观察周围事物的习惯，丰富见闻，积累素材。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S3_028",
+              "label": "unique_experience",
+              "description": "珍视个人独特感受，积累习作素材。",
+              "cognitive_level": "理解",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S3_029",
+              "label": "narrative_writing",
+              "description": "能写简单的记实作文和想象作文，内容具体，感情真实。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S3_030",
+              "label": "paragraph_division",
+              "description": "根据内容表达需要，分段表述。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S3_031",
+              "label": "reading_notes",
+              "description": "学写读书笔记。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S3_032",
+              "label": "practical_writing",
+              "description": "学写常见应用文。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S3_033",
+              "label": "revision_skills",
+              "description": "修改自己的习作，并主动与他人交换修改，做到语句通顺，行款正确，书写规范整洁。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S3_034",
+              "label": "writing_speed",
+              "description": "习作要有一定速度。",
+              "cognitive_level": "掌握",
+              "source_block": "表达与交流"
+            },
+            {
+              "id": "CH_S3_035",
+              "label": "writing_frequency",
+              "description": "课内习作每学年16次左右。",
+              "cognitive_level": "了解",
+              "source_block": "表达与交流"
+            }
+          ]
+        },
+        {
+          "name": "语文园地",
+          "knowledge_points": [
+            {
+              "id": "CH_S3_036",
+              "label": "character_classification",
+              "description": "分类整理学过的字词，发现汉字形音义和书写特点，发展独立识字写字能力。",
+              "cognitive_level": "掌握",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S3_037",
+              "label": "media_expression",
+              "description": "感受不同媒介的表达效果，学习跨媒介阅读与运用，初步运用多种方法整理和呈现信息。",
+              "cognitive_level": "理解",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S3_038",
+              "label": "information_retrieval",
+              "description": "初步了解查找资料、运用资料的基本方法，利用图书馆、网络等渠道获取资料解决学习与生活问题。",
+              "cognitive_level": "了解",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S3_039",
+              "label": "research_report",
+              "description": "尝试写简单的研究报告。",
+              "cognitive_level": "应用",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S3_040",
+              "label": "activity_planning",
+              "description": "策划简单的校园和社会活动，讨论分析主题，学写活动计划和总结。",
+              "cognitive_level": "应用",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S3_041",
+              "label": "thematic_inquiry",
+              "description": "对身边问题或影视作品中的故事形象，通过调查访问、讨论演讲等方式开展专题探究，学习辨别是非善恶美丑。",
+              "cognitive_level": "应用",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S3_042",
+              "label": "cultural_heritage",
+              "description": "了解中华优秀传统文化的源远流长、丰富多彩，提升自身传统文化修养。",
+              "cognitive_level": "了解",
+              "source_block": "梳理与探究"
+            },
+            {
+              "id": "CH_S3_043",
+              "label": "heroic_spirit",
+              "description": "感受先贤志士的人格魅力，感悟革命家的英雄气概、优良作风和高尚品质，体会捍卫民族尊严和国家利益的精神。",
+              "cognitive_level": "理解",
+              "source_block": "梳理与探究"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
