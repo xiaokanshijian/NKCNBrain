@@ -1,55 +1,47 @@
-# Environment
+# Local credentials
 .env
 .env.*
 !.env.example
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-.venv/
-venv/
-env/
-*.egg-info/
-.pytest_cache/
-.mypy_cache/
-
-# Node
-node_modules/
-dist/
-.npm
-*.log
-
-# Django / data
-*.sqlite3
-db.sqlite3
-media/
-staticfiles/
-local_settings.py
-
-# Secrets and keys
+**/.env
+**/.env.*
+!**/.env.example
 *.pem
 *.key
-credentials.json
-secrets.json
-
-# OCR / local dumps
-small_llm_deep_judge/**/ocr_output/
-small_llm_deep_judge/**/uploads/
-small_llm_deep_judge/**/*.log
-
-# IDE / OS
+*.p12
+*.pfx
+# Environments, dependencies, generated files
+node_modules/
+dist/
+.venv/
+venv/
+nkcn/
+__pycache__/
+*.py[cod]
+*.log
+*.pkl
+*.pickle
+*.sqlite3
+*.db
+.cache/
+.coverage
+.pytest_cache/
+# Private runtime material
+backend/received_dir/
+backend/document_split_cache/
+backend/pre_summary_cache/
+backend/dmt_analysis/
+backend/analysis_output/
+backend/ocr_output/
+backend/skill_cache/
+backend/runtime/
+backend/app_chat/config/model_cache/
+backend/app_chat/redirect_config.json
+# Local editor state and verification output
 .idea/
 .vscode/
-.DS_Store
-Thumbs.db
-*.swp
+.verification/
+*.zip
 
-# Model weights / large binaries
-*.bin
-*.pt
-*.safetensors
-*.gguf
-*.ckpt
+# Vendored audio player is a source dependency, not application build output.
+!frontend/src/components/dist/
+!frontend/src/components/dist/**

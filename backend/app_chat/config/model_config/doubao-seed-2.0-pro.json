@@ -1,104 +1,104 @@
 {
-    "abbr_name": "doubao-seed-2.0-pro",
-    "model_id": "1360",
-    "sequence": 34,
-    "model_type": "openai",
-    "reasoning_level": "medium_native",
-    "multimodal_level": "medium",
-    "response_speed": "fast",
-    "description": "豆包文本推理模型",
-    "config": {
-        "model_name": "doubao-seed-2-0-pro-260215",
-        "openai_api_key": "env:ARK_API_KEY",
-        "openai_api_base": "https://ark.cn-beijing.volces.com/api/v3",
-        "default_headers": {
-            "x-foo": "true"
-        },
-        "temperature": 0.7,
-        "top_p": 0.95,
-        "max_tokens": 2048,
-        "presence_penalty": 1,
-        "frequency_penalty": 1,
-        "stop": [
-            "\n"
-        ]
+  "abbr_name": "doubao-seed-2.0-pro",
+  "model_id": "1360",
+  "sequence": 34,
+  "model_type": "openai",
+  "reasoning_level": "medium_native",
+  "multimodal_level": "medium",
+  "response_speed": "fast",
+  "description": "豆包文本推理模型",
+  "config": {
+    "model_name": "doubao-seed-2-0-pro-260215",
+    "openai_api_key": "env:NKCN_DOUBAO_SEED_2_0_PRO_OPENAI_API_KEY",
+    "openai_api_base": "https://ark.cn-beijing.volces.com/api/v3",
+    "default_headers": {
+      "x-foo": "true"
     },
-    "prompts": {
-        "sum_msg": [
-            {
-                "type": "system",
-                "template": "{sum_prompt}\nWhat you need to notice is that user may give you some images for his request by the way you can parse, you also need to exploit the possible images(Possible means that not have images all the time,sometimes user will not give the images).不要把图片当成一个主要的部分，你应该以文本为主，当你需要的时候再从图片种提取信息。"
-            },
-            {
-                "type": "human",
-                "template": "Please complete the request in Chinese with the following text and possible images:\n"
-            },
-            {
-                "type": "placeholder",
-                "variable_name": "images_store"
-            }
-        ],
-        "que_msg": {
-            "messages_1": [
-                {
-                    "type": "system",
-                    "template": "{que_prompt}\n"
-                },
-                {
-                    "type": "system",
-                    "content": "For identifying easily the output， you should follow the format like that:\n{'output_question1','output_question2','output_question3'}\n"
-                }
-            ],
-            "messages_2": [
-                {
-                    "type": "human",
-                    "template": "Please refer to the following relevant text and possible images to complete the follow-up questions of the above Q&A pair in Chinese (It is best to have no more than 50 Chinese characters per question):\n"
-                },
-                {
-                    "type": "placeholder",
-                    "variable_name": "images_store"
-                }
-            ]
+    "temperature": 0.7,
+    "top_p": 0.95,
+    "max_tokens": 2048,
+    "presence_penalty": 1,
+    "frequency_penalty": 1,
+    "stop": [
+      "\n"
+    ]
+  },
+  "prompts": {
+    "sum_msg": [
+      {
+        "type": "system",
+        "template": "{sum_prompt}\nWhat you need to notice is that user may give you some images for his request by the way you can parse, you also need to exploit the possible images(Possible means that not have images all the time,sometimes user will not give the images).不要把图片当成一个主要的部分，你应该以文本为主，当你需要的时候再从图片种提取信息。"
+      },
+      {
+        "type": "human",
+        "template": "Please complete the request in Chinese with the following text and possible images:\n"
+      },
+      {
+        "type": "placeholder",
+        "variable_name": "images_store"
+      }
+    ],
+    "que_msg": {
+      "messages_1": [
+        {
+          "type": "system",
+          "template": "{que_prompt}\n"
         },
-        "qa_msg": {
-            "messages": [
-                {
-                    "type": "system",
-                    "template": "{qa_prompt}\nWhat you need to notice is that the user may give you some images in the request in the form you can parse, you also need to exploit the possible images(Possible means that not have images all the time,sometimes user will not give the images)."
-                },
-                {
-                    "type": "human",
-                    "template": "Please complete the following request in Chinese :\n\n{question}\nPlease complete the request in Chinese with the following text and possible images:\n{text}"
-                }
-            ],
-            "messages_2": [
-                {
-                    "type": "placeholder",
-                    "variable_name": "images_store"
-                }
-            ]
-        },
-        "topic_msg": {
-            "messages_1": [
-                {
-                    "type": "system",
-                    "template": "{topic_prompt}What you need to notice is that user may give you some images for his request by the way you can parse, you also need to exploit the possible images(Possible means that not have images all the time,sometimes user will not give the images)."
-                },
-                {
-                    "type": "system",
-                    "content": "For identifying easily the output， you should follow the format like that:\n{'topic1','topic2','topic3'}\nPlease complete the request with the help of following examples:\n"
-                }
-            ],
-            "messages_2": [
-                {
-                    "type": "human",
-                    "template": "Please complete the request in Chinese with the following text and possible images:\n"
-                },
-                {
-                    "type": "placeholder",
-                    "variable_name": "images_store"
-                }
-            ]
+        {
+          "type": "system",
+          "content": "For identifying easily the output， you should follow the format like that:\n{'output_question1','output_question2','output_question3'}\n"
         }
+      ],
+      "messages_2": [
+        {
+          "type": "human",
+          "template": "Please refer to the following relevant text and possible images to complete the follow-up questions of the above Q&A pair in Chinese (It is best to have no more than 50 Chinese characters per question):\n"
+        },
+        {
+          "type": "placeholder",
+          "variable_name": "images_store"
+        }
+      ]
+    },
+    "qa_msg": {
+      "messages": [
+        {
+          "type": "system",
+          "template": "{qa_prompt}\nWhat you need to notice is that the user may give you some images in the request in the form you can parse, you also need to exploit the possible images(Possible means that not have images all the time,sometimes user will not give the images)."
+        },
+        {
+          "type": "human",
+          "template": "Please complete the following request in Chinese :\n\n{question}\nPlease complete the request in Chinese with the following text and possible images:\n{text}"
+        }
+      ],
+      "messages_2": [
+        {
+          "type": "placeholder",
+          "variable_name": "images_store"
+        }
+      ]
+    },
+    "topic_msg": {
+      "messages_1": [
+        {
+          "type": "system",
+          "template": "{topic_prompt}What you need to notice is that user may give you some images for his request by the way you can parse, you also need to exploit the possible images(Possible means that not have images all the time,sometimes user will not give the images)."
+        },
+        {
+          "type": "system",
+          "content": "For identifying easily the output， you should follow the format like that:\n{'topic1','topic2','topic3'}\nPlease complete the request with the help of following examples:\n"
+        }
+      ],
+      "messages_2": [
+        {
+          "type": "human",
+          "template": "Please complete the request in Chinese with the following text and possible images:\n"
+        },
+        {
+          "type": "placeholder",
+          "variable_name": "images_store"
+        }
+      ]
     }
+  }
 }

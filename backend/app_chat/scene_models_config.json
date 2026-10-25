@@ -1,13 +1,15 @@
 {
   "values": {
+    "card_shallow_rate": "claude-4-sonnet",
+    "doc_file_summary": "claude-opus-4.8",
     "card_html": "claude-opus-4.7",
     "gxx_claude": "claude-sonnet-4.6",
     "gxx_gemini": "gemini-3.1-pro-preview",
     "card_image_gemini": "gemini-3.1-flash-image-preview-X",
     "card_image_gemini_fallback": "gemini-3.1-flash-image-preview",
-    "card_image_gpt": "gpt-image-2",
-    "card_image_gpt_fallback": "gpt-image-2-all",
-    "card_image_claude_spec": "claude-sonnet-5",
+    "card_image_gpt": "gpt-image-2.5-flare",
+    "card_image_gpt_fallback": "gpt-image-2.5-sunburst",
+    "card_image_claude_spec": "claude-sonnet-4-6",
     "dmt_overlay_claude": "claude-sonnet-4-20250514",
     "dmt_gemini": "gemini-3.1-pro-preview",
     "output_article_claude_1": "claude-sonnet-4.5",
@@ -34,6 +36,8 @@
     "task_cluster_semantic": "gemini-3.1-pro-preview",
     "card_semantic_keywords": "claude-sonnet-5",
     "notebook_memory_write": "deepseek-v4-flash",
-    "notebook_memory_dream": "claude-opus-4.8"
+    "notebook_memory_dream": "claude-opus-4.8",
+    "cross_reorganize_plan": "claude-opus-5.5",
+    "cross_reorganize_write": "deepseek-chat"
   }
 }

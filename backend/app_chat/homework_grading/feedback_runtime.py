@@ -95,5 +95,12 @@ def stamp_feedback(value, runtime, phase=None):
     if runtime is not None and isinstance(value,dict):
         value['feedback_context']=runtime.context
         value['feedback_execution']=runtime.audit()
+        from .execution_control import current_execution
+        execution = current_execution()
+        if execution is not None:
+            value['feedback_execution']['actual_code_fingerprint'] = execution.identity['actual_code_fingerprint']
+            from .stage_dependencies import enabled, basis
+            if enabled(runtime):
+                value['feedback_execution']['stage_basis'] = basis(runtime, execution.identity['actual_code_hashes'], execution.stage)
         if phase: value['feedback_execution']['consumer']=phase
     return value

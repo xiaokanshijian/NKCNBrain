@@ -3,6 +3,7 @@ PDF OCR处理工具模块
 
 提供PDF OCR识别、扫描件判断、Markdown转PDF等功能
 """
+import nkcn_public_config as _public_config
 
 import os
 import json
@@ -20,15 +21,15 @@ from PIL import Image, ImageDraw, ImageFont
 def get_small_model_server_url(model_id=None):
     """
     根据小模型ID获取对应的服务器URL
-    3007 -> 192.0.2.1
-    3001-3006 -> 192.0.2.1
+    3007 -> 127.0.0.1
+    3001-3006 -> 127.0.0.1
     """
     if model_id and str(model_id) == "3007":
-        return "http://192.0.2.1:8000"
+        return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
     else:
-        return "http://192.0.2.1:8000"
+        return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
 
-RELAY_SERVER_URL = "http://192.0.2.1:8000/ocr_forward"  # 默认URL，可通过get_small_model_server_url动态获取
+RELAY_SERVER_URL = _public_config.endpoint('NKCN_SERVICE_8000_OCR_FORWARD_URL', 'http://localhost:8000/ocr_forward')  # 默认URL，可通过get_small_model_server_url动态获取
 OCR_TIMEOUT = 1200  # 20分钟超时
 PAGE_BREAK = '\n\n<div STYLE="page-break-after: always;"></div>\n\n'
 
@@ -1899,7 +1900,7 @@ def _pil_images_to_pdf(pil_images: List[Image.Image], output_path: str, jpeg_qua
 
 # if __name__ == "__main__":
 #     # 版面布局PDF测试
-#     test_pdf = "/home/ubuntu/Backend/received_dir/user_raw_file/marklee_WangWeiGongPapers/王唯工【以肾为基：用现代科学看中医肾脉，解析传统气功养生源流】繁体竖版黑白扫描.pdf"
+#     test_pdf = "./runtime"
 #     success, layout_pdf = generate_layout_pdf(test_pdf)
 #     if success:
 #         print(f"布局PDF生成成功: {layout_pdf}")

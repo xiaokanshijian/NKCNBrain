@@ -349,11 +349,11 @@
       </el-form>
     </div>
 
-    <!-- 场景模型配置（P0-P3 业务写死模型） -->
+    <!-- 场景模型配置（P0-P5 业务写死模型） -->
     <div class="scene-models-container" style="margin: 30px 0; padding: 20px; background: #f0f9eb; border-radius: 8px;">
       <h2>一些系统能力的模型配置</h2>
       <p style="color: #666; margin-bottom: 12px;">
-        卡片 HTML/Group.md整理更新/卡片生图、输出目录卡 Claude、连续图片OCR/识别/理解、作业批改等处的模型。保存后立即生效，无需重启。
+        红蓝浅评、文档摘要、卡片 HTML 整理更新/卡片生图、输出目录卡、连续图片OCR/识别/理解、作业批改、交叉梳理 Skill 等处的模型。保存后立即生效，无需重启。
       </p>
       <p style="color: #909399; margin-bottom: 20px; font-size: 13px;">
         <strong style="color: #67c23a;">标准配置</strong>：从已有模型配置里选择，只换模型缩写名，调用方式不变；
@@ -802,7 +802,7 @@ export default {
     },
     sceneModelGroups() {
       const groupLabels = {
-        P0: 'P0 · 卡片助记 HTML/Group.md整理更新/卡片生图',
+        P0: 'P0 · 建卡浅评/文档摘要/卡片助记 HTML/Group.md整理更新/卡片生图',
         P1: 'P1 · 输出目录卡（Claude 思考/校验）',
         P2: 'P2 · 连续图片理解（OCR、识字、版面精修、覆盖层等）',
         P3: 'P3 · 作业批改',

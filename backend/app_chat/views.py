@@ -1,3 +1,4 @@
+import nkcn_public_config as _public_config
 import contextvars
 import csv
 import functools
@@ -236,8 +237,8 @@ QS_QQ_base = "请务必注意：当前的语境口吻为建议引导性回答，
              "如果用户的提问本身是需要提出一些相关问题链，则此时你应该" \
              "给出更有引导价值、更有张力、更有深度思考价值的问题。请重视这个要求！"
 
-# OPEN_AI_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPEN_AI_KEY = os.environ.get("NKCN_LLM_API_KEY", "")
+# OPEN_AI_KEY = "[redacted]"
+OPEN_AI_KEY = _public_config.secret('OPENAI_API_KEY')
 
 system_prompt_claude = """<人性化思考协议>
 <多模态感知体验>
@@ -710,6 +711,20 @@ def stream_generator_sync_down(data):
 def stream_generator_sync_summa(data):
     print("[DEBUG] 从前端获取到的数据:", data)
 
+    # Admin 场景槽：文档点摘要模型（覆盖前端写死的 model_id）
+    try:
+        from app_chat.scene_models import resolve_scene_model_id
+        admin_mid = resolve_scene_model_id('doc_file_summary')
+        if admin_mid:
+            if hasattr(data, 'copy'):
+                data = data.copy()
+                data['model_id'] = admin_mid
+            elif isinstance(data, dict):
+                data = {**data, 'model_id': admin_mid}
+            print(f"[SceneModels] doc_file_summary → model_id={admin_mid}")
+    except Exception as e:
+        print(f"[SceneModels] doc_file_summary 解析失败，沿用请求 model_id: {e}")
+
     # 【新增】在异步上下文之前预处理数据库操作
     # data = preprocess_data_before_async(data)
 
@@ -746,6 +761,20 @@ def stream_generator_sync_summa(data):
 
 def stream_generator_sync_rate(data):
     print("[DEBUG] 从前端获取到的数据:", data)
+
+    # Admin 场景槽：建卡红蓝浅评模型（覆盖前端写死的 model_id）
+    try:
+        from app_chat.scene_models import resolve_scene_model_id
+        admin_mid = resolve_scene_model_id('card_shallow_rate')
+        if admin_mid:
+            if hasattr(data, 'copy'):
+                data = data.copy()
+                data['model_id'] = admin_mid
+            elif isinstance(data, dict):
+                data = {**data, 'model_id': admin_mid}
+            print(f"[SceneModels] card_shallow_rate → model_id={admin_mid}")
+    except Exception as e:
+        print(f"[SceneModels] card_shallow_rate 解析失败，沿用请求 model_id: {e}")
 
     # 【新增】在异步上下文之前预处理数据库操作
     # data = preprocess_data_before_async(data)
@@ -1465,12 +1494,39 @@ def chat_sendParams(request):
             run_socratic_probe,
             store_socratic_probe_on_params,
         )
+        from app_chat.skill_router import run_skill_select
+        from app_chat.rag_structure_scope import (
+            should_locate_structure_scope,
+            run_structure_scope_locate,
+        )
 
         req_mode = str(data.get('mode') or 'normal').strip().lower()
         req_window_id = str(data.get('windowId') or data.get('window_id') or 'left').strip() or 'left'
+        # 勾选列表：RAG 不含 zip；Skill 候选用完整 file_list（含 zip）
+        file_list_all = list(file_list or [])
+        file_list = [f for f in file_list_all if not str(f).lower().endswith('.zip')]
+        # 杨谦：所选材料若有已完成批改，供 RAG 参考（与 RAG 文档列表一致，不含 zip）
+        from app_chat.homework_grading.grading_rag import inspect_selection, cache_matches
+        grading_selection = inspect_selection(username, file_list)
+        grading_cache_key = grading_selection['cache_key']
+        grading_context_status = []
         has_docs = bool(file_list)
+        # 前端「是否启用反问」：关闭则不调用 DS 判定
+        _socratic_flag = str(
+            data.get('isSocraticProbeUsed')
+            or data.get('socraticProbeEnabled')
+            or 'false'
+        ).strip().lower()
+        socratic_enabled = _socratic_flag in ('true', '1', 'yes', 'on')
         socratic_future = None
+        skill_future = None
+        structure_future = None
+        structure_scope_result = None
+        page_scopes_for_rag = None
+        structure_plans_for_rag = None
+        structure_map_prompt = ''
         socratic_probe_result = None
+        skill_select_result = None
         _socratic_pool = None
         prev_socratic = {}
         try:
@@ -1495,7 +1551,48 @@ def chat_sendParams(request):
         except Exception:
             prev_socratic = {}
 
-        if req_mode == 'iteration':
+        if not socratic_enabled:
+            socratic_probe_result = {
+                'ok': True,
+                'should_counter_ask': False,
+                'decision': '否',
+                'skipped_rejudge': True,
+                'skip_reason': 'user_disabled',
+                'phase': 'user_disabled',
+                'instruction': '',
+            }
+            print(
+                f'[chat_sendParams] 用户关闭反问判定 window={req_window_id} mode={req_mode}：跳过 DS',
+                flush=True,
+            )
+            if has_docs:
+                _probe_message = str(data.get('socraticBoundMessage') or message or '').strip() or message
+                _need_scope = should_locate_structure_scope(_probe_message, file_list)
+                _socratic_pool = ThreadPoolExecutor(max_workers=2 if _need_scope else 1)
+                skill_future = _socratic_pool.submit(
+                    run_skill_select,
+                    username,
+                    _probe_message,
+                    file_list_all,
+                    mode=req_mode,
+                )
+                if _need_scope:
+                    structure_future = _socratic_pool.submit(
+                        run_structure_scope_locate,
+                        username,
+                        _probe_message,
+                        file_list,
+                    )
+            else:
+                _probe_message = str(data.get('socraticBoundMessage') or message or '').strip() or message
+                try:
+                    skill_select_result = run_skill_select(
+                        username, _probe_message, file_list_all, mode=req_mode,
+                    )
+                except Exception as _sk_e:
+                    print(f'[chat_sendParams] skill_select 失败: {_sk_e}', flush=True)
+                    skill_select_result = {'ok': False, 'selected_skills': [], 'injection_block': ''}
+        elif req_mode == 'iteration':
             # 慢思考二次迭代：不重判；首答为反问则延续并加深反问
             socratic_probe_result = preserve_socratic_for_iteration(prev_socratic, mode=req_mode)
             print(
@@ -1504,6 +1601,17 @@ def chat_sendParams(request):
                 f'phase={socratic_probe_result.get("phase")}',
                 flush=True,
             )
+            # 迭代仍可能问「第x章」：与选 Skill 无关，单独并发定位
+            if has_docs:
+                _probe_message = str(data.get('socraticBoundMessage') or message or '').strip() or message
+                if should_locate_structure_scope(_probe_message, file_list):
+                    _socratic_pool = ThreadPoolExecutor(max_workers=1)
+                    structure_future = _socratic_pool.submit(
+                        run_structure_scope_locate,
+                        username,
+                        _probe_message,
+                        file_list,
+                    )
         elif req_mode == 'merge':
             # 综合合并不应继承「只反问」约束，避免把合并答案强行改成反问
             socratic_probe_result = {
@@ -1516,9 +1624,21 @@ def chat_sendParams(request):
                 'instruction': '',
             }
             print('[chat_sendParams] mode=merge：清除语义反问约束', flush=True)
+            # merge 仍可能做 RAG：章/节问题照样定位收窄
+            if has_docs:
+                _probe_message = str(data.get('socraticBoundMessage') or message or '').strip() or message
+                if should_locate_structure_scope(_probe_message, file_list):
+                    _socratic_pool = ThreadPoolExecutor(max_workers=1)
+                    structure_future = _socratic_pool.submit(
+                        run_structure_scope_locate,
+                        username,
+                        _probe_message,
+                        file_list,
+                    )
         elif has_docs:
             _probe_message = str(data.get('socraticBoundMessage') or message or '').strip() or message
-            _socratic_pool = ThreadPoolExecutor(max_workers=1)
+            _need_scope = should_locate_structure_scope(_probe_message, file_list)
+            _socratic_pool = ThreadPoolExecutor(max_workers=3 if _need_scope else 2)
             socratic_future = _socratic_pool.submit(
                 run_socratic_probe,
                 username=username,
@@ -1528,6 +1648,20 @@ def chat_sendParams(request):
                 prev_question=str(data.get('socraticPrevQuestion') or ''),
                 prev_answer=str(data.get('socraticPrevAnswer') or ''),
             )
+            skill_future = _socratic_pool.submit(
+                run_skill_select,
+                username,
+                _probe_message,
+                file_list_all,
+                mode=req_mode,
+            )
+            if _need_scope:
+                structure_future = _socratic_pool.submit(
+                    run_structure_scope_locate,
+                    username,
+                    _probe_message,
+                    file_list,
+                )
         else:
             print('[chat_sendParams] 无勾选文档：先执行语义反问判定', flush=True)
             _probe_message = str(data.get('socraticBoundMessage') or message or '').strip() or message
@@ -1539,6 +1673,14 @@ def chat_sendParams(request):
                 prev_question=str(data.get('socraticPrevQuestion') or ''),
                 prev_answer=str(data.get('socraticPrevAnswer') or ''),
             )
+            # 无 PDF 但可能勾了 Skill zip
+            try:
+                skill_select_result = run_skill_select(
+                    username, _probe_message, file_list_all, mode=req_mode,
+                )
+            except Exception as _sk_e:
+                print(f'[chat_sendParams] skill_select 失败: {_sk_e}', flush=True)
+                skill_select_result = {'ok': False, 'selected_skills': [], 'injection_block': ''}
 
         try:
             if not has_docs:
@@ -1549,14 +1691,40 @@ def chat_sendParams(request):
                 last_segments[name2lock] = segments
                 print('[chat_sendParams] 无勾选文档：跳过文档分割/RAG', flush=True)
             else:
+                # 章/节定位：必须在 RAG 前拿到（与 skill_select 并发，不挡选 Skill）
+                if structure_future is not None:
+                    try:
+                        structure_scope_result = structure_future.result(timeout=25)
+                        page_scopes_for_rag = (structure_scope_result or {}).get('page_scopes')
+                        structure_plans_for_rag = (structure_scope_result or {}).get('plans') or None
+                        structure_map_prompt = (structure_scope_result or {}).get('map_prompt') or ''
+                        print(
+                            f'[chat_sendParams] RAG 页码收窄: '
+                            f'triggered={(structure_scope_result or {}).get("triggered")} '
+                            f'scopes={page_scopes_for_rag} '
+                            f'plans={len(structure_plans_for_rag or [])}',
+                            flush=True,
+                        )
+                    except Exception as _sc_e:
+                        print(f'[chat_sendParams] structure_scope 失败，RAG 不收窄: {_sc_e}', flush=True)
+                        structure_scope_result = {'ok': False, 'note': str(_sc_e)}
+                        page_scopes_for_rag = None
+                        structure_plans_for_rag = None
+                        structure_map_prompt = ''
+
                 # 🔥 缓存key需要包含core_keyword，确保关键词变化时重新搜索
                 cache_key_core_keyword = chat_with_files_params[name2lock].get("core_keyword") if chat_with_files_params[name2lock] else None
                 cache_key_cross_nb = chat_with_files_params[name2lock].get("cross_notebook_context") if chat_with_files_params[name2lock] else None
                 cache_key_pinned_nb = chat_with_files_params[name2lock].get("pinned_cross_notebooks") if chat_with_files_params[name2lock] else None
+                cache_key_page_scopes = chat_with_files_params[name2lock].get("page_scopes") if chat_with_files_params[name2lock] else None
+                cache_key_plans = chat_with_files_params[name2lock].get("structure_plans") if chat_with_files_params[name2lock] else None
                 if chat_with_files_params[name2lock] == {} or chat_with_files_params[name2lock]["file_list"] != file_list or \
                         chat_with_files_params[name2lock]["get_way"] != right_select_list or chat_with_files_params[name2lock][
                     "question"] != message or (core_keyword != cache_key_core_keyword) or (
-                    cross_notebook_context_on != cache_key_cross_nb) or (pinned_cross_notebooks != cache_key_pinned_nb):
+                    cross_notebook_context_on != cache_key_cross_nb) or (pinned_cross_notebooks != cache_key_pinned_nb) or (
+                    page_scopes_for_rag != cache_key_page_scopes) or (
+                    structure_plans_for_rag != cache_key_plans) or (
+                    not cache_matches(chat_with_files_params[name2lock], grading_selection)):
                     print('开始分割文档')
                     # 记录RAG搜索开始时间
                     rag_start_time = time.time()
@@ -1568,7 +1736,25 @@ def chat_sendParams(request):
                         segment_get_way_list=right_select_list,
                         text_for_search=message,
                         core_keyword=core_keyword,  # 🔥 传递核心关键词
+                        page_scopes=page_scopes_for_rag,
+                        structure_plans=structure_plans_for_rag,
+                        grading_selection=grading_selection,
                     )
+                    grading_context_status = grading_selection.get('result_status', [])
+                    if structure_map_prompt:
+                        from langchain_core.documents import Document as _MapDoc
+                        map_doc = _MapDoc(
+                            page_content=(
+                                "以下是本题所涉文档的目录结构（DocStructure），"
+                                "用于把握全书/全章位置，不是正文证据：\n"
+                                + structure_map_prompt
+                            ),
+                            metadata={"type": "doc_structure_map", "source": "doc_structure"},
+                        )
+                        if segments and isinstance(segments[0], list):
+                            segments.insert(0, [map_doc])
+                        else:
+                            segments = [[map_doc]]
 
                     # 计算RAG搜索用时
                     rag_end_time = time.time()
@@ -1589,6 +1775,7 @@ def chat_sendParams(request):
                         last_segments[name2lock] = segments
                 else:
                     segments = last_segments[name2lock]
+                    grading_context_status = chat_with_files_params[name2lock].get('grading_context_status', [])
                     cross_notebook_citation_prefix = chat_with_files_params[name2lock].get('cross_notebook_citation_prefix', '')
                     # 从缓存中恢复RAG搜索时间
                     if name2lock in chat_with_files_params and 'rag_search_time' in chat_with_files_params[name2lock]:
@@ -1609,12 +1796,52 @@ def chat_sendParams(request):
                             'decision': '否',
                             'error': str(_socratic_e)[:200],
                         }
+                if skill_future is not None:
+                    try:
+                        skill_select_result = skill_future.result(timeout=35)
+                    except Exception as _skill_e:
+                        print(f'[chat_sendParams] Skill 选择并行等待失败: {_skill_e}', flush=True)
+                        skill_select_result = {
+                            'ok': False,
+                            'selected_skills': [],
+                            'injection_block': '',
+                            'error': str(_skill_e)[:200],
+                        }
         finally:
             if _socratic_pool is not None:
                 try:
                     _socratic_pool.shutdown(wait=False)
                 except Exception:
                     pass
+
+        # iteration/merge：不注入 Skill
+        if req_mode in ('iteration', 'merge'):
+            skill_select_result = {
+                'ok': True,
+                'skipped': True,
+                'skip_reason': req_mode,
+                'selected_skills': [],
+                'injection_block': '',
+            }
+            print(f'[Skill] 本轮选用: (skipped: {req_mode})', flush=True)
+        elif skill_select_result is None:
+            skill_select_result = {'ok': True, 'selected_skills': [], 'injection_block': ''}
+
+        # 反问轮：降为 description 级注入
+        try:
+            from app_chat.skill_router import build_injection_block
+            if (
+                isinstance(skill_select_result, dict)
+                and skill_select_result.get('selected_skills')
+                and (socratic_probe_result or {}).get('should_counter_ask')
+            ):
+                skill_select_result['injection_block'] = build_injection_block(
+                    username,
+                    skill_select_result.get('selected_skills') or [],
+                    counter_ask=True,
+                )
+        except Exception as _inj_e:
+            print(f'[chat_sendParams] Skill 反问降级注入失败: {_inj_e}', flush=True)
 
         # 这里也用作者username去获取文件夹里存储的勾选Cards的可能图片base64
         base64_images = []
@@ -1645,6 +1872,8 @@ def chat_sendParams(request):
             rounds=rounds,
             cross_notebook_citation_prefix=cross_notebook_citation_prefix if cross_notebook_context_on else None,
         )
+        from app_chat.homework_grading.grading_rag import apply_reference_policy
+        apply_reference_policy(chat_with_files_params[name2lock], grading_context_status)
         if _prev_socratic_by_message:
             chat_with_files_params[name2lock]['socratic_by_message'] = _prev_socratic_by_message
         # 🔥 保存核心关键词到缓存
@@ -1655,8 +1884,33 @@ def chat_sendParams(request):
         if cross_notebook_context_on:
             chat_with_files_params[name2lock]["cross_notebook_citation_prefix"] = cross_notebook_citation_prefix
 
+        # Skill 选择结果：只写在 name2lock（组本下是协作者个人键）
+        # 禁止写到共享 username，否则 uzi/uzi2 同开时会互相覆盖对方的 injection
+        try:
+            chat_with_files_params[name2lock]['skill_select'] = skill_select_result or {}
+            chat_with_files_params[name2lock]['skill_injection'] = (skill_select_result or {}).get('injection_block') or ''
+            chat_with_files_params[name2lock]['checked_files_all'] = file_list_all
+            if isinstance(chat_with_files_params_tmp.get(name2lock), dict):
+                chat_with_files_params_tmp[name2lock]['skill_select'] = skill_select_result or {}
+                chat_with_files_params_tmp[name2lock]['skill_injection'] = (
+                    (skill_select_result or {}).get('injection_block') or ''
+                )
+                chat_with_files_params_tmp[name2lock]['checked_files_all'] = file_list_all
+        except Exception:
+            pass
+
         # 添加RAG搜索用时到params中
         chat_with_files_params[name2lock]['rag_search_time'] = rag_search_time
+        chat_with_files_params[name2lock]['page_scopes'] = page_scopes_for_rag
+        chat_with_files_params[name2lock]['structure_plans'] = structure_plans_for_rag
+        chat_with_files_params[name2lock]['grading_cache_key'] = grading_cache_key
+        chat_with_files_params[name2lock]['grading_context_status'] = grading_context_status
+        if structure_scope_result is not None:
+            chat_with_files_params[name2lock]['structure_scope'] = {
+                'triggered': (structure_scope_result or {}).get('triggered'),
+                'scopes': (structure_scope_result or {}).get('scopes') or [],
+                'note': (structure_scope_result or {}).get('note') or '',
+            }
         print(f"[DEBUG] chat_sendParams - 存储RAG时间到chat_with_files_params[{name2lock}]: {rag_search_time}s")
 
         # 语义反问判定结果：按「原问题」发布共享，主辅窗口同轮必须一致
@@ -1818,6 +2072,7 @@ def chat_sendParams(request):
     response['msg'] = 'success'
     response['error_num'] = 0
 
+    response['grading_context_status'] = chat_with_files_params.get(name2lock, {}).get('grading_context_status', [])
     # 回传本轮语义反问判定，供前端慢思考决定是否跳过深评/迭代
     try:
         _probe = {}
@@ -1937,9 +2192,9 @@ async def gpt_stream_generator(data):
     if not constructed_data["file_list"]:
         try:
             client = OpenAI(
-                # api_key=os.environ.get("OPENAI_API_KEY", ""),
-                api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-                base_url='https://chat.cloudapi.vip/v1/',
+                # api_key='[redacted]',
+                api_key=_public_config.secret('OPENAI_API_KEY'),
+                base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
                 default_headers={"x-foo": "true"},
             )
             print("GPT4o不勾选文件，发送消息: ", constructed_data["questionGPT"])
@@ -2127,8 +2382,8 @@ async def gemini_stream_generator(data):
     if not constructed_data["file_list"]:
         try:
             client = OpenAI(
-                api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-                base_url='https://chat.cloudapi.vip/v1/',
+                api_key=_public_config.secret('OPENAI_API_KEY'),
+                base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
                 default_headers={"x-foo": "true"},
             )
             print("Gemini不勾选文件，发送消息: ", constructed_data["questionGemini"])
@@ -2312,8 +2567,8 @@ async def claude_stream_generator(data):
     if not constructed_data["file_list"]:
         try:
             client = OpenAI(
-                api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-                base_url='https://chat.cloudapi.vip/v1/',
+                api_key=_public_config.secret('OPENAI_API_KEY'),
+                base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
                 default_headers={"x-foo": "true"}
             )
             print("Claude3.5不勾选文件，发送消息: ", constructed_data["questionClaude"])
@@ -2600,7 +2855,7 @@ async def deepseek_stream_generator(data):
     chat_content[username]["deepseek"] = ""
     if not constructed_data["file_list"]:
         try:
-            API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+            API_KEY = _public_config.secret('DEEPSEEK_API_KEY')
             if constructed_data["system_prompt_claudeUse"] != "":
                 role = system_prompt_deepseek  # thinking的简化版
                 role = role + "\n当前的场景阶段提示：\n" + global_var.store_memory[constructed_data['writer']]["prompt"]["LUI2"][
@@ -2801,7 +3056,7 @@ async def llama_stream_generator(data):
     if not constructed_data["file_list"]:
         client = OpenAI(
             base_url="https://integrate.api.nvidia.com/v1",
-            api_key=os.environ.get("NVIDIA_API_KEY", "")
+            api_key=_public_config.secret('NVIDIA_API_KEY')
         )
         try:
             print("Llama3不勾选文件，发送消息: ", constructed_data["questionLlama"])
@@ -2963,7 +3218,7 @@ async def kimi_stream_generator(data):
     if not constructed_data["file_list"]:
         try:
             client = OpenAI(
-                api_key=os.environ.get("KIMI_API_KEY", ""),
+                api_key=_public_config.secret('KIMI_API_KEY'),
                 base_url="https://api.moonshot.cn/v1",
                 default_headers={"x-foo": "true"},
             )
@@ -2987,15 +3242,12 @@ async def kimi_stream_generator(data):
             response = await asyncio.wait_for(
                 to_thread(  # 将同步调用转为异步任务
                     client.chat.completions.create,
-                    model='moonshot-v1-32k',
+                    model='kimi-k3',
                     messages=[
                         {"role": "system", "content": useSystemPrompt},
                         {"role": "user", "content": constructed_data["questionKimi"]},
                     ],
-                    temperature=global_var.kimiConfig["temperature"],
-                    top_p=global_var.kimiConfig["top_p"],
-                    frequency_penalty=global_var.kimiConfig["frequency_penalty"],
-                    presence_penalty=global_var.kimiConfig["presence_penalty"],
+                    temperature=1.0,
                     max_tokens=global_var.kimiConfig["max_tokens"],
                     n=global_var.kimiConfig["n"],
                     stream=True,  # FIXME yq: 现在暂时默认都开启流式输出
@@ -3125,8 +3377,8 @@ async def dsreasoner_stream_generator(data):
     chat_content[username]["dsreasoner"] = ""
     if not constructed_data["file_list"]:
         try:
-            # API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
-            API_KEY_ALI = os.environ.get("DASHSCOPE_API_KEY", "")
+            # API_KEY = '[redacted]'
+            API_KEY_ALI = _public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY')
 
             if constructed_data["system_prompt"] != "":
                 role = "当前的场景阶段提示：\n" + global_var.store_memory[constructed_data['writer']]["prompt"]["LUI2"]["qa"]
@@ -3352,8 +3604,8 @@ async def qwq_stream_generator(data):
     chat_content[username]["qwq"] = ""
     if not constructed_data["file_list"]:
         try:
-            # API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
-            API_KEY_ALI = os.environ.get("DASHSCOPE_API_KEY", "")
+            # API_KEY = '[redacted]'
+            API_KEY_ALI = _public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY')
 
             if constructed_data["system_prompt"] != "":
                 role = "当前的场景阶段提示：\n" + global_var.store_memory[constructed_data['writer']]["prompt"]["LUI2"]["qa"]
@@ -4327,7 +4579,92 @@ def chat_upload(request):
         # response['error_num'] = 0
 
         # 两段式处理：第一阶段只处理文本，快速返回
-        if filesuffix.lower() == 'pdf':
+        if filesuffix.lower() == 'zip' or filetype == 'zip' or str(data.get('filetype')) == '5':
+            # Skill 包 zip：不向量化；校验结构后导入 skills/
+            full_zip_name = filename + '.' + filesuffix
+            zip_path = f'./received_dir/user_raw_file/{username}/{full_zip_name}'
+            try:
+                from app_chat import skills_store as skills_store
+                from app_chat import skill_generate as skill_generate
+                insp = skills_store.inspect_skill_zip(zip_path)
+                if not insp.get('ok'):
+                    # 非法结构：删除已写入的 zip，告知前端
+                    try:
+                        if os.path.isfile(zip_path):
+                            os.remove(zip_path)
+                    except Exception:
+                        pass
+                    response = {
+                        'content': '',
+                        'msg': insp.get('error') or '非 Skill 包 zip',
+                        'error_num': 1,
+                        'is_skill_pack': False,
+                        'reject_zip': True,
+                    }
+                else:
+                    # 有冲突时仍先导入？按默认：返回需冲突处理，先不自动 overwrite
+                    existing = set(skills_store.list_skill_dirs(username))
+                    conflicts = [n for n in (insp.get('skill_names') or []) if n in existing]
+                    if conflicts:
+                        response = {
+                            'content': 'dddddddddddd',
+                            'msg': 'need_conflict_resolution',
+                            'error_num': 0,
+                            'is_skill_pack': True,
+                            'need_conflict_resolution': True,
+                            'conflicts': conflicts,
+                            'skill_names': insp.get('skill_names') or [],
+                            'zip_name': full_zip_name,
+                        }
+                    else:
+                        result = skills_store.import_skill_zip(
+                            username, zip_path, full_zip_name, conflict_policy='overwrite',
+                        )
+                        if result.get('ok'):
+                            try:
+                                skill_generate.update_notebook_hub(realName, username)
+                            except Exception:
+                                pass
+                            # 标记 split 完成，避免前端一直转圈
+                            try:
+                                global_var.add_split_file(username, full_zip_name)
+                            except Exception:
+                                pass
+                            # 进度拉满
+                            try:
+                                global_var.set_task_current_page(task_id, 1)
+                                task = global_var.tasks.get(task_id)
+                                if task:
+                                    task['current_item'] = 1
+                                    task['total_items'] = 1
+                            except Exception:
+                                pass
+                            response = {
+                                'content': 'dddddddddddd',
+                                'msg': 'success',
+                                'error_num': 0,
+                                'is_skill_pack': True,
+                                'imported': result.get('imported') or [],
+                                'hub': result.get('hub'),
+                            }
+                        else:
+                            response = {
+                                'content': '',
+                                'msg': result.get('error') or 'Skill 包导入失败',
+                                'error_num': 1,
+                                'is_skill_pack': True,
+                            }
+            except Exception as e:
+                print(f'[SkillZip] 处理失败: {e}')
+                import traceback
+                traceback.print_exc()
+                response = {
+                    'content': str(e)[:200],
+                    'msg': 'error',
+                    'error_num': 2,
+                    'is_skill_pack': True,
+                }
+        elif filesuffix.lower() == 'pdf':
             # PDF文件：先处理文本部分，图片在后台异步处理
             try:
                 # 第一阶段：只处理文本，不处理图片
@@ -4354,6 +4691,45 @@ def chat_upload(request):
                     'error_num': 0,
                     'is_pdf': True  # 标识是否为PDF文件
                 }
+
+                # 🔥 新上传 PDF：先 PreSummary，完成后再生成 Skill（失败也仍 spawn，避免永远无 Skill）
+                def process_new_uploaded_pdf_pre_summary_and_skill():
+                    try:
+                        from llm_langchain.parse_input import process_document_pre_summary, \
+                            update_document_pre_summary_status
+                        from app_chat.skill_generate import spawn_document_skill_async
+                        from zym.models import UserNotebook
+
+                        full_filename = filename + "." + filesuffix
+                        book_name = username[len(realName) + 1:] if '_' in username and len(username) > len(
+                            realName) + 1 else None
+                        presummary_ok = False
+                        if book_name:
+                            try:
+                                UserNotebook.objects.get(username=realName, bookName=book_name)
+                                update_document_pre_summary_status(realName, book_name, full_filename, False)
+                                print(f"[新上传PDF] 开始 PreSummary（完成后才生成 Skill）: {full_filename}")
+                                success, error_msg = process_document_pre_summary(realName, username, full_filename)
+                                if success:
+                                    update_document_pre_summary_status(realName, book_name, full_filename, True)
+                                    presummary_ok = True
+                                    print(f"[新上传PDF] ✅ PreSummary 完成: {full_filename}")
+                                else:
+                                    print(f"[新上传PDF] ❌ PreSummary 失败，仍将生成 Skill（仅原文/OCR）: {full_filename}, {error_msg}")
+                            except Exception as e:
+                                print(f"[新上传PDF] PreSummary 异常，仍将生成 Skill: {full_filename}, {e}")
+                        else:
+                            print(f"[新上传PDF] 无 book_name，跳过 PreSummary，直接生成 Skill: {full_filename}")
+
+                        print(f"[新上传PDF] 触发 Skill 生成: {full_filename} (presummary_ok={presummary_ok})")
+                        spawn_document_skill_async(realName, username, full_filename)
+                    except Exception as e:
+                        print(f"[新上传PDF预处理] 后台异常: {e}")
+                        import traceback
+                        traceback.print_exc()
+
+                import threading
+                threading.Thread(target=process_new_uploaded_pdf_pre_summary_and_skill, daemon=True).start()
 
             except TimeoutError:
                 print(f'PDF文本处理超时: task_id={task_id}')
@@ -4415,11 +4791,12 @@ def chat_upload(request):
                     'is_pdf': False
                 }
 
-                # 🔥 新上传文档后，后台处理章节摘要（不阻塞返回前端）
+                # 🔥 新上传文档：先 PreSummary，完成后再生成 Skill（失败也仍 spawn）
                 def process_new_uploaded_doc_pre_summary():
                     try:
                         from llm_langchain.parse_input import process_document_pre_summary, \
                             update_document_pre_summary_status
+                        from app_chat.skill_generate import spawn_document_skill_async
                         from zym.models import UserNotebook
 
                         full_filename = filename + "." + filesuffix
@@ -4430,26 +4807,26 @@ def chat_upload(request):
                         # username格式是"用户名_本子名"
                         book_name = username[len(realName) + 1:] if '_' in username and len(username) > len(
                             realName) + 1 else None
-
+                        presummary_ok = False
                         if book_name:
                             try:
-                                notebook = UserNotebook.objects.get(username=realName, bookName=book_name)
-                                # 先将处理状态设为false
+                                UserNotebook.objects.get(username=realName, bookName=book_name)
                                 update_document_pre_summary_status(realName, book_name, full_filename, False)
-
-                                # 处理文档
+                                print(f"[新上传文档] 开始 PreSummary（完成后才生成 Skill）: {full_filename}")
                                 success, error_msg = process_document_pre_summary(realName, username, full_filename)
-
                                 if success:
-                                    # 更新状态为已完成
                                     update_document_pre_summary_status(realName, book_name, full_filename, True)
-                                    print(f"[新上传文档预处理] ✅ 成功处理文档: {full_filename}")
+                                    presummary_ok = True
+                                    print(f"[新上传文档] ✅ PreSummary 完成: {full_filename}")
                                 else:
-                                    # 保持状态为未处理（False）
-                                    print(f"[新上传文档预处理] ❌ 处理文档失败: {full_filename}, 错误: {error_msg}")
-
+                                    print(f"[新上传文档] ❌ PreSummary 失败，仍将生成 Skill: {full_filename}, {error_msg}")
                             except Exception as e:
-                                print(f"[新上传文档预处理] 处理异常: {full_filename}, 错误: {str(e)}")
+                                print(f"[新上传文档] PreSummary 异常，仍将生成 Skill: {full_filename}, {e}")
+                        else:
+                            print(f"[新上传文档] 无 book_name，跳过 PreSummary，直接生成 Skill: {full_filename}")
+
+                        print(f"[新上传文档] 触发 Skill 生成: {full_filename} (presummary_ok={presummary_ok})")
+                        spawn_document_skill_async(realName, username, full_filename)
 
                     except Exception as e:
                         print(f"[新上传文档预处理] 后台处理异常: {e}")
@@ -4768,12 +5145,14 @@ def remove_emojis(text):
         str: 去除emoji后的文本
     """
     # 更精确的emoji正则表达式，避免删除中文字符
+    # 含 Geometric Shapes Extended（🟠🟢🟡🟣 等彩色圆点，常见于摘要/教学标注）
     emoji_pattern = re.compile(
         "["
         "\U0001F600-\U0001F64F"  # 表情符号
         "\U0001F300-\U0001F5FF"  # 符号和象形文字
         "\U0001F680-\U0001F6FF"  # 交通和地图符号
         "\U0001F1E0-\U0001F1FF"  # 国旗
+        "\U0001F780-\U0001F7FF"  # 几何图形扩展（🟠🟢🟡🟣🟤 等）
         "\U0001F900-\U0001F9FF"  # 补充符号
         "\U0001FA70-\U0001FAFF"  # 符号和象形文字扩展-A
         "\U00002600-\U000026FF"  # 杂项符号
@@ -4819,7 +5198,7 @@ def generate_card_content_title_only(content):
     try:
         import os
         from openai import OpenAI
-        ds_api_key = os.environ.get('DEEPSEEK_API_KEY') or os.environ.get("DEEPSEEK_API_KEY", "")
+        ds_api_key = os.environ.get('DEEPSEEK_API_KEY') or _public_config.secret('DEEPSEEK_API_KEY')
         client = OpenAI(
             api_key=ds_api_key,
             base_url="https://api.deepseek.com",
@@ -6178,16 +6557,17 @@ def card_getAllUserFiles(request):
                 except Exception as e:
                     print(f"[card_getAllUserFiles] 从segments metadata获取文件 {file_list[i]} 的四色DMT属性失败: {e}")
 
-            # 音频/白名单txt 文件特殊处理：
+            # 音频/白名单txt/Skill包zip 特殊处理：
             # 重启后 split_file_list 可能为空，导致这些文件在前端显示为 split=0（不可选中）
             file_extension = os.path.splitext(file_list[i])[1].lower()
             audio_extensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.webm']
             is_audio_file = file_extension in audio_extensions
+            is_skill_zip = file_extension == '.zip'
             is_long_txt = file_list[i].endswith("_LONG.txt")
             is_timestamp_txt = re.match(r"^.+_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}\.txt$", file_list[i]) is not None
             is_whitelist_txt = is_long_txt or is_timestamp_txt
             file_exists = os.path.exists(file_path) and os.path.isfile(file_path)
-            if (is_audio_file or is_whitelist_txt) and file_exists:
+            if (is_audio_file or is_whitelist_txt or is_skill_zip) and file_exists:
                 split_status = 1
             else:
                 split_status = 1 if file_list[i] in split_file_list else 0
@@ -6315,6 +6695,86 @@ def card_getAllUserFiles(request):
     # 启动后台异步处理文档预处理章节摘要
     import threading
     threading.Thread(target=process_documents_pre_summary_async, daemon=True).start()
+
+    # 🔥 旧本子 Skill 补生成：与 PreSummary 是否已完成解耦
+    # （原先挂在 to_process 里，旧文档 PreSummary 已 true 时永远不会 spawn Skill）
+    def backfill_document_skills_async():
+        try:
+            from app_chat import skills_store as skills_store
+            from app_chat.skill_generate import spawn_document_skill_async, update_document_skill_status
+            from zym.models import UserNotebook
+
+            realName = username.split('_')[0] if '_' in username else username
+            book_name = username[len(realName) + 1:] if '_' in username and len(username) > len(realName) + 1 else None
+            if not book_name:
+                try:
+                    scene_obj = scene.objects.get(sceneDescription=scene_name)
+                    notebook = UserNotebook.objects.filter(username=realName, sid=scene_obj.sid).first()
+                    if notebook:
+                        book_name = notebook.bookName
+                except Exception:
+                    pass
+            if not book_name:
+                print(f"[Skill补生成] 无法确定 book_name，跳过: {username}")
+                return
+
+            user_path = './received_dir/user_raw_file/' + username
+            if not os.path.exists(user_path):
+                return
+
+            skill_status = {}
+            try:
+                nb = UserNotebook.objects.get(username=realName, bookName=book_name)
+                raw = getattr(nb, "documentSkillStatus", "") or ""
+                skill_status = json.loads(raw) if raw else {}
+            except Exception:
+                skill_status = {}
+
+            to_skill = []
+            for f in os.listdir(user_path):
+                if os.path.isdir(os.path.join(user_path, f)):
+                    continue
+                if f.endswith('_transFTWYGUHX.pdf'):
+                    continue
+                if not (f.lower().endswith('.pdf') or f.lower().endswith('.txt')):
+                    continue
+                st = skill_status.get(f)
+                if st is True or st == 'pending':
+                    continue
+                if skills_store.find_skill_by_source_doc(username, f):
+                    # 磁盘已有但状态未记：补 true，不重跑模型
+                    try:
+                        update_document_skill_status(realName, book_name, f, True)
+                    except Exception:
+                        pass
+                    continue
+                # 尚无 PreSummary 的留给批量 PreSummary→Skill，避免抢跑吃不到摘要
+                file_ext = os.path.splitext(f)[1][1:] if os.path.splitext(f)[1] else ""
+                file_base = os.path.splitext(f)[0]
+                pre_path = os.path.join(user_path, "pre_summary", f"{file_base}_Presummary_{file_ext}.md")
+                if not os.path.isfile(pre_path):
+                    print(f"[Skill补生成] 尚无 PreSummary，交由批量链路生成: {f}")
+                    continue
+                to_skill.append(f)
+
+            if not to_skill:
+                print(f"[Skill补生成] 无需补生成: {username}")
+                return
+
+            print(f"[Skill补生成] 检测到 {len(to_skill)} 个旧文档需生成 Skill: {to_skill}")
+            for docs_name in to_skill:
+                try:
+                    update_document_skill_status(realName, book_name, docs_name, "pending")
+                except Exception:
+                    pass
+                spawn_document_skill_async(realName, username, docs_name)
+                print(f"[Skill补生成] 已 spawn: {docs_name}")
+        except Exception as e:
+            print(f"[Skill补生成] 后台异常: {e}")
+            import traceback
+            traceback.print_exc()
+
+    threading.Thread(target=backfill_document_skills_async, daemon=True).start()
 
     # 🔥 后台异步处理已有文档的四色DMT属性（不阻塞前端）
     def process_existing_documents_async():
@@ -6623,19 +7083,28 @@ def card_getFileByName(request):
             summary_filename = f"{file_base_name}_Presummary_{file_ext}.md"
             summary_path = os.path.join(base_dir, summary_filename)
 
-            # 检查摘要文件是否存在
+            realName = data.get("realName", username.split('_')[0] if '_' in username else username)
+            # 先保证 PreSummary，再补 Skill（避免新文件 Skill 抢跑吃不到摘要）
             if not os.path.exists(summary_path):
                 print(f"[card_getFileByName] 检测到预处理章节摘要文件不存在，开始生成: {filename}")
-                # 获取realName（从username解析或从数据中获取）
-                realName = data.get("realName", username.split('_')[0] if '_' in username else username)
-                # 异步生成预处理摘要（不阻塞返回）
                 success, error_msg = process_document_pre_summary(realName, username, filename)
                 if success:
-                    print(f"[card_getFileByName] 预处理章节摘要生成成功: {filename}")
+                    print(f"[card_getFileByName] ✅ PreSummary 生成成功: {filename}")
                 else:
-                    print(f"[card_getFileByName] 预处理章节摘要生成失败: {filename}, 错误: {error_msg}")
+                    print(f"[card_getFileByName] ❌ PreSummary 生成失败（仍将尝试 Skill）: {filename}, {error_msg}")
             else:
-                print(f"[card_getFileByName] 预处理章节摘要文件已存在: {filename}")
+                print(f"[card_getFileByName] PreSummary 已存在: {filename}")
+
+            try:
+                from app_chat import skills_store as skills_store
+                from app_chat.skill_generate import spawn_document_skill_async
+                if not skills_store.find_skill_by_source_doc(username, filename):
+                    print(f"[card_getFileByName] 无关联 Skill，在 PreSummary 检查后触发生成: {filename}")
+                    spawn_document_skill_async(realName, username, filename)
+                else:
+                    print(f"[card_getFileByName] 已有关联 Skill，跳过生成: {filename}")
+            except Exception as _sk_e:
+                print(f"[card_getFileByName] Skill 补生成跳过: {_sk_e}")
         except Exception as e:
             print(f"[card_getFileByName] 检测预处理章节摘要时出错: {e}")
             import traceback
@@ -6958,8 +7427,8 @@ async def stream_img_text_generator(data, pixel_limit=12000000):
     start_time = time.time()
     try:
         # client = OpenAI(
-        #     # api_key=os.environ.get("OPENAI_API_KEY", ""),
-        #     api_key=os.environ.get("DASHSCOPE_API_KEY", ""),
+        #     # api_key='[redacted]',
+        #     api_key='[redacted]',
         #     base_url='https://dashscope.aliyuncs.com/compatible-mode/v1',
         #     default_headers={"x-foo": "true"},
         # )
@@ -6998,7 +7467,7 @@ async def stream_img_text_generator(data, pixel_limit=12000000):
             response = await asyncio.wait_for(
                 to_thread(  # 将同步调用转为异步任务
                     MultiModalConversation.call,
-                    api_key=os.environ.get("DASHSCOPE_API_KEY", ""),
+                    api_key=_public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY'),
                     model='qwen-vl-max-latest',
                     messages=messages,
                     vl_high_resolution_images=True,
@@ -7022,8 +7491,8 @@ async def stream_img_text_generator(data, pixel_limit=12000000):
             else:
                 prompt = image_merge_summary_prompt.format(old_content=old_content, merge_content=merge_content)
             client = OpenAI(
-                api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-                base_url='https://chat.cloudapi.vip/v1/',
+                api_key=_public_config.secret('OPENAI_API_KEY'),
+                base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
                 default_headers={"x-foo": "true"},
             )
             base64_image = global_var.store_memory[username]["images"][filename][int(imgid)]
@@ -8762,6 +9231,17 @@ def getCardsContentByIds(request):
         if open_card_id is not None and id == int(open_card_id):
             print("此卡片ctrl+k部分内容选中")
             cardContent = chosen_content
+        # 解释精要卡过长：问答只注入总览/学情/枢纽 + 各页整体（不含逐题）
+        try:
+            from app_chat.homework_grading.excerpt_card_render import (
+                is_excerpt_grading_card,
+                trim_excerpt_card_for_qa,
+            )
+            title = card.contentTitle or ''
+            if is_excerpt_grading_card(cardContent, title):
+                cardContent = trim_excerpt_card_for_qa(cardContent, title)
+        except Exception as exc:
+            print(f'[getCardsContentByIds] 解释精要截取跳过 cid={id}: {exc}', flush=True)
         content = '[重要素材文本' + str(i + 1) + ']:\n' + '标题：' + card.contentTitle + '\n内容：' + cardContent + '\n\n'
         CardContentList.append(content)
 
@@ -8935,20 +9415,20 @@ def getLastContent(request):
 def get_small_model_server_url(username):
     """
     根据username从全局变量获取小模型ID，返回对应的服务器URL
-    3007 -> 192.0.2.1
-    3001-3006 -> 192.0.2.1
+    3007 -> 127.0.0.1
+    3001-3006 -> 127.0.0.1
     """
     from app_chat.global_state import GLOBAL_STATE
     model_id = GLOBAL_STATE.user_little_model_id.get(username, "3003")
     if str(model_id) == "3007":
-        return "http://192.0.2.1:8000"
+        return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
     else:
-        return "http://192.0.2.1:8000"
+        return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
 
 
 def little_model_switch(username, model_id):
     try:
-        # command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","model_id":"{model_id}"}}\' http://192.0.2.1:8000/model_switch/'
+        # command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","model_id":"{model_id}"}}\' http://localhost:8000/model_switch/'
         # 更新全局变量
         from app_chat.global_state import GLOBAL_STATE
         GLOBAL_STATE.user_little_model_id[username] = str(model_id)
@@ -10299,13 +10779,22 @@ def save_deleted_files(request):
             # 先删除该用户在该场景下的所有记录
             DeletedFile.objects.filter(username=username, scene_name=scene_name).delete()
 
-            # 保存新的删除记录
+            # 保存新的删除记录；对应 Skill 标 orphaned（不自动删磁盘）
+            try:
+                from app_chat.skills_store import mark_orphaned_for_file
+            except Exception:
+                mark_orphaned_for_file = None
             for filename in filenames:
                 DeletedFile.objects.create(
                     username=username,
                     filename=filename,
                     scene_name=scene_name
                 )
+                if mark_orphaned_for_file and username and filename:
+                    try:
+                        mark_orphaned_for_file(username, filename)
+                    except Exception as _oe:
+                        print(f"[save_deleted_files] orphaned 标记失败 {filename}: {_oe}")
 
             return JsonResponse({'error_num': 0})
         except Exception as e:
@@ -10452,16 +10941,16 @@ def reget_topics(request):
             "请给出你微调修正topics后的结果吧，记得不能改变格式，除此结果外，不要输出任何其他内容！\n"
         )
     ]
-    OPEN_AI_KEY = os.environ.get("KIMI_API_KEY", "")  # kimi
+    OPEN_AI_KEY = _public_config.secret('KIMI_API_KEY')  # kimi
     base_url = "https://api.moonshot.cn/v1"
 
     try:
         print("reget_topics------------------")
-        chat_model = ChatOpenAI(temperature=0.2,
+        chat_model = ChatOpenAI(temperature=1.0,
                                 openai_api_key=OPEN_AI_KEY,
                                 openai_api_base=base_url,
                                 # streaming=True,
-                                model_name="moonshot-v1-32k",
+                                model_name="kimi-k3",
                                 max_tokens=1000)
         prompt = ChatPromptTemplate.from_messages(messages)
         end = prompt.invoke({"topics": topics, "summary": summary})
@@ -10566,6 +11055,32 @@ def add_card_directly(request):
         # 🔥 移除emoji，避免MySQL utf8字符集不支持4字节UTF-8字符的问题
         content = remove_emojis(content)
 
+        # 批改配置卡：建卡前校验模板 + 材料标识须与本子文件完全同名
+        try:
+            from app_chat.grading_config_card import (
+                is_grading_config_content,
+                list_notebook_filenames,
+                validate_grading_config_for_create,
+            )
+            if is_grading_config_content(content):
+                try:
+                    ok_cfg, cfg_errs = validate_grading_config_for_create(
+                        content, list_notebook_filenames(username)
+                    )
+                    if not ok_cfg:
+                        return JsonResponse({
+                            'error_num': 1,
+                            'msg': '；'.join(cfg_errs) if cfg_errs else '批改配置卡校验失败',
+                        })
+                except Exception as _val_e:
+                    print(f'[add_card_directly] 批改配置卡校验异常: {_val_e}')
+                    return JsonResponse({
+                        'error_num': 1,
+                        'msg': f'批改配置卡校验异常: {str(_val_e)[:200]}',
+                    })
+        except Exception as _cfg_e:
+            print(f'[add_card_directly] 批改配置卡模块加载失败（非配置卡仍继续）: {_cfg_e}')
+
         gpt4_response_title, four_color_type, dmt_level, is_analyzed_by_new_standard = (
             generate_title_and_card_attrs_parallel(
                 content, username, sceneName, subSceneName,
@@ -10573,6 +11088,9 @@ def add_card_directly(request):
                 provisional_content_title=subSceneOrder,
             )
         )
+        # 批改配置卡标题可识别
+        if '【批改配置卡】' in (content or ''):
+            gpt4_response_title = '批改配置卡'
         contentTitle = subSceneOrder + gpt4_response_title
         keyWords = SEMANTIC_KEYWORDS_PENDING
 
@@ -11202,7 +11720,7 @@ def execute_commands(request):
 
     try:
         # 构建curl命令，使用提取的text值
-        # command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","text":"{text}"}}\' http://192.0.2.1:8000/invoke_rate'
+        # command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","text":"{text}"}}\' http://localhost:8000/invoke_rate'
         server_url = get_small_model_server_url(username)
         command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","text":"{text}"}}\' {server_url}/invoke_rate'
         result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -11594,7 +12112,7 @@ def AIWork(request):
 
         gpt_vision = ChatOpenAI(temperature=0,
                                 openai_api_key=OPEN_AI_KEY,
-                                openai_api_base='https://chat.cloudapi.vip/v1/',
+                                openai_api_base=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
                                 default_headers={"x-foo": "true"},
                                 model_name="gpt-4o",
                                 max_tokens=1000)
@@ -12628,7 +13146,7 @@ def shootCardAnalysis(request):
 #         # 调用OpenAI
 #         # gpt_vision = ChatOpenAI(temperature=0,
 #         #                         openai_api_key=OPEN_AI_KEY,
-#         #                         openai_api_base='https://chat.cloudapi.vip/v1/',
+#         #                         openai_api_base='http://localhost:9999/v1/',
 #         #                         default_headers={"x-foo": "true"},
 #         #                         model_name="gpt-4o",
 #         #                         max_tokens=2048)
@@ -17637,1721 +18155,6 @@ def save_question_comment(request):
             return JsonResponse({'error_num': 1, 'message': f'保存评论失败: {str(e)}'})
 
     return JsonResponse({'error_num': 1, 'message': '只支持POST请求'})
-
-
-@csrf_exempt
-def analyze_thinking_state(request):
-    """分析用户思维状态"""
-    if request.method == 'POST':
-        try:
-            import json
-            data = json.loads(request.body)
-
-            user_id = data.get('user_id')
-            notebook_name = data.get('notebook_name')
-            chat_history = data.get('chat_history', [])
-            file_list = data.get('file_list', [])
-            scene_name = data.get('scene_name', '')
-            sub_scene_name = data.get('sub_scene_name', '')
-
-            if not user_id or not notebook_name:
-                return JsonResponse({'error_num': 1, 'message': '缺少必要参数'})
-
-            # 分析思维状态
-            thinking_analysis = analyze_cognitive_state(chat_history, file_list, scene_name, sub_scene_name, user_id, notebook_name)
-
-            return JsonResponse({
-                'error_num': 0,
-                'data': thinking_analysis
-            })
-
-        except Exception as e:
-            return JsonResponse({'error_num': 1, 'message': f'思维状态分析失败: {str(e)}'})
-
-    return JsonResponse({'error_num': 1, 'message': '只支持POST请求'})
-
-
-@csrf_exempt
-def generate_context_navigation(request):
-    """生成四色语境导航"""
-    if request.method == 'POST':
-        try:
-            import json
-            data = json.loads(request.body)
-
-            content = data.get('content', '')
-            scene_name = data.get('scene_name', '')
-            sub_scene_name = data.get('sub_scene_name', '')
-
-            if not content:
-                return JsonResponse({'error_num': 1, 'message': '缺少内容参数'})
-
-            # 生成四色语境
-            context_navigation = generate_four_color_context(content, scene_name, sub_scene_name)
-
-            return JsonResponse({
-                'error_num': 0,
-                'data': context_navigation
-            })
-
-        except Exception as e:
-            return JsonResponse({'error_num': 1, 'message': f'语境导航生成失败: {str(e)}'})
-
-    return JsonResponse({'error_num': 1, 'message': '只支持POST请求'})
-
-
-@csrf_exempt
-def get_action_suggestions(request):
-    """获取智能行动建议"""
-    if request.method == 'POST':
-        try:
-            import json
-            data = json.loads(request.body)
-
-            thinking_state = data.get('thinking_state', {})
-            current_context = data.get('current_context', '')
-            user_id = data.get('user_id')
-            notebook_name = data.get('notebook_name')
-
-            if not user_id or not notebook_name:
-                return JsonResponse({'error_num': 1, 'message': '缺少必要参数'})
-
-            # 生成行动建议
-            action_suggestions = generate_smart_actions(thinking_state, current_context, user_id, notebook_name)
-
-            return JsonResponse({
-                'error_num': 0,
-                'data': action_suggestions
-            })
-
-        except Exception as e:
-            return JsonResponse({'error_num': 1, 'message': f'行动建议生成失败: {str(e)}'})
-
-    return JsonResponse({'error_num': 1, 'message': '只支持POST请求'})
-
-
-# def analyze_cognitive_state(chat_history, file_list, scene_name, sub_scene_name, user_id, notebook_name):
-#     """分析认知状态的核心算法"""
-#     import re
-#     import math
-#
-#     # 1. 象限感知分析
-#     quadrant = detect_cognitive_quadrant(chat_history)
-#
-#     # 2. 思维活跃度计算
-#     activity = calculate_mental_activity(chat_history, file_list)
-#
-#     # 3. 知识盲区识别
-#     blind_spots = identify_knowledge_gaps(chat_history, scene_name)
-#
-#     # 4. 跨本子连接分析
-#     connections = analyze_cross_notebook_connections(chat_history, user_id, notebook_name)
-#
-#     print(f"[analyze_cognitive_state]结果: {quadrant} / {activity} / {blind_spots} / {connections}")
-#
-#     return {
-#         'quadrant': quadrant,
-#         'activity': activity,
-#         'blind_spots': blind_spots,
-#         'connections': connections,
-#         'timestamp': timezone.now().isoformat()
-#     }
-
-
-def detect_cognitive_quadrant(chat_history):
-    """检测认知象限"""
-    if not chat_history:
-        return 'Q4'  # 知道自己不知道
-
-    # 分析问题模式
-    questions = [msg for msg in chat_history if msg.get('uid') != '2000']
-    ai_responses = [msg for msg in chat_history if msg.get('uid') == '2000']
-
-    # 计算问题复杂度指标
-    question_complexity = 0
-    failed_retrieval_indicators = 0
-    concept_jump_indicators = 0
-
-    for question in questions:
-        content = question.get('msg', '')
-
-        # 问题复杂度：基于问题长度、疑问词数量、专业术语
-        question_complexity += len(content) * 0.1
-        question_complexity += len(re.findall(r'[？?]', content)) * 5
-        question_complexity += len(re.findall(r'(什么|为什么|如何|怎样|怎么|是否|能否)', content)) * 3
-
-        # 检索失败指标：基于"没有找到"、"无法理解"等关键词
-        if any(keyword in content for keyword in ['没有找到', '无法理解', '不清楚', '不知道', '不明白']):
-            failed_retrieval_indicators += 1
-
-    # 概念跳跃指标：基于专业术语的突然出现
-    technical_terms = ['算法', '模型', '神经网络', '深度学习', '机器学习', 'AI', '人工智能']
-    for response in ai_responses:
-        content = response.get('msg', '')
-        if any(term in content for term in technical_terms):
-            concept_jump_indicators += 1
-
-    # 象限判断逻辑
-    if failed_retrieval_indicators > len(questions) * 0.3 and concept_jump_indicators < len(ai_responses) * 0.2:
-        return 'Q3'  # 不知道自己不知道
-    elif concept_jump_indicators > len(ai_responses) * 0.5 and len(questions) > 3:
-        return 'Q2'  # 不知道自己知道
-    elif len(questions) > 0 and failed_retrieval_indicators < len(questions) * 0.1:
-        return 'Q1'  # 知道自己知道
-    else:
-        return 'Q4'  # 知道自己不知道
-
-
-def calculate_mental_activity(chat_history, file_list):
-    """计算思维活跃度"""
-    if not chat_history:
-        return 20
-
-    # 基础活跃度
-    base_activity = len(chat_history) * 5
-
-    # 问题数量加成
-    question_count = len([msg for msg in chat_history if msg.get('uid') != '2000'])
-    question_bonus = question_count * 8
-
-    # 文件使用加成
-    file_bonus = len(file_list) * 3
-
-    # 交互频率加成
-    interaction_bonus = min(30, len(chat_history) * 2)
-
-    # 内容复杂度加成
-    complexity_bonus = 0
-    for msg in chat_history:
-        content = msg.get('msg', '')
-        complexity_bonus += len(content) * 0.05
-        complexity_bonus += len(re.findall(r'[？?]', content)) * 2
-
-    total_activity = base_activity + question_bonus + file_bonus + interaction_bonus + complexity_bonus
-
-    return min(100, max(20, int(total_activity)))
-
-
-def identify_knowledge_gaps(chat_history, scene_name):
-    """识别知识盲区"""
-    # 定义知识领域
-    knowledge_domains = {
-        'AI技术': ['人工智能', '机器学习', '深度学习', '神经网络', '算法'],
-        '产品设计': ['用户体验', '界面设计', '交互设计', '产品规划'],
-        '技术实现': ['编程', '开发', '架构', '数据库', 'API'],
-        '业务分析': ['需求分析', '市场调研', '商业模式', '竞品分析'],
-        '项目管理': ['计划', '进度', '资源', '风险', '质量']
-    }
-
-    # 分析已涉及的知识领域
-    covered_domains = set()
-    for msg in chat_history:
-        content = msg.get('msg', '')
-        for domain, keywords in knowledge_domains.items():
-            if any(keyword in content for keyword in keywords):
-                covered_domains.add(domain)
-
-    # 识别未充分探索的领域
-    blind_spots = []
-    for domain, keywords in knowledge_domains.items():
-        if domain not in covered_domains:
-            # 计算相关性得分
-            relevance_score = calculate_domain_relevance(domain, scene_name)
-            if relevance_score > 0.3:  # 只显示相关性较高的盲区
-                blind_spots.append({
-                    'id': domain,
-                    'label': domain,
-                    'score': round(relevance_score, 2),
-                    'intensity': 'high' if relevance_score > 0.7 else 'medium' if relevance_score > 0.4 else 'low'
-                })
-
-    return blind_spots[:6]  # 最多返回6个盲区
-
-
-def calculate_domain_relevance(domain, scene_name):
-    """计算领域相关性"""
-    # 基于场景名称计算相关性
-    scene_keywords = {
-        'AI技术': ['技术', '开发', '算法', '智能'],
-        '产品设计': ['产品', '设计', '用户', '体验'],
-        '技术实现': ['实现', '开发', '技术', '代码'],
-        '业务分析': ['业务', '分析', '需求', '市场'],
-        '项目管理': ['管理', '计划', '项目', '流程']
-    }
-
-    if domain in scene_keywords:
-        keywords = scene_keywords[domain]
-        relevance = sum(1 for keyword in keywords if keyword in scene_name) / len(keywords)
-        return relevance
-
-    return 0.5  # 默认相关性
-
-
-def analyze_cross_notebook_connections(chat_history, user_id, current_notebook_name):
-    """分析跨本子连接"""
-    try:
-        from .context_evaluator_formal_v4 import EmbeddingModel, SimpleSimilarity, cosine_similarity
-
-        # 初始化嵌入模型
-        embedding_model = EmbeddingModel(use_transformer=False, vector_dim=300)
-
-        # 获取当前用户的所有本子
-        from django.db.models import Q
-        from .models import Card
-
-        # 查询当前用户的所有卡片，按本子分组
-        user_cards = Card.objects.filter(
-            Q(username__startswith=user_id.replace('_' + current_notebook_name, ''))
-        ).exclude(history__isnull=True).exclude(history='').order_by('-datetime')
-
-        if not user_cards.exists():
-            return []
-
-        # 按本子分组
-        notebook_cards = {}
-        for card in user_cards:
-            # 从字段中提取本子名
-            username_parts = card.username.split('_')
-            if len(username_parts) >= 2:
-                notebook_name = '_'.join(username_parts[1:])  # 去掉用户名部分
-                if notebook_name not in notebook_cards:
-                    notebook_cards[notebook_name] = []
-                notebook_cards[notebook_name].append(card)
-
-        # 排除当前本子
-        if current_notebook_name in notebook_cards:
-            del notebook_cards[current_notebook_name]
-
-        if not notebook_cards:
-            return []
-
-        # 获取当前本子的最新卡片内容
-        current_latest_card = None
-        current_cards = Card.objects.filter(
-            Q(username=user_id)
-        ).exclude(history__isnull=True).exclude(history='').order_by('-datetime').first()
-
-        if current_cards:
-            current_latest_card = current_cards
-
-        if not current_latest_card:
-            return []
-
-        # 解析当前卡片的历史记录
-        current_content = ""
-        try:
-            # 检查history字段是否已经是dict类型
-            if isinstance(current_latest_card.history, dict):
-                current_history = current_latest_card.history
-            else:
-                current_history = json.loads(current_latest_card.history)
-
-            if isinstance(current_history, dict) and 'data' in current_history:
-                for item in current_history['data']:
-                    if 'message' in item:
-                        current_content += item['message'] + " "
-                    if 'AImessage' in item:
-                        if isinstance(item['AImessage'], list):
-                            current_content += " ".join(item['AImessage']) + " "
-                        else:
-                            current_content += str(item['AImessage']) + " "
-        except Exception as e:
-            print(f"解析当前卡片历史记录失败: {e}")
-            # 如果解析失败，使用卡片内容作为备选
-            current_content = current_latest_card.content or ""
-
-        connections = []
-
-        # 分析每个本子的相似度
-        print(f"[跨本子分析]开始分析 {len(notebook_cards)} 个本子")
-        for notebook_name, cards in notebook_cards.items():
-            if not cards:
-                continue
-
-            # 获取该本子的最新卡片
-            latest_card = cards[0]  # 已经按时间排序
-            print(f"[跨本子分析]分析本子: {notebook_name}, 卡片ID: {latest_card.cid}")
-
-            # 解析该卡片的历史记录
-            other_content = ""
-            try:
-                # 检查history字段是否已经是dict类型
-                if isinstance(latest_card.history, dict):
-                    other_history = latest_card.history
-                else:
-                    other_history = json.loads(latest_card.history)
-
-                if isinstance(other_history, dict) and 'data' in other_history:
-                    for item in other_history['data']:
-                        if 'message' in item:
-                            other_content += item['message'] + " "
-                        if 'AImessage' in item:
-                            if isinstance(item['AImessage'], list):
-                                other_content += " ".join(item['AImessage']) + " "
-                            else:
-                                other_content += str(item['AImessage']) + " "
-            except Exception as e:
-                print(f"解析其他卡片历史记录失败: {e}")
-                # 如果解析失败，使用卡片内容作为备选
-                other_content = latest_card.content or ""
-
-            if not other_content.strip():
-                continue
-
-            print(f"[跨本子分析]开始计算本子 {notebook_name} 的相似度")
-
-            # 计算文本相似度
-            try:
-                # 使用多种相似度计算方法
-                jaccard_sim = SimpleSimilarity.jaccard_similarity(current_content, other_content)
-                keyword_sim = SimpleSimilarity.keyword_overlap(current_content, other_content)
-
-                # 使用嵌入模型计算余弦相似度
-                current_embedding = embedding_model.embed(current_content)
-                other_embedding = embedding_model.embed(other_content)
-
-                cosine_sim = cosine_similarity([current_embedding], [other_embedding])[0][0]
-
-                # 综合相似度分数
-                overall_similarity = (jaccard_sim * 0.25 + keyword_sim * 0.25 + cosine_sim * 0.5) * 100
-
-                print(f"相似度: {jaccard_sim:.3f} / {keyword_sim:.3f} / {cosine_sim:.3f}")
-                print(f"本子: {notebook_name}, 综合相似度: {overall_similarity:.1f}")
-
-                connections.append({
-                    'id': len(connections) + 1,
-                    'notebook_name': notebook_name,
-                    'strength': round(overall_similarity, 1),
-                    'similarity_details': {
-                        'jaccard': round(jaccard_sim * 100, 1),
-                        'keyword': round(keyword_sim * 100, 1),
-                        'cosine': round(cosine_sim * 100, 1)
-                    }
-                })
-
-            except Exception as e:
-                print(f"计算相似度时出错: {e}")
-                continue
-
-        # 按相似度排序，返回前3个
-        connections.sort(key=lambda x: x['strength'], reverse=True)
-        return connections[:3]
-
-    except Exception as e:
-        print(f"跨本子连接分析出错: {e}")
-        return []
-
-
-@csrf_exempt
-def get_real_chat_history(request):
-    """获取真实的聊天历史记录"""
-    if request.method == 'POST':
-        try:
-            import json
-            data = json.loads(request.body)
-            user_id = data.get('user_id')
-            notebook_name = data.get('notebook_name')
-            scene_name = data.get('scene_name', '')
-
-            if not user_id or not notebook_name:
-                return JsonResponse({'error_num': 1, 'message': '缺少必要参数'})
-
-            # 获取当前本子最新的有历史记录的卡片
-            from django.db.models import Q
-            from .models import Card
-
-            latest_card = Card.objects.filter(
-                Q(username=user_id)
-            ).exclude(history__isnull=True).exclude(history='').order_by('-datetime').first()
-
-            chat_list = []
-
-            if latest_card and latest_card.history:
-                try:
-                    history_data = json.loads(latest_card.history)
-                    if isinstance(history_data, dict) and 'data' in history_data:
-                        for item in history_data['data']:
-                            if 'message' in item and 'AImessage' in item:
-                                # 用户消息
-                                chat_list.append({
-                                    'id': len(chat_list) + 1,
-                                    'uid': '1001',
-                                    'msg': item['message'],
-                                    'name': '用户',
-                                    'time': latest_card.datetime.strftime('%H:%M'),
-                                    'chatType': 0
-                                })
-
-                                # AI回复
-                                ai_message = item['AImessage']
-                                if isinstance(ai_message, list):
-                                    ai_content = ' '.join(ai_message)
-                                else:
-                                    ai_content = str(ai_message)
-
-                                chat_list.append({
-                                    'id': len(chat_list) + 1,
-                                    'uid': '2000',
-                                    'msg': ai_content,
-                                    'name': 'AI助手',
-                                    'time': latest_card.datetime.strftime('%H:%M'),
-                                    'chatType': 0
-                                })
-                except Exception as e:
-                    print(f"解析历史记录失败: {e}")
-                    # 如果解析失败，使用卡片内容作为备选
-                    if latest_card.content:
-                        chat_list.append({
-                            'id': 1,
-                            'uid': '1001',
-                            'msg': '查看卡片内容',
-                            'name': '用户',
-                            'time': latest_card.datetime.strftime('%H:%M'),
-                            'chatType': 0
-                        })
-                        chat_list.append({
-                            'id': 2,
-                            'uid': '2000',
-                            'msg': latest_card.content[:200] + '...' if len(
-                                latest_card.content) > 200 else latest_card.content,
-                            'name': 'AI助手',
-                            'time': latest_card.datetime.strftime('%H:%M'),
-                            'chatType': 0
-                        })
-
-            return JsonResponse({
-                'error_num': 0,
-                'data': chat_list
-            })
-
-        except Exception as e:
-            return JsonResponse({'error_num': 1, 'message': f'获取聊天历史失败: {str(e)}'})
-    return JsonResponse({'error_num': 1, 'message': '只支持POST请求'})
-
-
-def generate_four_color_context(content, scene_name, sub_scene_name):
-    """生成四色语境导航"""
-    # 业务语境提取
-    business_context = extract_business_context(content, scene_name)
-
-    # 中性语境推导
-    neutral_context = derive_neutral_context(content)
-
-    # 场景语境建议
-    scene_context = suggest_scene_context(content, scene_name, sub_scene_name)
-
-    # 自然语境升华
-    natural_context = elevate_to_natural_context(content)
-
-    return {
-        'business_context': business_context,
-        'neutral_context': neutral_context,
-        'scene_context': scene_context,
-        'natural_context': natural_context
-    }
-
-
-def extract_business_context(content, scene_name):
-    """提取业务语境"""
-    business_keywords = ['用户', '需求', '市场', '产品', '服务', '价值', '收益', '成本', '效率']
-
-    if any(keyword in content for keyword in business_keywords):
-        return f"从业务需求出发，关注{scene_name}场景下的实际应用价值和用户体验"
-    else:
-        return f"基于{scene_name}场景，从业务角度思考实际应用场景和用户价值"
-
-
-def derive_neutral_context(content):
-    """推导中性语境"""
-    technical_keywords = ['技术', '方法', '原理', '机制', '系统', '架构']
-
-    if any(keyword in content for keyword in technical_keywords):
-        return "抽象出中性的技术概念和通用原理，形成可复用的方法论"
-    else:
-        return "从具体问题中抽象出中性的概念和原则，形成通用理解"
-
-
-def suggest_scene_context(content, scene_name, sub_scene_name):
-    """建议场景语境"""
-    if sub_scene_name:
-        return f"在{scene_name}的{sub_scene_name}子场景中，构建具体的应用环境和上下文"
-    else:
-        return f"基于{scene_name}场景，构建具体的应用环境和上下文关系"
-
-
-def elevate_to_natural_context(content):
-    """升华到自然语境"""
-    return "将技术概念升华到自然语言表达，形成直观、易懂的理解和描述"
-
-
-def generate_smart_actions(thinking_state, current_context, user_id, notebook_name):
-    """生成智能行动建议"""
-    actions = []
-
-    quadrant = thinking_state.get('quadrant', 'Q1')
-    activity = thinking_state.get('activity', 50)
-    blind_spots = thinking_state.get('blind_spots', [])
-
-    # 基于象限生成建议
-    if quadrant == 'Q3':
-        actions.append({
-            'id': 1,
-            'title': '澄清问题',
-            'description': '尝试将问题分解为更具体的子问题，明确真正想要了解的内容',
-            'icon': 'el-icon-question',
-            'priority': 'high',
-            'action_type': 'clarify'
-        })
-
-    if quadrant == 'Q2':
-        actions.append({
-            'id': 2,
-            'title': '挖掘潜力',
-            'description': '深入探索你已经知道但未意识到的知识，建立知识连接',
-            'icon': 'el-icon-lightbulb',
-            'priority': 'medium',
-            'action_type': 'explore'
-        })
-
-    # 基于活跃度生成建议
-    if activity < 50:
-        actions.append({
-            'id': 3,
-            'title': '激活思维',
-            'description': '尝试从不同角度思考问题，提出更多疑问和假设',
-            'icon': 'el-icon-refresh',
-            'priority': 'medium',
-            'action_type': 'activate'
-        })
-
-    # 基于知识盲区生成建议
-    if blind_spots:
-        high_priority_gaps = [gap for gap in blind_spots if gap.get('intensity') == 'high']
-        if high_priority_gaps:
-            actions.append({
-                'id': 4,
-                'title': '探索盲区',
-                'description': f'深入探索{high_priority_gaps[0]["label"]}等知识领域',
-                'icon': 'el-icon-search',
-                'priority': 'high',
-                'action_type': 'explore_gap'
-            })
-
-    # 通用建议
-    actions.append({
-        'id': 5,
-        'title': '整理思路',
-        'description': '将当前思考内容整理成卡片，便于后续回顾和深化',
-        'icon': 'el-icon-document',
-        'priority': 'low',
-        'action_type': 'organize'
-    })
-
-    return actions
-
-
-# ==================== NKCN思维神经网络 ====================
-
-# @csrf_exempt
-# def find_similar_notebooks_smart(user_id, current_notebook, exclude_notebooks, target_count=3):
-#     """
-#     智能查找相似本子，避免重复和循环引用
-#
-#     Args:
-#         user_id: 用户ID
-#         current_notebook: 当前本子名称
-#         exclude_notebooks: 需要排除的本子名称列表
-#         target_count: 目标查找数量
-#
-#     Returns:
-#         相似本子列表
-#     """
-#     try:
-#         print(f"智能查找相似本子: {current_notebook}, 排除: {exclude_notebooks}")
-#         from .context_evaluator_formal_v4 import EmbeddingModel, SimpleSimilarity, cosine_similarity
-#
-#         # 初始化嵌入模型
-#         embedding_model = EmbeddingModel(use_transformer=False, vector_dim=300)
-#
-#         # 获取用户的所有本子，按最近使用时间排序
-#         # user_id格式可能是"用户名_本子名"，需要提取纯用户名
-#         if '_' in user_id:
-#             pure_user_id = user_id.split('_')[0]  # 提取纯用户名
-#             print(f"调试：从 {user_id} 提取纯用户名: {pure_user_id}")
-#         else:
-#             pure_user_id = user_id
-#             print(f"调试：使用原始user_id: {user_id}")
-#
-#         # 获取该用户的所有username
-#         all_usernames = Card.objects.filter(username__startswith=f"{pure_user_id}_").values_list('username',
-#                                                                                                  flat=True).distinct()
-#         print(f"调试：用户 {pure_user_id} 的所有username: {list(all_usernames)[:10]}")  # 显示前10个
-#
-#         # 提取本子名（去掉用户名前缀）
-#         all_notebooks = []
-#         for username in all_usernames:
-#             if username.startswith(f"{pure_user_id}_"):
-#                 notebook_name = username[len(f"{pure_user_id}_"):]  # 去掉用户名前缀
-#                 all_notebooks.append(notebook_name)
-#
-#         # 按最近使用时间排序（获取每个本子的最新卡片时间）
-#         notebook_times = []
-#         for nb_name in all_notebooks:
-#             latest_card = Card.objects.filter(
-#                 username=f"{pure_user_id}_{nb_name}"
-#             ).order_by('-datetime').first()
-#
-#             # 如果没找到，尝试其他可能的格式
-#             if not latest_card:
-#                 latest_card = Card.objects.filter(
-#                     username=nb_name
-#                 ).order_by('-datetime').first()
-#
-#             if latest_card:
-#                 notebook_times.append({
-#                     'name': nb_name,
-#                     'datetime': latest_card.datetime
-#                 })
-#
-#         # 按时间降序排序
-#         notebook_times.sort(key=lambda x: x['datetime'], reverse=True)
-#         sorted_notebooks = [nb['name'] for nb in notebook_times]
-#
-#         print(f"找到 {len(sorted_notebooks)} 个本子，按时间排序")
-#
-#         # 查找相似本子
-#         found_similar = []
-#
-#         # 首先尝试当前场景内的相似本子
-#         current_scene_notebooks = [nb for nb in sorted_notebooks if nb not in exclude_notebooks]
-#         print(f"当前场景内可用的本子: {current_scene_notebooks[:10]}")  # 显示前10个
-#
-#         # 计算当前场景内本子的相似度
-#         # 使用纯用户名+本子名格式
-#         current_cards = Card.objects.filter(
-#             username=f"{pure_user_id}_{current_notebook}"
-#         ).order_by('-datetime')[:10]
-#
-#         # 如果没找到，尝试其他可能的格式
-#         if not current_cards.exists():
-#             current_cards = Card.objects.filter(
-#                 username=current_notebook
-#             ).order_by('-datetime')[:10]
-#
-#         if not current_cards.exists():
-#             print(f"未找到本子 {current_notebook} 的卡片")
-#             return found_similar
-#
-#         current_content = ' '.join([card.content for card in current_cards])
-#
-#         # 在当前场景内查找相似本子
-#         for nb_name in current_scene_notebooks[:10]:  # 限制数量提高性能
-#             if len(found_similar) >= target_count:
-#                 break
-#
-#             try:
-#                 other_cards = Card.objects.filter(
-#                     username=f"{pure_user_id}_{nb_name}"
-#                 ).order_by('-datetime')[:10]
-#
-#                 # 如果没找到，尝试其他可能的格式
-#                 if not other_cards.exists():
-#                     other_cards = Card.objects.filter(
-#                         username=nb_name
-#                     ).order_by('-datetime')[:10]
-#
-#                 if not other_cards.exists():
-#                     continue
-#
-#                 other_content = ' '.join([card.content for card in other_cards])
-#
-#                 # 计算相似度
-#                 jaccard_sim = SimpleSimilarity.jaccard_similarity(current_content, other_content)
-#                 keyword_sim = SimpleSimilarity.keyword_overlap(current_content, other_content)
-#
-#                 # 使用嵌入模型计算余弦相似度
-#                 current_embedding = embedding_model.embed(current_content)
-#                 other_embedding = embedding_model.embed(other_content)
-#                 cosine_sim = cosine_similarity([current_embedding], [other_embedding])[0][0]
-#
-#                 # 综合相似度分数
-#                 overall_similarity = (jaccard_sim * 0.3 + keyword_sim * 0.3 + cosine_sim * 0.4) * 100
-#
-#                 if overall_similarity > 10:  # 设置最低相似度阈值
-#                     found_similar.append({
-#                         'notebook_name': nb_name,
-#                         'strength': round(overall_similarity, 1),
-#                         'source': 'current_scene'
-#                     })
-#                     print(f"找到相似本子: {nb_name}, 相似度: {overall_similarity:.1f}%")
-#
-#             except Exception as e:
-#                 print(f"计算本子 {nb_name} 相似度时出错: {e}")
-#                 continue
-#
-#         # 如果当前场景内找到的相似本子不够，按时间顺序查找其他场景的本子
-#         if len(found_similar) < target_count:
-#             print(f"当前场景内找到 {len(found_similar)} 个相似本子，继续查找其他场景...")
-#
-#             # 按时间顺序查找其他场景的本子
-#             for nb_name in sorted_notebooks:
-#                 if len(found_similar) >= target_count:
-#                     break
-#
-#                 # 跳过已使用的本子
-#                 if nb_name in exclude_notebooks or any(nb['notebook_name'] == nb_name for nb in found_similar):
-#                     continue
-#
-#                 try:
-#                     other_cards = Card.objects.filter(
-#                         username=f"{pure_user_id}_{nb_name}"
-#                     ).order_by('-datetime')[:10]
-#
-#                     # 如果没找到，尝试其他可能的格式
-#                     if not other_cards.exists():
-#                         other_cards = Card.objects.filter(
-#                             username=nb_name
-#                         ).order_by('-datetime')[:10]
-#
-#                     if not other_cards.exists():
-#                         continue
-#
-#                     other_content = ' '.join([card.content for card in other_cards])
-#
-#                     # 计算相似度
-#                     jaccard_sim = SimpleSimilarity.jaccard_similarity(current_content, other_content)
-#                     keyword_sim = SimpleSimilarity.keyword_overlap(current_content, other_content)
-#
-#                     # 使用嵌入模型计算余弦相似度
-#                     current_embedding = embedding_model.embed(current_content)
-#                     other_embedding = embedding_model.embed(other_content)
-#                     cosine_sim = cosine_similarity([current_embedding], [other_embedding])[0][0]
-#
-#                     # 综合相似度分数
-#                     overall_similarity = (jaccard_sim * 0.3 + keyword_sim * 0.3 + cosine_sim * 0.4) * 100
-#
-#                     if overall_similarity > 10:  # 设置最低相似度阈值
-#                         found_similar.append({
-#                             'notebook_name': nb_name,
-#                             'strength': round(overall_similarity, 1),
-#                             'source': 'other_scene'
-#                         })
-#                         print(f"找到其他场景相似本子: {nb_name}, 相似度: {overall_similarity:.1f}%")
-#
-#                 except Exception as e:
-#                     print(f"计算本子 {nb_name} 相似度时出错: {e}")
-#                     continue
-#
-#         # 按相似度排序
-#         found_similar.sort(key=lambda x: x['strength'], reverse=True)
-#
-#         print(f"最终为 {current_notebook} 找到 {len(found_similar)} 个相似本子")
-#         return found_similar
-#
-#     except Exception as e:
-#         print(f"智能查找相似本子时出错: {str(e)}")
-#         return []
-
-
-@csrf_exempt
-def find_similar_notebooks_smart(user_id, current_notebook, exclude_notebooks, target_count=3):
-    """
-    智能查找相似本子，避免重复和循环引用
-
-    Args:
-        user_id: 用户ID
-        current_notebook: 当前本子名称
-        exclude_notebooks: 需要排除的本子名称列表
-        target_count: 目标查找数量
-
-    Returns:
-        相似本子列表
-    """
-    try:
-        print(f"智能查找相似本子: {current_notebook}, 排除: {exclude_notebooks}")
-        from .context_evaluator_formal_v4 import EmbeddingModel, SimpleSimilarity, cosine_similarity
-
-        # 初始化嵌入模型
-        embedding_model = EmbeddingModel(use_transformer=False, vector_dim=300)
-
-        # 获取用户的所有本子，按最近使用时间排序
-        # user_id格式可能是"用户名_本子名"，需要提取纯用户名
-        if '_' in user_id:
-            pure_user_id = user_id.split('_')[0]  # 提取纯用户名
-            print(f"调试：从 {user_id} 提取纯用户名: {pure_user_id}")
-        else:
-            pure_user_id = user_id
-            print(f"调试：使用原始user_id: {user_id}")
-
-        # 获取该用户的所有username
-        all_usernames = Card.objects.filter(username__startswith=f"{pure_user_id}_").values_list('username',
-                                                                                                 flat=True).distinct()
-        print(f"调试：用户 {pure_user_id} 的所有username: {list(all_usernames)[:10]}")  # 显示前10个
-
-        # 提取本子名（去掉用户名前缀）
-        all_notebooks = []
-        for username in all_usernames:
-            if username.startswith(f"{pure_user_id}_"):
-                notebook_name = username[len(f"{pure_user_id}_"):]  # 去掉用户名前缀
-                all_notebooks.append(notebook_name)
-
-        # 按最近使用时间排序（获取每个本子的最新卡片时间）
-        notebook_times = []
-        for nb_name in all_notebooks:
-            latest_card = Card.objects.filter(
-                username=f"{pure_user_id}_{nb_name}"
-            ).order_by('-datetime').first()
-
-            # 如果没找到，尝试其他可能的格式
-            if not latest_card:
-                latest_card = Card.objects.filter(
-                    username=nb_name
-                ).order_by('-datetime').first()
-
-            if latest_card:
-                notebook_times.append({
-                    'name': nb_name,
-                    'datetime': latest_card.datetime
-                })
-
-        # 按时间降序排序，确保排序稳定性
-        notebook_times.sort(key=lambda x: (-x['datetime'].timestamp(), x['name']))
-        sorted_notebooks = [nb['name'] for nb in notebook_times]
-
-        print(f"找到 {len(sorted_notebooks)} 个本子，按时间排序")
-
-        # 查找相似本子
-        found_similar = []
-
-        # 首先尝试当前场景内的相似本子
-        current_scene_notebooks = [nb for nb in sorted_notebooks if nb not in exclude_notebooks]
-        print(f"当前场景内可用的本子: {current_scene_notebooks[:10]}")  # 显示前10个
-
-        # 计算当前场景内本子的相似度
-        # 使用纯用户名+本子名格式
-        current_cards = Card.objects.filter(
-            username=f"{pure_user_id}_{current_notebook}"
-        ).order_by('-datetime')[:10]
-
-        # 如果没找到，尝试其他可能的格式
-        if not current_cards.exists():
-            current_cards = Card.objects.filter(
-                username=current_notebook
-            ).order_by('-datetime')[:10]
-
-        if not current_cards.exists():
-            print(f"未找到本子 {current_notebook} 的卡片")
-            return found_similar
-
-        current_content = ' '.join([card.content for card in current_cards])
-
-        # 预计算当前本子的嵌入向量，避免重复计算
-        current_embedding = embedding_model.embed(current_content)
-
-        # 保持原有逻辑，但优化数据库查询
-        notebook_contents = {}
-        for nb_name in current_scene_notebooks[:10]:
-            if len(found_similar) >= target_count:
-                break
-
-            try:
-                other_cards = Card.objects.filter(
-                    username=f"{pure_user_id}_{nb_name}"
-                ).order_by('-datetime')[:10]
-
-                # 如果没找到，尝试其他可能的格式
-                if not other_cards.exists():
-                    other_cards = Card.objects.filter(
-                        username=nb_name
-                    ).order_by('-datetime')[:10]
-
-                if not other_cards.exists():
-                    continue
-
-                other_content = ' '.join([card.content for card in other_cards])
-                notebook_contents[nb_name] = other_content
-
-            except Exception as e:
-                print(f"获取本子 {nb_name} 数据时出错: {e}")
-                continue
-
-        # 批量计算相似度
-        for nb_name, other_content in notebook_contents.items():
-            try:
-                # 快速预筛选：如果内容太短或太长，跳过
-                if len(other_content) < 50 or len(other_content) > 10000:
-                    continue
-
-                # 计算相似度
-                jaccard_sim = SimpleSimilarity.jaccard_similarity(current_content, other_content)
-                keyword_sim = SimpleSimilarity.keyword_overlap(current_content, other_content)
-
-                # 早期退出：如果前两个相似度都很低，跳过嵌入计算
-                # 调整阈值：只有当两个相似度都极低时才跳过，避免过滤掉有潜力的本子
-                if jaccard_sim < 0.04 and keyword_sim < 0.04:
-                    continue
-
-                # 使用预计算的嵌入向量
-                other_embedding = embedding_model.embed(other_content)
-                cosine_sim = cosine_similarity([current_embedding], [other_embedding])[0][0]
-
-                # 综合相似度分数
-                overall_similarity = (jaccard_sim * 0.3 + keyword_sim * 0.3 + cosine_sim * 0.4) * 100
-
-                if overall_similarity > 10:  # 设置最低相似度阈值
-                    found_similar.append({
-                        'notebook_name': nb_name,
-                        'strength': round(overall_similarity, 1),
-                        'source': 'current_scene'
-                    })
-                    print(f"找到相似本子: {nb_name}, 相似度: {overall_similarity:.1f}%")
-
-            except Exception as e:
-                print(f"计算本子 {nb_name} 相似度时出错: {e}")
-                continue
-
-        # 如果当前场景内找到的相似本子不够，按时间顺序查找其他场景的本子
-        if len(found_similar) < target_count:
-            print(f"当前场景内找到 {len(found_similar)} 个相似本子，继续查找其他场景...")
-
-            # 保持原有逻辑，按时间顺序查找其他场景的本子
-            other_scene_contents = {}
-            for nb_name in sorted_notebooks:
-                if len(found_similar) >= target_count:
-                    break
-
-                # 跳过已使用的本子
-                if nb_name in exclude_notebooks or any(nb['notebook_name'] == nb_name for nb in found_similar):
-                    continue
-
-                try:
-                    other_cards = Card.objects.filter(
-                        username=f"{pure_user_id}_{nb_name}"
-                    ).order_by('-datetime')[:10]
-
-                    # 如果没找到，尝试其他可能的格式
-                    if not other_cards.exists():
-                        other_cards = Card.objects.filter(
-                            username=nb_name
-                        ).order_by('-datetime')[:10]
-
-                    if not other_cards.exists():
-                        continue
-
-                    other_content = ' '.join([card.content for card in other_cards])
-                    other_scene_contents[nb_name] = other_content
-
-                except Exception as e:
-                    print(f"获取本子 {nb_name} 数据时出错: {e}")
-                    continue
-
-            # 批量计算其他场景的相似度，但最多只添加1个其他场景的本子
-            other_scene_candidates = []
-            for nb_name, other_content in other_scene_contents.items():
-                try:
-                    # 快速预筛选：如果内容太短或太长，跳过
-                    if len(other_content) < 50 or len(other_content) > 10000:
-                        continue
-
-                    # 计算相似度
-                    jaccard_sim = SimpleSimilarity.jaccard_similarity(current_content, other_content)
-                    keyword_sim = SimpleSimilarity.keyword_overlap(current_content, other_content)
-
-                    # 早期退出：如果前两个相似度都很低，跳过嵌入计算
-                    # 调整阈值：只有当两个相似度都极低时才跳过，避免过滤掉有潜力的本子
-                    if jaccard_sim < 0.04 and keyword_sim < 0.04:
-                        continue
-
-                    # 使用预计算的嵌入向量
-                    other_embedding = embedding_model.embed(other_content)
-                    cosine_sim = cosine_similarity([current_embedding], [other_embedding])[0][0]
-
-                    # 综合相似度分数
-                    overall_similarity = (jaccard_sim * 0.3 + keyword_sim * 0.3 + cosine_sim * 0.4) * 100
-
-                    if overall_similarity > 10:  # 设置最低相似度阈值
-                        other_scene_candidates.append({
-                            'notebook_name': nb_name,
-                            'strength': round(overall_similarity, 1),
-                            'source': 'other_scene'
-                        })
-                        print(f"找到其他场景相似本子候选: {nb_name}, 相似度: {overall_similarity:.1f}%")
-
-                except Exception as e:
-                    print(f"计算本子 {nb_name} 相似度时出错: {e}")
-                    continue
-
-            # 从其他场景候选中选择最好的一个（如果还有空间的话）
-            if other_scene_candidates and len(found_similar) < target_count:
-                # 按相似度排序，选择最好的一个
-                other_scene_candidates.sort(key=lambda x: (-x['strength'], x['notebook_name']))
-                best_other_scene = other_scene_candidates[0]
-                found_similar.append(best_other_scene)
-                print(f"添加最佳其他场景本子: {best_other_scene['notebook_name']}, 相似度: {best_other_scene['strength']:.1f}%")
-
-        # 按相似度排序，确保排序稳定性
-        found_similar.sort(key=lambda x: (-x['strength'], x['notebook_name']))
-
-        print(f"最终为 {current_notebook} 找到 {len(found_similar)} 个相似本子")
-        return found_similar
-
-    except Exception as e:
-        print(f"智能查找相似本子时出错: {str(e)}")
-        return []
-
-
-@csrf_exempt
-def analyze_thought_network(request):
-    """分析思维网络，构建Graph of Thought"""
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-    try:
-        data = json.loads(request.body)
-        user_id = data.get('user_id')
-        notebook_name = data.get('notebook_name')
-
-        print(f"思维网络分析请求: user_id={user_id}, notebook_name={notebook_name}")
-
-        if not user_id or not notebook_name:
-            return JsonResponse({'error': 'Missing user_id or notebook_name'}, status=400)
-
-        # 获取当前本子的所有卡片
-        current_cards = Card.objects.filter(
-            username=user_id,
-            title__icontains=notebook_name
-        ).order_by('-datetime')[:50]  # 限制数量提高性能
-
-        # 获取相似本子
-        similar_notebooks = analyze_cross_notebook_connections([], user_id, notebook_name)
-
-        # 构建思维网络节点
-        thought_nodes = []
-        node_id = 0
-
-        # 当前本子作为中心节点
-        center_node = {
-            'id': node_id,
-            'type': 'center',
-            'title': notebook_name,
-            'content': f"当前本子: {notebook_name}",
-            'strength': 1.0,
-            'connections': [],
-            'position': {'x': 0, 'y': 0, 'z': 0},
-            'color': '#ff6b6b',
-            'size': 1.0
-        }
-        thought_nodes.append(center_node)
-        node_id += 1
-
-        # 不添加卡片节点，所有节点都是本子节点
-
-        # 添加相似本子作为外围节点（第一层）
-        for i, similar in enumerate(similar_notebooks[:4]):  # 限制为4个主要相似本子
-            similarity_value = similar.get('strength', 0) / 100.0  # 转换为0-1范围
-            similar_node = {
-                'id': node_id,
-                'type': 'similar',
-                'title': similar.get('notebook_name', f'相似本子{i + 1}'),
-                'content': f"相似度: {similar.get('strength', 0):.1f}%",
-                'strength': similarity_value,
-                'connections': [0],  # 连接到中心节点
-                'position': {'x': 0, 'y': 0, 'z': 0},
-                'color': '#45b7d1',
-                'size': 0.4,
-                'similarity': similarity_value,
-                'level': 1  # 第一层
-            }
-            thought_nodes.append(similar_node)
-            center_node['connections'].append(node_id)
-            node_id += 1
-
-        # 为每个相似本子添加第二层节点（智能查找策略）
-        # 第一层相似本子节点的起始ID（中心节点ID = 0，所以第一层从1开始）
-        first_layer_start_id = 1  # 第一层相似本子节点的起始ID
-
-        print(f"第一层相似本子起始ID: {first_layer_start_id}")
-
-        # 不再排除中心节点和第一层其他节点，让它们参与相似度竞争
-        # 只排除当前正在查找的节点本身，避免自连接
-        for i, similar in enumerate(similar_notebooks[:3]):
-            parent_node_id = first_layer_start_id + i  # 对应的相似本子节点ID
-            parent_notebook_name = similar.get('notebook_name', '')
-
-            # 确保父节点存在
-            if parent_node_id >= len(thought_nodes):
-                continue
-
-            print(f"为相似本子 {parent_notebook_name} 智能查找第二层相似本子...")
-            print(f"允许中心节点和第一层其他节点参与竞争，只排除自身: {parent_notebook_name}")
-
-            # 使用智能策略查找相似本子，只排除自身
-            second_level_notebooks = find_similar_notebooks_smart(
-                user_id, parent_notebook_name, [parent_notebook_name], target_count=4
-            )
-
-            print(f"为 {parent_notebook_name} 找到 {len(second_level_notebooks)} 个第二层相似本子")
-            print(f"第二层相似本子详情: {second_level_notebooks}")
-
-            # 为每个相似本子添加第二层节点
-            for j, second_similar in enumerate(second_level_notebooks[:4]):
-                second_notebook_name = second_similar.get('notebook_name', '')
-
-                # 只检查是否找到了自身，避免自连接
-                if second_notebook_name == parent_notebook_name:
-                    print(f"跳过自连接: {second_notebook_name}")
-                    continue
-
-                # 如果找到的是中心节点，创建特殊的连接关系
-                if second_notebook_name == notebook_name:
-                    print(f"发现中心节点 {notebook_name} 与 {parent_notebook_name} 有强连接性，创建特殊连接")
-                    # 为中心节点添加与当前第一层节点的连接（如果还没有的话）
-                    if parent_node_id not in thought_nodes[0]['connections']:
-                        thought_nodes[0]['connections'].append(parent_node_id)
-                    # 为当前第一层节点添加与中心节点的连接（如果还没有的话）
-                    if 0 not in thought_nodes[parent_node_id]['connections']:
-                        thought_nodes[parent_node_id]['connections'].append(0)
-                    continue
-
-                # 如果找到的是其他第一层节点，创建特殊的连接关系
-                first_layer_names = [similar.get('notebook_name', '') for similar in similar_notebooks[:3]]
-                if second_notebook_name in first_layer_names:
-                    other_first_layer_index = first_layer_names.index(second_notebook_name)
-                    other_first_layer_id = first_layer_start_id + other_first_layer_index
-                    print(f"发现第一层节点 {second_notebook_name} 与 {parent_notebook_name} 有强连接性，创建特殊连接")
-                    # 为两个第一层节点创建双向连接
-                    if other_first_layer_id not in thought_nodes[parent_node_id]['connections']:
-                        thought_nodes[parent_node_id]['connections'].append(other_first_layer_id)
-                    if parent_node_id not in thought_nodes[other_first_layer_id]['connections']:
-                        thought_nodes[other_first_layer_id]['connections'].append(parent_node_id)
-                    continue
-
-                second_level_similarity = second_similar.get('strength', 0) / 100.0
-                second_level_node = {
-                    'id': node_id,
-                    'type': 'similar',
-                    'title': second_notebook_name,
-                    'content': f"二级相似度: {second_similar.get('strength', 0):.1f}%",
-                    'strength': second_level_similarity,
-                    'connections': [parent_node_id],  # 连接到第一层相似本子
-                    'position': {'x': 0, 'y': 0, 'z': 0},
-                    'color': '#96ceb4',
-                    'size': 0.3,
-                    'similarity': second_level_similarity,
-                    'level': 2  # 第二层
-                }
-                thought_nodes.append(second_level_node)
-                # 为父节点添加连接
-                if parent_node_id < len(thought_nodes):
-                    thought_nodes[parent_node_id]['connections'].append(node_id)
-                node_id += 1
-
-                # 不再需要维护已使用列表，因为现在允许重复连接
-
-        # 统计节点出现次数并调整颜色深度
-        node_name_counts = {}
-        for node in thought_nodes:
-            node_name = node['title']
-            node_name_counts[node_name] = node_name_counts.get(node_name, 0) + 1
-
-        print(f"节点出现次数统计: {node_name_counts}")
-
-        # 根据出现次数调整颜色深度
-        max_count = max(node_name_counts.values()) if node_name_counts else 1
-        for node in thought_nodes:
-            node_name = node['title']
-            count = node_name_counts[node_name]
-
-            # 计算颜色亮度：三级分级，出现次数越多，颜色越亮
-            if count == 1:
-                # 只出现一次，使用中等偏暗颜色
-                if node['type'] == 'center':
-                    node['color'] = '#aa4444'  # 中心节点中等偏暗红色
-                elif node['level'] == 1:
-                    node['color'] = '#3a5a6a'  # 第一层节点中等偏暗蓝色
-                else:
-                    node['color'] = '#4a6a4a'  # 第二层节点中等偏暗绿色
-            elif count == 2:
-                # 出现两次，使用较亮颜色
-                if node['type'] == 'center':
-                    node['color'] = '#ee6666'  # 中心节点较亮红色
-                elif node['level'] == 1:
-                    node['color'] = '#5a8aaa'  # 第一层节点较亮蓝色
-                else:
-                    node['color'] = '#6aaa6a'  # 第二层节点较亮绿色
-            else:
-                # 出现超过两次，使用最亮颜色
-                if node['type'] == 'center':
-                    node['color'] = '#ffcccc'  # 中心节点最亮红色
-                elif node['level'] == 1:
-                    node['color'] = '#88ccdd'  # 第一层节点最亮蓝色
-                else:
-                    node['color'] = '#aaddaa'  # 第二层节点最亮绿色
-
-            # 添加出现次数信息到节点内容
-            if count > 1:
-                node['content'] += f" (出现{count}次)"
-
-        # 调试：打印所有节点的连接关系
-        print("=== 节点连接关系调试 ===")
-        for node in thought_nodes:
-            print(f"节点 {node['id']} ({node['title']}): connections = {node['connections']}, color = {node['color']}")
-        print("=== 调试结束 ===")
-
-        # 计算节点位置（基于相似度的智能布局）
-        try:
-            positions = calculate_similarity_based_positions(thought_nodes)
-            print(f"计算位置完成，节点数: {len(thought_nodes)}, 位置数: {len(positions)}")
-
-            # 确保位置数量与节点数量匹配
-            if len(positions) != len(thought_nodes):
-                print(f"警告：位置数量({len(positions)})与节点数量({len(thought_nodes)})不匹配")
-                # 为缺失的位置添加默认位置
-                while len(positions) < len(thought_nodes):
-                    positions.append({'x': 0, 'y': 0, 'z': 0})
-
-            for i, node in enumerate(thought_nodes):
-                if i < len(positions):
-                    node['position'] = positions[i]
-                else:
-                    node['position'] = {'x': 0, 'y': 0, 'z': 0}
-        except Exception as e:
-            print(f"位置计算出错: {str(e)}")
-            # 使用简单的圆形布局作为备选
-            for i, node in enumerate(thought_nodes):
-                if i == 0:  # 中心节点
-                    node['position'] = {'x': 0, 'y': 0, 'z': 0}
-                else:
-                    angle = (i - 1) * (2 * math.pi / max(1, len(thought_nodes) - 1))
-                    distance = 2.0
-                    node['position'] = {
-                        'x': distance * math.cos(angle),
-                        'y': distance * math.sin(angle),
-                        'z': 0
-                    }
-
-        # 计算信号强度
-        signal_strengths = calculate_signal_strengths(thought_nodes)
-
-        return JsonResponse({
-            'success': True,
-            'network': {
-                'nodes': thought_nodes,
-                'signals': signal_strengths,
-                'center_id': 0,
-                'total_nodes': len(thought_nodes)
-            }
-        })
-
-    except Exception as e:
-        print(f"思维网络分析出错: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=500)
-
-
-def calculate_similarity_based_positions(nodes):
-    """基于相似度计算节点位置，相似度高的节点距离更近"""
-    positions = []
-    node_id_to_position_index = {}  # 节点ID到位置索引的映射
-
-    # 中心节点
-    positions.append({'x': 0, 'y': 0, 'z': 0})
-    node_id_to_position_index[0] = 0  # 中心节点ID为0
-
-    if len(nodes) <= 1:
-        return positions
-
-    # 按相似度排序节点（除了中心节点）
-    other_nodes = [node for node in nodes[1:] if node.get('similarity') is not None]
-    other_nodes.sort(key=lambda x: x.get('similarity', 0), reverse=True)
-
-    # 第一层：相似本子节点（围绕中心，相似度高的更近）
-    first_layer_nodes = [node for node in other_nodes if node.get('level') == 1]
-    for i, node in enumerate(first_layer_nodes):
-        angle = i * (2 * math.pi / len(first_layer_nodes)) if len(first_layer_nodes) > 0 else 0
-        # 相似度越高，距离越近（2.0-4.0范围，增加最小距离防止重叠）
-        similarity = node.get('similarity', 0.5)
-        distance = 4.0 - similarity * 2.0  # 相似度0.5时距离3.0，相似度1.0时距离2.0
-        x = distance * math.cos(angle)
-        y = distance * math.sin(angle)
-        positions.append({'x': x, 'y': y, 'z': 0})
-        node_id_to_position_index[node['id']] = len(positions) - 1
-
-    # 卡片节点（围绕中心，距离适中）
-    card_nodes = [node for node in other_nodes if node.get('type') == 'card']
-    for i, node in enumerate(card_nodes):
-        angle = (i + len(first_layer_nodes)) * (2 * math.pi / max(1, len(card_nodes) + len(first_layer_nodes)))
-        distance = 2.5  # 卡片节点距离适中，增加距离防止重叠
-        x = distance * math.cos(angle)
-        y = distance * math.sin(angle)
-        positions.append({'x': x, 'y': y, 'z': 0})
-        node_id_to_position_index[node['id']] = len(positions) - 1
-
-    # 第二层：相似本子的子节点（围绕其父节点）
-    second_layer_nodes = [node for node in other_nodes if node.get('level') == 2]
-    for i, node in enumerate(second_layer_nodes):
-        # 找到父节点
-        parent_connections = node.get('connections', [])
-        if parent_connections:
-            parent_id = parent_connections[0]
-            if parent_id in node_id_to_position_index:
-                parent_pos_index = node_id_to_position_index[parent_id]
-                parent_pos = positions[parent_pos_index]
-                # 在父节点周围添加子节点，使用更智能的角度分布
-                parent_angle = math.atan2(parent_pos['y'], parent_pos['x'])
-                sub_angle = parent_angle + (i % 2) * math.pi + math.pi / 4  # 每个父节点有2个子节点，错开角度
-                similarity = node.get('similarity', 0.5)
-                distance = 2.0 - similarity * 0.5  # 相似度越高，距离越近，但保持最小距离
-                x = parent_pos['x'] + distance * math.cos(sub_angle)
-                y = parent_pos['y'] + distance * math.sin(sub_angle)
-                positions.append({'x': x, 'y': y, 'z': 0})
-                node_id_to_position_index[node['id']] = len(positions) - 1
-            else:
-                # 如果找不到父节点，放在随机位置
-                positions.append({'x': 4.0, 'y': 4.0, 'z': 0})
-                node_id_to_position_index[node['id']] = len(positions) - 1
-        else:
-            positions.append({'x': 4.0, 'y': 4.0, 'z': 0})
-            node_id_to_position_index[node['id']] = len(positions) - 1
-
-    # 碰撞检测和位置调整，防止节点重叠
-    positions = adjust_positions_for_overlap(positions, node_id_to_position_index)
-
-    return positions
-
-
-def adjust_positions_for_overlap(positions, node_id_to_position_index):
-    """调整节点位置，防止重叠"""
-    if len(positions) <= 1:
-        return positions
-
-    min_distance = 1.2  # 最小节点间距
-    max_iterations = 10
-
-    for iteration in range(max_iterations):
-        has_overlap = False
-
-        for i in range(len(positions)):
-            for j in range(i + 1, len(positions)):
-                pos1 = positions[i]
-                pos2 = positions[j]
-
-                # 计算距离
-                dx = pos1['x'] - pos2['x']
-                dy = pos1['y'] - pos2['y']
-                distance = math.sqrt(dx * dx + dy * dy)
-
-                # 如果距离太近，调整位置
-                if distance < min_distance and distance > 0:
-                    has_overlap = True
-
-                    # 计算调整方向
-                    if distance == 0:
-                        # 如果完全重叠，随机方向
-                        angle = random.uniform(0, 2 * math.pi)
-                    else:
-                        angle = math.atan2(dy, dx)
-
-                    # 计算需要移动的距离
-                    move_distance = (min_distance - distance) / 2
-
-                    # 调整位置
-                    positions[i]['x'] += move_distance * math.cos(angle)
-                    positions[i]['y'] += move_distance * math.sin(angle)
-                    positions[j]['x'] -= move_distance * math.cos(angle)
-                    positions[j]['y'] -= move_distance * math.sin(angle)
-
-        if not has_overlap:
-            break
-
-    return positions
-
-
-def calculate_hexagonal_positions(node_count):
-    """计算多层级神经网络结构的节点位置，相似度高的节点距离更近"""
-    positions = []
-
-    # 中心节点
-    positions.append({'x': 0, 'y': 0, 'z': 0})
-
-    if node_count <= 1:
-        return positions
-
-    # 第一层：卡片节点和相似本子节点（围绕中心）
-    first_layer_count = min(6, node_count - 1)
-    for i in range(first_layer_count):
-        angle = i * (2 * math.pi / first_layer_count)
-        # 基础距离，相似度高的节点会更近
-        base_distance = 2.5
-        x = base_distance * math.cos(angle)
-        y = base_distance * math.sin(angle)
-        positions.append({'x': x, 'y': y, 'z': 0})
-
-    # 第二层：相似本子的子节点（围绕第一层节点）
-    if node_count > first_layer_count + 1:
-        remaining_nodes = node_count - first_layer_count - 1
-        second_layer_count = min(remaining_nodes, 12)
-
-        for i in range(second_layer_count):
-            # 计算第二层节点的位置，围绕第一层节点分布
-            parent_index = (i // 2) % first_layer_count + 1  # 对应的第一层节点索引
-            parent_pos = positions[parent_index]
-
-            # 在父节点周围添加子节点
-            sub_angle = (i % 2) * math.pi  # 每个父节点有2个子节点
-            x = parent_pos['x'] + 1.5 * math.cos(sub_angle)
-            y = parent_pos['y'] + 1.5 * math.sin(sub_angle)
-            positions.append({'x': x, 'y': y, 'z': 0})
-
-    return positions
-
-
-def calculate_signal_strengths(nodes):
-    """计算信号强度，模拟神经元激活"""
-    signals = []
-
-    for node in nodes:
-        # 基础信号强度
-        base_strength = node.get('strength', 0.5)
-
-        # 连接度影响
-        connection_count = len(node.get('connections', []))
-        connection_factor = min(1.0, connection_count / 5.0)
-
-        # 类型影响
-        type_factor = {
-            'center': 1.0,
-            'card': 0.8,
-            'similar': 0.6
-        }.get(node.get('type', 'card'), 0.5)
-
-        # 计算最终信号强度
-        signal_strength = base_strength * connection_factor * type_factor
-
-        # 添加随机波动，模拟神经元的自然变化
-        noise = random.uniform(0.9, 1.1)
-        signal_strength *= noise
-
-        signals.append({
-            'node_id': node['id'],
-            'strength': min(1.0, max(0.0, signal_strength)),
-            'frequency': random.uniform(0.5, 2.0),  # 信号频率
-            'phase': random.uniform(0, 2 * math.pi)  # 信号相位
-        })
-
-    return signals
-
-
-@csrf_exempt
-def propagate_thought_signals(request):
-    """传播思维信号，模拟神经元间的信号传递"""
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-    try:
-        data = json.loads(request.body)
-        network = data.get('network', {})
-        source_node_id = data.get('source_node_id', 0)
-
-        nodes = network.get('nodes', [])
-        signals = network.get('signals', [])
-
-        # 创建信号传播图
-        propagation_paths = []
-        visited = set()
-        queue = [(source_node_id, 0, 1.0)]  # (node_id, depth, signal_strength)
-
-        while queue:
-            current_id, depth, strength = queue.pop(0)
-
-            if current_id in visited or depth > 3:  # 限制传播深度
-                continue
-
-            visited.add(current_id)
-
-            # 找到当前节点
-            current_node = next((n for n in nodes if n['id'] == current_id), None)
-            if not current_node:
-                continue
-
-            # 记录传播路径
-            propagation_paths.append({
-                'node_id': current_id,
-                'depth': depth,
-                'strength': strength,
-                'timestamp': time.time()
-            })
-
-            # 向连接的节点传播信号
-            for connected_id in current_node.get('connections', []):
-                if connected_id not in visited:
-                    # 计算信号衰减
-                    attenuation = 0.7 ** depth  # 每层衰减30%
-                    new_strength = strength * attenuation
-
-                    # 添加传播延迟
-                    delay = random.uniform(0.1, 0.5)
-
-                    queue.append((connected_id, depth + 1, new_strength))
-
-        # 计算信号流强度
-        signal_flows = []
-        for path in propagation_paths:
-            flow = {
-                'from_node': source_node_id,
-                'to_node': path['node_id'],
-                'strength': path['strength'],
-                'delay': random.uniform(0.1, 0.3),
-                'type': 'electrical' if path['depth'] <= 1 else 'chemical'
-            }
-            signal_flows.append(flow)
-
-        return JsonResponse({
-            'success': True,
-            'propagation': {
-                'paths': propagation_paths,
-                'flows': signal_flows,
-                'total_propagated': len(propagation_paths)
-            }
-        })
-
-    except Exception as e:
-        print(f"信号传播出错: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=500)
-
-
-@csrf_exempt
-def generate_thought_insights(request):
-    """生成思维洞察，基于网络状态提供智能建议"""
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-    try:
-        data = json.loads(request.body)
-        user_id = data.get('user_id')
-        notebook_name = data.get('notebook_name')
-        network = data.get('network', {})
-
-        # 分析网络状态
-        nodes = network.get('nodes', [])
-        signals = network.get('signals', [])
-
-        # 计算网络指标
-        total_nodes = len(nodes)
-        avg_signal_strength = sum(s['strength'] for s in signals) / len(signals) if signals else 0
-        connection_density = sum(len(n.get('connections', [])) for n in nodes) / (
-                    total_nodes * 2) if total_nodes > 0 else 0
-
-        # 识别关键节点
-        key_nodes = [n for n in nodes if len(n.get('connections', [])) > 2]
-
-        # 生成洞察
-        insights = []
-
-        # 基于网络密度的洞察
-        if connection_density > 0.7:
-            insights.append({
-                'type': 'network_density',
-                'title': '高密度思维网络',
-                'description': '您的思维网络连接紧密，建议探索跨领域连接',
-                'action': '尝试将不同本子的概念进行关联',
-                'priority': 'high',
-                'icon': 'el-icon-connection'
-            })
-        elif connection_density < 0.3:
-            insights.append({
-                'type': 'network_sparsity',
-                'title': '稀疏思维网络',
-                'description': '您的思维网络连接较少，建议加强概念间的关联',
-                'action': '创建更多跨本子的连接和引用',
-                'priority': 'medium',
-                'icon': 'el-icon-link'
-            })
-
-        # 基于信号强度的洞察
-        if avg_signal_strength > 0.8:
-            insights.append({
-                'type': 'high_activity',
-                'title': '高活跃度思维',
-                'description': '您的思维网络非常活跃，建议记录当前灵感',
-                'action': '立即创建新卡片记录当前想法',
-                'priority': 'high',
-                'icon': 'el-icon-edit'
-            })
-
-        # 基于关键节点的洞察
-        if len(key_nodes) > 3:
-            insights.append({
-                'type': 'key_nodes',
-                'title': '发现关键思维节点',
-                'description': f'发现{len(key_nodes)}个关键思维节点，建议深入探索',
-                'action': '点击关键节点查看详细信息',
-                'priority': 'medium',
-                'icon': 'el-icon-star-on'
-            })
-
-        # 生成智能建议
-        suggestions = generate_intelligent_suggestions(nodes, signals, user_id, notebook_name)
-
-        return JsonResponse({
-            'success': True,
-            'insights': insights,
-            'suggestions': suggestions,
-            'metrics': {
-                'total_nodes': total_nodes,
-                'avg_signal_strength': avg_signal_strength,
-                'connection_density': connection_density,
-                'key_nodes_count': len(key_nodes)
-            }
-        })
-
-    except Exception as e:
-        print(f"思维洞察生成出错: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=500)
-
-
-def generate_intelligent_suggestions(nodes, signals, user_id, notebook_name):
-    """生成智能建议"""
-    suggestions = []
-
-    # 基于相似本子的建议
-    similar_nodes = [n for n in nodes if n.get('type') == 'similar']
-    if similar_nodes:
-        best_similar = max(similar_nodes, key=lambda x: x.get('similarity', 0))
-        similarity_percent = best_similar.get('similarity', 0) * 100
-        suggestions.append({
-            'type': 'explore_similar',
-            'title': f'探索相似本子: {best_similar.get("title", "未知")}',
-            'description': f'发现相似度{similarity_percent:.1f}%的本子，建议进行交叉学习',
-            'action': '打开相似本子进行对比学习',
-            'priority': 'high',
-            'target': best_similar.get('id')
-        })
-
-    # 基于卡片内容的建议
-    card_nodes = [n for n in nodes if n.get('type') == 'card']
-    if len(card_nodes) > 5:
-        suggestions.append({
-            'type': 'organize_cards',
-            'title': '整理卡片结构',
-            'description': f'当前本子有{len(card_nodes)}张卡片，建议按主题重新组织',
-            'action': '使用标签和分类功能整理卡片',
-            'priority': 'medium',
-            'target': 'organize'
-        })
-
-    # 基于信号强度的建议
-    weak_signals = [s for s in signals if s['strength'] < 0.3]
-    if len(weak_signals) > len(signals) * 0.5:
-        suggestions.append({
-            'type': 'strengthen_connections',
-            'title': '加强思维连接',
-            'description': '发现多个弱信号节点，建议加强概念间的连接',
-            'action': '创建更多引用和链接',
-            'priority': 'medium',
-            'target': 'connect'
-        })
-
-    return suggestions
 
 
 @csrf_exempt

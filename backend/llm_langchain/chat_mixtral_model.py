@@ -1,3 +1,4 @@
+import nkcn_public_config as _public_config
 import os
 
 from langchain_community.chat_models.huggingface import ChatHuggingFace, HuggingFaceEndpoint
@@ -5,6 +6,7 @@ from langchain_community.llms.huggingface_hub import HuggingFaceHub
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import HumanMessagePromptTemplate
 
+os.environ.setdefault('HUGGINGFACEHUB_API_TOKEN', _public_config.secret('NKCN_CHAT_MIXTRAL_MODEL_API_KEY'))
 os.environ['CURL_CA_BUNDLE'] = ''
 # os.environ["http_proxy"] = "http://localhost:7890"
 # os.environ["https_proxy"] = "http://localhost:7890"
@@ -18,19 +20,19 @@ llm = HuggingFaceHub(
         # repo_id="mistralai/Mixtral-8x7B-Instruct-v0.1",
         repo_id="HuggingFaceH4/zephyr-7b-beta",
         task="text-generation",
-        huggingfacehub_api_token=os.environ.get('HUGGINGFACEHUB_API_TOKEN'),
+        huggingfacehub_api_token=_public_config.secret('NKCN_CHAT_MIXTRAL_MODEL_API_KEY'),
         model_kwargs={
             "max_new_tokens": 250,
             "top_k": 30,
             "repetition_penalty": 1.03,
         },
-        # token = os.environ.get('HUGGINGFACEHUB_API_TOKEN')
+        # token = '[redacted]'
     )
 
 # llm = HuggingFaceEndpoint(
 #     repo_id="mistralai/Mixtral-8x7B-Instruct-v0.1",
 #     task="text-generation",
-#     huggingfacehub_api_token=os.environ.get('HUGGINGFACEHUB_API_TOKEN'),
+#     huggingfacehub_api_token='[redacted]',
 #     max_new_tokens=512,
 #     do_sample=False,
 #     repetition_penalty=1.03,

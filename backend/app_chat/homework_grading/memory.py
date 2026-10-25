@@ -2,6 +2,7 @@ from .feedback_runtime import stamp_feedback
 from .feedback_verification import validate_page
 
 import collections
+import copy
 import os
 import re
 from typing import Any, Dict, List
@@ -28,6 +29,9 @@ def aggregate_pages(page_files: List[str], *, feedback_runtime=None) -> Dict[str
         feedback_runtime is not None
         and is_open_material((feedback_runtime.context or {}).get('material_type'))
     )
+    from .note_evidence import is_notes, normalize_note_fields, NOTE_FIELDS
+    from .material_markings import MARKING_FIELDS, normalize_markings
+    notes = is_notes(feedback_runtime)
     question_count = 0
     verdict_dist: Dict[str, int] = collections.defaultdict(int)
     accuracy_by_page: Dict[str, float] = {}
@@ -38,6 +42,7 @@ def aggregate_pages(page_files: List[str], *, feedback_runtime=None) -> Dict[str
     error_type_dist: Dict[str, int] = collections.defaultdict(int)
     listening_skipped_count = 0
     cross_page_uncertain_count = 0
+    page_understanding = []
 
     for page_file in page_files:
         page_data = safe_json_load(page_file)
@@ -45,31 +50,39 @@ def aggregate_pages(page_files: List[str], *, feedback_runtime=None) -> Dict[str
             validate_page(page_data, feedback_runtime)
         page_num = page_data.get('page') or parse_page_num(os.path.basename(page_file))
         questions = page_data.get('questions') or []
+        from .page_feedback import page_evidence
+        page_understanding.append(page_evidence(page_data, page_num))
         page_correct = 0
         for question in questions:
+            if open_material:
+                question = normalize_markings(copy.deepcopy(question))
+            if notes:
+                question = normalize_note_fields(copy.deepcopy(question))
+            eligible = not notes or question['diagnostic_eligible']
             question_count += 1
             verdict = str(question.get('verdict') or 'uncertain')
             verdict_dist[verdict] += 1
             knowledge_point = str(question.get('knowledge_point') or '').strip()
-            if knowledge_point:
+            if knowledge_point and eligible:
                 kp_total[knowledge_point] += 1
             if verdict == 'correct':
                 page_correct += 1
             include_for_feedback = verdict in ERROR_VERDICTS or (open_material and verdict == 'correct')
             if include_for_feedback:
                 error_type = str(question.get('error_type') or '').strip()
-                if verdict == 'uncertain' and _is_listening_question(question):
+                if verdict == 'uncertain' and not open_material and _is_listening_question(question):
                     listening_skipped_count += 1
                     continue
                 if verdict == 'uncertain' and question.get('cross_page') and not question.get('cross_page_resolved'):
                     cross_page_uncertain_count += 1
+                    if not open_material:
+                        continue
+                if verdict == 'uncertain' and not knowledge_point and not error_type and not open_material:
                     continue
-                if verdict == 'uncertain' and not knowledge_point and not error_type:
-                    continue
-                if knowledge_point and verdict in ERROR_VERDICTS:
+                if knowledge_point and eligible and verdict in ERROR_VERDICTS:
                     kp_errors[knowledge_point] += 1
                     kp_importance_levels[knowledge_point].append(importance_of(error_type))
-                if error_type and verdict in ERROR_VERDICTS:
+                if error_type and eligible and verdict in ERROR_VERDICTS:
                     error_type_dist[error_type] += 1
                 entry = {
                     'cross_page': bool(question.get('cross_page')),
@@ -90,6 +103,11 @@ def aggregate_pages(page_files: List[str], *, feedback_runtime=None) -> Dict[str
                     'position': question.get('position', []),
                     'importance': importance_of(error_type),
                 }
+                if notes:
+                    entry.update({key: question[key] for key in NOTE_FIELDS})
+                    entry['page_origin'] = page_data.get('page_origin', {})
+                if open_material:
+                    entry.update({key: copy.deepcopy(question[key]) for key in (*MARKING_FIELDS, 'note_role') if key in question})
                 if verdict == 'uncertain':
                     entry['uncertain_reason'] = (
                         'cross_page_attempted'
@@ -120,11 +138,14 @@ def aggregate_pages(page_files: List[str], *, feedback_runtime=None) -> Dict[str
     kp_importance = {point: max_importance(levels) for point, levels in kp_importance_levels.items()}
     return stamp_feedback({
         'page_count': len(page_files),
+        'page_understanding': page_understanding,
         'question_count': question_count,
         'accuracy': {
-            'overall': round(total_correct / question_count, 4) if question_count else 0.0,
-            'by_page': accuracy_by_page,
+            'overall': None if notes else round(total_correct / question_count, 4) if question_count else 0.0,
+            'by_page': {} if notes else accuracy_by_page,
         },
+        **({'evidence_mode': 'notes', 'temporal_evidence': False} if notes else {}),
+        **({'material_type': feedback_runtime.context['material_type']} if open_material else {}),
         'verdict_distribution': dict(verdict_dist),
         'uncertain_count': verdict_dist.get('uncertain', 0),
         'listening_skipped_count': listening_skipped_count,

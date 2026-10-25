@@ -28,6 +28,7 @@ NK2026 主题小组个人课设报告期末综合批改脚本。
 模型回退：claude-opus-4.8(cloudapi)×2 → gemini-3.1-pro-preview(dmxapi)×2 → deepseek-v4-flash×2
 """
 from __future__ import annotations
+import nkcn_public_config as _public_config
 
 import argparse
 import json
@@ -336,10 +337,10 @@ def _cloudapi_cfg() -> Dict[str, str]:
     cfg = resolve_openai_cfg_from_abbr(
         "claude-opus-4.8",
         default_model="claude-opus-4-8",
-        default_base="https://chat.cloudapi.vip/v1/",
+        default_base=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
         default_key=os.environ.get(
             "NKCN_CLOUDAPI_KEY",
-            os.environ.get("NKCN_LLM_API_KEY", ""),
+            _public_config.secret('OPENAI_API_KEY'),
         ),
     )
     return cfg
@@ -348,10 +349,10 @@ def _cloudapi_cfg() -> Dict[str, str]:
 def _dmxapi_cfg() -> Dict[str, str]:
     return {
         "model": os.environ.get("NKCN_DMT_GEMINI_MODEL", "gemini-3.1-pro-preview"),
-        "base_url": os.environ.get("NKCN_DMT_GEMINI_BASE_URL", "https://www.dmxapi.cn/v1").rstrip("/"),
+        "base_url": os.environ.get("NKCN_DMT_GEMINI_BASE_URL", _public_config.endpoint('NKCN_REVIEW_GATEWAY_V1_URL', 'http://localhost:9999/v1')).rstrip("/"),
         "api_key": os.environ.get(
             "NKCN_DMT_GEMINI_API_KEY",
-            os.environ.get("DMX_API_KEY", ""),
+            _public_config.secret('NKCN_LLM_DMXAPI_API_KEY'),
         ),
     }
 
@@ -362,7 +363,7 @@ def _deepseek_cfg() -> Dict[str, str]:
         "base_url": "https://api.deepseek.com",
         "api_key": os.environ.get(
             "DEEPSEEK_API_KEY",
-            os.environ.get("DEEPSEEK_API_KEY", ""),
+            _public_config.secret('DEEPSEEK_API_KEY'),
         ),
     }
 

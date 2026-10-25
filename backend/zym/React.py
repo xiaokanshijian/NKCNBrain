@@ -1,5 +1,5 @@
+import nkcn_public_config as _public_config
 import json
-import os
 
 
 from langchain_core.messages import SystemMessage, AIMessage
@@ -135,11 +135,11 @@ def parse_str_to_list(ai_message: AIMessage) -> list:
         return final_list
 
 
-# OPEN_AI_KEY = os.environ.get("OPENAI_API_KEY", "")
-# OPEN_AI_KEY = os.environ.get("OPENAI_API_KEY", "")
-# base_url = "https://ai98.vip/v1"
+# OPEN_AI_KEY = "[redacted]"
+# OPEN_AI_KEY = "[redacted]"
+# base_url = "http://localhost:9999/v1"
 base_url = "https://api.moonshot.cn/v1"
-OPEN_AI_KEY = os.environ.get("KIMI_API_KEY", "")
+OPEN_AI_KEY = _public_config.secret('KIMI_API_KEY')
 chat_model = ChatOpenAI(temperature=0.1,
                         openai_api_key=OPEN_AI_KEY,
                         openai_api_base=base_url,

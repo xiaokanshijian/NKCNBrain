@@ -19,6 +19,7 @@ from .feedback_snapshot_reader import read_feedback_snapshot
 from .feedback_start_transaction import publish_start, recover_start
 from .feedback_workspaces import current_directory, run_directory
 from .utils import sha256_file
+from .completion import RECOVERABLE, summarize_completion
 
 
 class RunLease:
@@ -67,6 +68,20 @@ def start_grading_request(workspace, filename, data, *, resolution=None, rerun=F
         raise ValueError('批改目标阶段无效')
     if not isinstance(filename, str) or not filename.lower().endswith('.pdf'):
         raise ValueError('批改当前仅支持单份PDF')
+    refresh_saved_settings = (
+        not rerun
+        or data.get('refresh_configuration') is True
+        or str(data.get('refresh_configuration') or '').strip().lower() in ('1', 'true')
+        or ('notebook_skill_selection' not in data and (
+            data.get('full_recompute') is True
+            or str(data.get('full_recompute') or '').strip().lower() in ('1', 'true')))
+    )
+    settings_source_digest = None
+    if refresh_saved_settings:
+        from app_chat.feedback_material_identity import source_digest
+        settings_source_digest = source_digest(workspace, filename)
+        from app_chat.feedback_material_settings import merge_saved_material_settings
+        data, _ = merge_saved_material_settings(workspace, filename, data)
     source = Path(assert_workspace_path(workspace,
         Path(settings.BASE_DIR) / 'received_dir' / 'user_raw_file' / workspace / filename))
     if not source.is_file():
@@ -80,6 +95,8 @@ def start_grading_request(workspace, filename, data, *, resolution=None, rerun=F
     if resolution['route'] != 'homework_grading':
         raise ValueError('当前请求不是可执行的题目批改')
     digest = sha256_file(str(source))
+    if refresh_saved_settings and settings_source_digest != digest:
+        raise ValueError('读取材料设置期间源文件发生变化，请重新打开材料')
     analysis_id = 'homework_' + digest[:24]
     if rerun and data.get('analysis_id') != analysis_id:
         raise ValueError('源PDF已变化，不能对原运行发起续跑；请从材料入口完整新跑')
@@ -98,12 +115,12 @@ def start_grading_request(workspace, filename, data, *, resolution=None, rerun=F
         rerun_plan = None
         if rerun:
             from .feedback_rerun_plan import choose_rerun_runtime
-            runtime, rerun_plan = choose_rerun_runtime(current, filename, data)
+            runtime, rerun_plan = choose_rerun_runtime(current, filename, data, workspace=workspace)
             target = 'grading' if rerun_plan['stage'] == 'all' else rerun_plan['stage']
             resolution['warnings'].extend(rerun_plan['warnings'])
         else:
             runtime = build_request_runtime(resolution['feedback_context'], data,
-                                            preprocess_mode=data.get('preprocess_mode', 'auto'))
+                                            preprocess_mode=data.get('preprocess_mode'), workspace=workspace)
         state = read_feedback_snapshot(current, old)
         same = state['snapshot_status'] == 'complete' and state['config_fingerprint'] == runtime.fingerprint
         if same:
@@ -116,29 +133,51 @@ def start_grading_request(workspace, filename, data, *, resolution=None, rerun=F
                 'task_kind': 'homework_grading', 'analysis_type': 'homework_grading',
                 'current_item': 0, 'total_items': 0, 'current_section': '准备批改', 'error': '',
                 'warnings': resolution['warnings'], 'content_validation': {'status': 'inconclusive'}}
-        if not rerun and same and check_homework_stage_ready(workspace, analysis_id, target):
+        dependency_ready = True
+        from .stage_dependencies import enabled as scoped_dependencies
+        if same and scoped_dependencies(runtime):
+            from .service import prepare_homework_workspace
+            from .execution_checkpoints import receipt_matches
+            previous_paths = prepare_homework_workspace(workspace, analysis_id, create=False)
+            required = ['layout'] + (['understanding'] if target != 'layout' else []) + (['grading', 'render', 'quality'] if target == 'grading' else [])
+            dependency_ready = all(receipt_matches(previous_paths, old, name) for name in required)
+        if not rerun and same and dependency_ready and check_homework_stage_ready(workspace, analysis_id, target):
+            completion = summarize_completion(old)
             task.update(run_id=old.get('run_id') or 'current', current_item=1, total_items=1,
-                        current_section='完成', completed=True, status='completed')
+                        completion=completion, current_section=completion['message'], completed=True, status='completed')
             global_var.tasks[task_id] = create_task(task)
-            return _response(task, runtime, target, 'existing_result')
+            return {**_response(task, runtime, target, 'existing_result'), 'completion': completion}
 
         destination = run_directory(container, run_id)
         snapshot = prepare_feedback_snapshot(destination, source_path=str(source),
             analysis_id=analysis_id, expected_source_sha256=digest,
             context=runtime.context, **runtime.dependencies)
-        clone = rerun_plan['clone'] if rerun_plan is not None else same
+        configuration_clone = False
+        if not same and state['snapshot_status'] == 'complete' and not rerun:
+            from .stage_dependencies import reusable_upstream
+            configuration_clone = reusable_upstream(restore_feedback_runtime(current), runtime)
+        clone = rerun_plan['clone'] if rerun_plan is not None else same or configuration_clone
         if clone and (current / 'homework_grading').is_dir():
             _copy_homework_version_workspace(str(current / 'homework_grading'),
                                              str(destination / 'homework_grading'))
+            from .artifact_transaction import recover_transaction
+            recover_transaction(destination / 'homework_grading')
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         manifest = {**(old if clone else {}), **snapshot, 'run_id': run_id,
                     'source_page_count': source_page_count,
                     'username': workspace, 'selected_files': [filename], 'mode': 'single',
+                    'scene_name': str(data.get('scene_name') or data.get('sceneName') or '').strip(),
+                    'sub_scene_name': str(data.get('sub_scene_name') or data.get('subSceneName') or '').strip(),
+                    'analysis_id': analysis_id,
                     'subject': runtime.context['subject_code'],
                     'subject_label': runtime.context['subject_name'],
                     'feedback_context': runtime.context, 'status': 'prepared',
+                    'checkpoint_resume': bool(clone and (old.get('status') in RECOVERABLE
+                                                or (rerun_plan or {}).get('resume'))),
                     'failure_stage': '', 'error': '', 'processing_stage': 'startup',
-                    'created_at': now, 'updated_at': now}
+                    'created_at': now, 'updated_at': now, 'task_id': task_id, 'target_stage': target,
+                    'completion': {'status': 'running', 'target_stage': target, 'report_usable': False,
+                                   'issues': [], 'message': '批改任务正在执行。'}}
         atomic_json(destination / 'manifest.json', manifest)
         rerun_meta = {}
         if rerun_plan is not None:
@@ -147,7 +186,8 @@ def start_grading_request(workspace, filename, data, *, resolution=None, rerun=F
                                                  runtime, rerun_plan, data)
         previous_index = CIIndexManager.find_by_id(workspace, analysis_id)
         new_index = {'analysis_id': analysis_id, 'mode': 'single', 'analysis_type': 'homework_grading',
-                     'files': [filename], 'status': 'running', 'run_id': run_id,
+                     'files': [filename], 'source_document_sha256': digest,
+                     'status': 'running', 'run_id': run_id, 'task_id': task_id,
                      'homework_subject': runtime.context['subject_code'], 'created_at': now, 'updated_at': now}
 
         def worker():

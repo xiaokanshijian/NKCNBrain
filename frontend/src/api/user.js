@@ -1,3 +1,4 @@
+import { loginSession } from '@/api/authSession'
 import request from '@/utils/request'
 
 export function getList() {
@@ -16,11 +17,7 @@ export function addUser(username, password, level, coacher) {
 }
 
 export function verifyUser(username, password, choose) {
-    return request({
-        url: '/api/verify_user',
-        method: 'get',
-        params: { username, password, choose }
-    })
+  return loginSession(username, password, choose)
 }
 
 export function ban_user(formData) {

@@ -33,6 +33,8 @@
 <script>
 import Main from '@/views/mainPage.vue';
 import { user_exit } from '@/api/user';
+import { logoutSession } from '@/api/authSession';
+import { logoutBeforeNavigation } from '@/utils/authNavigation';
 
 export default {
   name: 'App',
@@ -65,7 +67,14 @@ export default {
   },
   methods: {
     // 导航守卫：路由切换前
-    beforeRouteChange(to, from, next) {
+    async beforeRouteChange(to, from, next) {
+      try {
+        await logoutBeforeNavigation(to, from, logoutSession, localStorage);
+      } catch (error) {
+        this.$message.error('退出登录失败，请重试');
+        next(false);
+        return;
+      }
       // 获取目标路由的路径
       const toPath = to.path;
       // 判断目标路由是否为指定路由

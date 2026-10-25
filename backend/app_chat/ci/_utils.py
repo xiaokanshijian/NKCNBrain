@@ -44,7 +44,8 @@ def _read_text_if_exists(path: str, default: str = '') -> str:
 def _update_task(task_id: str, *, current_item: Optional[int] = None, total_items: Optional[int] = None,
                  current_section: Optional[str] = None, completed: Optional[bool] = None,
                  error: Optional[str] = None, failure_stage: Optional[str] = None,
-                 content_validation: Optional[dict] = None, warnings: Optional[list] = None) -> None:
+                 content_validation: Optional[dict] = None, warnings: Optional[list] = None,
+                 completion: Optional[dict] = None) -> None:
     if task_id not in global_var.tasks:
         global_var.tasks[task_id] = {}
     task = global_var.tasks[task_id]
@@ -60,7 +61,7 @@ def _update_task(task_id: str, *, current_item: Optional[int] = None, total_item
     if error is not None:
         task['error'] = error
     for key, value in {'failure_stage': failure_stage, 'content_validation': content_validation,
-                       'warnings': warnings}.items():
+                       'warnings': warnings, 'completion': completion}.items():
         if value is not None:
             task[key] = value
     if task.get('_ci_persistent'):
@@ -69,7 +70,8 @@ def _update_task(task_id: str, *, current_item: Optional[int] = None, total_item
             'current_item': current_item, 'total_items': total_items,
             'current_section': current_section, 'completed': completed,
             'error': error, 'failure_stage': failure_stage,
-            'content_validation': content_validation, 'warnings': warnings}.items() if value is not None}
+            'content_validation': content_validation, 'warnings': warnings,
+            'completion': completion}.items() if value is not None}
         task.update(update_task(task_id, changes))
 
 

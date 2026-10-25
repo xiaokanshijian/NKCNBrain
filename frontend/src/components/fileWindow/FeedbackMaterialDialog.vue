@@ -2,7 +2,8 @@
   <el-dialog :model-value="visible" title="批改材料设置" width="520px" class="feedback-material-dialog"
     :close-on-click-modal="false" @update:model-value="$emit('close')">
     <p class="material-file">{{ filename }}</p>
-    <el-alert v-if="error" :title="error" type="error" :closable="false" />
+    <el-alert v-if="error" :title="error" type="error" :closable="true" @close="error = ''" />
+    <el-alert v-if="loadHint" :title="loadHint" type="warning" :closable="true" @close="loadHint = ''" />
     <el-form label-width="80px" :disabled="loading || submitting">
       <el-form-item label="学段">
         <el-select v-model="form.education_level" @change="preview">
@@ -31,12 +32,12 @@
         </el-select>
       </el-form-item>
       <el-collapse>
-        <el-collapse-item title="学期、教材与参考文字（可选）" name="optional">
+        <el-collapse-item title="学期、教材与附加信息（可选）" name="optional">
           <el-form-item label="学期"><el-input v-model="form.term" @change="preview" /></el-form-item>
           <el-form-item label="教材"><el-input v-model="form.textbook" @change="preview" /></el-form-item>
           <el-form-item label="学制"><el-input v-model="form.school_system" placeholder="可保持未知" @change="preview" /></el-form-item>
-          <el-form-item label="参考文字"><el-input v-model="referenceText" type="textarea" :rows="3" /></el-form-item>
-          <p class="material-note">此处填写的文字会用于本次批改；勾选的其他文档和卡片暂不读取。</p>
+          <el-form-item label="附加信息"><el-input v-model="referenceText" type="textarea" :rows="4" placeholder="可填写教材单元、教学进度、笔记用途或当前关注点" /></el-form-item>
+          <p class="material-note">保存后用于下一次新批改或显式“采用当前规则”的完整重跑；查看旧结果不会自动重算。</p>
         </el-collapse-item>
       </el-collapse>
     </el-form>
@@ -45,7 +46,7 @@
     <p class="material-note">未注明的信息可以保持未知。启动后以服务器返回的材料信息为准。</p>
     <template #footer>
       <el-button :disabled="submitting" @click="$emit('close')">取消</el-button>
-      <el-button type="primary" :loading="loading || submitting" :disabled="!!error" @click="submit">保存设置</el-button>
+      <el-button type="primary" :loading="loading || submitting" :disabled="submitting" @click="submit">保存设置</el-button>
     </template>
   </el-dialog>
 </template>
@@ -59,7 +60,7 @@ export default {
   emits: ['close', 'submit'],
   data() {
     return {
-      form: {}, candidate: null, warnings: [], error: '', loading: false, eligible: false,
+      form: {}, candidate: null, warnings: [], error: '', loadHint: '', loading: false, eligible: false,
       requestSequence: 0, curriculumSelection: 'auto', referenceText: '',
       levels: { primary: '小学', junior: '初中', senior: '高中', vocational: '职业教育', university: '大学', postgraduate: '研究生', adult: '成人教育', other: '其他' },
     }
@@ -78,13 +79,18 @@ export default {
         .map(key => [key, this.form[key] || null]))
     },
     async initialize() {
-      this.form = {}; this.candidate = null; this.error = ''; this.warnings = []
+      this.form = {}; this.candidate = null; this.error = ''; this.loadHint = ''; this.warnings = []
       this.curriculumSelection = 'auto'; this.referenceText = ''
       let saved
       try {
         saved = await feedbackMaterialSettings({ username: this.username, files: [this.filename] })
         if (saved.error_num !== 0) throw new Error(saved.msg)
-      } catch (error) { this.error = error.message; return }
+      } catch (error) {
+        // 旧设置读失败不挡重新填写；允许直接保存
+        this.loadHint = (error.message || '旧材料设置不可用') + '。请重新填写后点「保存设置」。'
+        this.form = { education_level: '', grade: '', subject: '', material_type: '', term: '', textbook: '', school_system: '' }
+        return
+      }
       const response = saved
       this.candidate = response.feedback_context; this.warnings = response.warnings || []
       this.curriculumSelection = saved.material?.curriculum_selection === null ? 'none' : 'auto'
@@ -115,10 +121,14 @@ export default {
       } finally { if (sequence === this.requestSequence) this.loading = false }
     },
     async submit() {
+      // 预览失败时仍允许按表单直接保存，避免旧设置冲突把保存卡死
       const response = await this.preview()
-      if (!response) return
+      this.error = ''
       this.$emit('submit', { feedback_overrides: this.overrides(),
         curriculum_selection: this.curriculumSelection === 'none' ? null : 'auto', reference_text: this.referenceText })
+      if (!response) {
+        this.loadHint = '预览未成功，已按当前填写内容提交保存。'
+      }
     },
   },
 }

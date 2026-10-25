@@ -1,3 +1,6 @@
+import copy
+import nkcn_public_config as _public_config
+from pathlib import Path
 import json
 import os
 from dotenv import load_dotenv
@@ -6,46 +9,10 @@ from typing import Dict, List
 from app_chat.config.model_config import ModelConfig
 
 
-_SECRET_KEY_FIELDS = {
-    "openai_api_key",
-    "anthropic_api_key",
-    "huggingfacehub_api_token",
-    "api_key",
-}
-
-
-def _looks_like_persisted_secret(value: str) -> bool:
-    if not isinstance(value, str):
-        return False
-    value = value.strip()
-    if not value or value.startswith("env:"):
-        return False
-    return value.startswith(("sk-", "nvapi-")) or len(value) >= 24
-
-
-def _redact_secrets_for_disk(config):
-    """Never write raw API keys back to model JSON files."""
-    if isinstance(config, dict):
-        redacted = {}
-        for key, value in config.items():
-            if key in _SECRET_KEY_FIELDS and _looks_like_persisted_secret(str(value)):
-                redacted[key] = (
-                    "env:ANTHROPIC_API_KEY"
-                    if key == "anthropic_api_key"
-                    else "env:NKCN_LLM_API_KEY"
-                )
-            else:
-                redacted[key] = _redact_secrets_for_disk(value)
-        return redacted
-    if isinstance(config, list):
-        return [_redact_secrets_for_disk(item) for item in config]
-    return config
-
-
 class ConfigManager:
     def __init__(self, config_dir: str, env_file_path: str = ".env"):
         self.config_dir = config_dir
-        self.env_file_path = env_file_path
+        self.env_file_path = str(Path(__file__).resolve().parents[2] / ".env")
         self.configs = {}
 
         # 加载 .env 文件中的环境变量
@@ -82,20 +49,14 @@ class ConfigManager:
         return matched_files
 
     def _load_env_variables(self) -> None:
-        """Load .env files if present. Missing files are not fatal."""
-        candidates = [
-            self.env_file_path,
-            os.path.join(os.getcwd(), ".env"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".env"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".env"),
-        ]
-        loaded = False
-        for path in candidates:
-            if path and os.path.exists(path):
-                load_dotenv(path, override=False)
-                loaded = True
-        if not loaded:
-            print("[WARNING] 未找到 .env，模型 API Key 需通过环境变量注入。")
+        """
+        加载 .env 文件中的环境变量。
+        """
+        if not os.path.exists(self.env_file_path):
+            return  # Environment injection is also supported.
+
+        # 使用 python-dotenv 加载环境变量
+        load_dotenv(self.env_file_path)
 
     def load_all_configs(self) -> None:
         """
@@ -139,10 +100,11 @@ class ConfigManager:
                 # 如果值是字典，递归解析
                 self._resolve_env_variables(value)
             elif isinstance(value, str) and value.startswith("env:"):
-                env_var_name = value[4:]
-                env_var_value = os.getenv(env_var_name, "")
-                if not env_var_value:
-                    print(f"[WARNING] 环境变量 '{env_var_name}' 未设置。")
+                # 如果值以 "env:" 开头，提取环境变量名称
+                env_var_name = value[4:]  # 去掉 "env:" 前缀
+                env_var_value = os.getenv(env_var_name)
+                if env_var_value is None:
+                    raise ValueError(f"环境变量 '{env_var_name}' 未设置。")
                 config[key] = env_var_value
                 
 
@@ -151,7 +113,8 @@ class ConfigManager:
         根据输入的字典构建 ModelConfig，并输出到新的 JSON 文件。
         自动配置输出路径为 config_dir/model_name.json。
         """
-        print("[DEBUG] 添加新模型配置：", config_data)
+        _public_config.validate_public_config(config_data)
+        print("[DEBUG] 添加新模型配置：", _public_config.redact(config_data))
         
         if "abbr_name" not in config_data:
             raise ValueError("配置数据中缺少 'abbr_name' 字段。")
@@ -165,15 +128,18 @@ class ConfigManager:
         print(f"[DEBUG] 输出路径: {output_path}")
 
         # 创建 ModelConfig 对象，加入当前model_config
-        model_config = ModelConfig(config_data)
+        runtime_config = copy.deepcopy(config_data)
+        self._resolve_env_variables(runtime_config)
+        model_config = ModelConfig(runtime_config)
         self.configs[model_name] = model_config
         
         # 打印输出的配置数据：正在将config_data保存到 output_path
         print(f"[DEBUG] 正在将{model_name}配置数据保存到 {output_path}")
         
 
+        # 将配置数据保存为 JSON 文件
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(_redact_secrets_for_disk(config_data), f, ensure_ascii=False, indent=4)
+            json.dump(config_data, f, ensure_ascii=False, indent=4)
 
         print(f"配置已保存到文件: {output_path}")
 
@@ -354,7 +320,8 @@ class ConfigManager:
         Raises:
             ValueError: 如果模型ID不存在或配置数据不完整
         """
-        print("[DEBUG] 更新模型配置：", config_data)
+        _public_config.validate_public_config(config_data)
+        print("[DEBUG] 更新模型配置：", _public_config.redact(config_data))
 
         # 检查必要字段
         if "model_id" not in config_data:
@@ -431,12 +398,15 @@ class ConfigManager:
                     print(f"[WARNING] 删除文件 {file_path} 时出错: {e}")
 
         # 更新配置对象
-        self.configs[new_model_name] = ModelConfig(updated_config)
+        _public_config.validate_public_config(updated_config)
+        runtime_config = copy.deepcopy(updated_config)
+        self._resolve_env_variables(runtime_config)
+        self.configs[new_model_name] = ModelConfig(runtime_config)
 
         # 保存更新后的配置到文件
         output_path = os.path.join(self.config_dir, f"{new_model_name}.json")
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(_redact_secrets_for_disk(updated_config), f, ensure_ascii=False, indent=4)
+            json.dump(updated_config, f, ensure_ascii=False, indent=4)
 
         print(f"[DEBUG] 配置已更新并保存到: {output_path}")
 
@@ -449,7 +419,7 @@ class ConfigManager:
                 print(f"[WARNING] 删除旧配置文件时出错: {e}")
 
 
-config_dir = os.path.join("app_chat", "config", "model_config")
+config_dir = str(Path(__file__).resolve().parent / "model_config")
 config_manager = ConfigManager(config_dir=config_dir)
 # config_manager = ConfigManager(config_dir="app_chat\\config\\model_config")
 config_manager.load_all_configs()

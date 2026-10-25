@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """跨本子任务簇：智能发现关联本子并注入参考文档（问答 RAG 扩展）。"""
 from __future__ import annotations
+import nkcn_public_config as _public_config
 
 import json
 import os
@@ -486,8 +487,8 @@ def _rank_via_relay(question: str, candidates: List[NotebookCandidate], real_nam
 
         model_id = GLOBAL_STATE.user_little_model_id.get(real_name, '3003')
         server_url = (
-            'http://192.0.2.1:8000' if str(model_id) == '3007'
-            else 'http://192.0.2.1:8000'
+            _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000') if str(model_id) == '3007'
+            else _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
         )
 
         lines = []
@@ -554,7 +555,7 @@ def _rank_via_deepseek(question: str, candidates: List[NotebookCandidate]) -> Li
             f"用户问题：{question[:500]}\n\n候选本子：\n" + '\n'.join(lines)
             + '\n选出最相关的2或3个编号，只输出JSON：{"indices":[1,2,3]}'
         )
-        ds_key = os.environ.get('DEEPSEEK_API_KEY') or os.environ.get("DEEPSEEK_API_KEY", "")
+        ds_key = os.environ.get('DEEPSEEK_API_KEY') or _public_config.secret('DEEPSEEK_API_KEY')
         client = OpenAI(api_key=ds_key, base_url='https://api.deepseek.com', timeout=20.0)
         resp = client.chat.completions.create(
             model='deepseek-v4-flash',

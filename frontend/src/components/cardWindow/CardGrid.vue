@@ -416,6 +416,7 @@
           :isRelatedToSelected="isCardRelatedToSelected(card)" :selectedDocs="card.selected_docs" :selectedCardId="selectedCardId"
           :cardTidying="(cardTidying && choosedCardIdList.includes(card.cid)) || (cardSingleMaking && choosedCardIdList.includes(card.cid)) || updatingPermanentCards.has(card.cid)" :cardList="cardList"
           :cardImageGeneratingCids="cardImageGeneratingCids"
+          :cardHtmlGeneratingCids="cardHtmlGeneratingCids"
           :hasCardImage="cardHasImageCids.includes(card.cid)"
           :fileNameList="fileNameList"
           :leftSelectList="leftSelectList"
@@ -572,7 +573,7 @@ import AnswerParser from '@/components/chatWindow/AnswerParser.vue';
 
 import { ElForm, ElFormItem, ElInput, ElButton, ElDialog, ElSelect, ElOption, ElMessageBox, ElProgress } from 'element-plus'
 
-import { get_cards, get_filtered_cards, get_card, semantic_reorganize_start, semantic_reorganize_status, semantic_reorganize_rollback, card_generate_four_color_images, card_get_image_generating_status } from "@/api/card/get_card"
+import { get_cards, get_filtered_cards, get_card, semantic_reorganize_start, semantic_reorganize_status, semantic_reorganize_rollback, card_generate_four_color_images, card_get_image_generating_status, card_get_html_generating_status } from "@/api/card/get_card"
 import { card_evalSFT } from "@/api/card/send_card"
 import { mergeCardBackend, cardUserDefine, react, cardTidyUpById, cardUpdPostIndex } from "@/api/card_zym/card_js"
 import { getDateTime, modelHL } from "@/api/getData";
@@ -705,6 +706,8 @@ export default {
       semanticReorganizeResultVisible: false,
       cardImageGeneratingCids: [], // 正在生图的卡片 cid 列表
       cardImagePollTimer: null, // 生图状态轮询定时器
+      cardHtmlGeneratingCids: [],
+      cardHtmlPollTimer: null,
       cardHasImageCids: [], // 已有附图的卡片 cid（左上角图标高亮）
       updatingPermanentCards: new Set(), // 🔥 正在更新的永久卡片CID集合
       isGeneratingArticle: false, // 🔥 是否正在生成输出文章
@@ -3652,22 +3655,54 @@ export default {
       if (!this.cardHasImageCids.includes(cid)) this.cardHasImageCids = [...this.cardHasImageCids, cid];
     },
 
+    _normCardCid(cid) {
+      const n = Number(cid);
+      return Number.isFinite(n) ? n : null;
+    },
     // 单张卡片点击「卡片生图」后，将 cid 加入生图列表并启动轮询
     onSingleCardImageRequested(cid) {
-      if (this.cardImageGeneratingCids.includes(cid)) return;
-      this.cardImageGeneratingCids = [...this.cardImageGeneratingCids, cid];
+      const id = this._normCardCid(cid);
+      if (id == null) return;
+      if (!this._imageGenSeenServer) this._imageGenSeenServer = new Set();
+      this._imageGenSeenServer.delete(id);
+      // 统一成 number，避免与后端 generating_cids(int) / Card.cid 比较失败
+      this.cardImageGeneratingCids = [
+        ...new Set([
+          ...this.cardImageGeneratingCids.map((c) => this._normCardCid(c)).filter((c) => c != null),
+          id,
+        ]),
+      ];
+      // 迭代重出图时可能已有图：先摘掉「已有图」标记，左上角改回生成中
+      this.cardHasImageCids = this.cardHasImageCids
+        .map((c) => this._normCardCid(c))
+        .filter((c) => c != null && c !== id);
       const username = localStorage.getItem('userId');
       if (!username) return;
+      let emptyPolls = 0;
       const poll = () => {
         card_get_image_generating_status({ username }).then(r => {
           const d = r.data || r;
           if (d.error_num === 0) {
-            const nextCids = d.generating_cids || [];
+            const nextCids = (d.generating_cids || [])
+              .map((c) => this._normCardCid(c))
+              .filter((c) => c != null);
             const prevSet = new Set(this.cardImageGeneratingCids);
             const nextSet = new Set(nextCids);
-            const finished = [...prevSet].filter(c => !nextSet.has(c));
-            this.cardImageGeneratingCids = nextCids;
-            if (finished.length) this.cardHasImageCids = [...new Set([...this.cardHasImageCids, ...finished])];
+            nextCids.forEach((c) => this._imageGenSeenServer.add(c));
+            if (nextCids.length) emptyPolls = 0;
+            else emptyPolls += 1;
+            // 服务端队列 ∪ 尚未在服务端出现过的本地乐观 cid（避免登记前被冲掉）
+            let optimistic = [...prevSet].filter((c) => !nextSet.has(c) && !this._imageGenSeenServer.has(c));
+            // 连续空队列仍只有乐观项：放弃，避免左上角永久转圈
+            if (!nextCids.length && emptyPolls >= 4) optimistic = [];
+            const finished = [...prevSet].filter((c) => !nextSet.has(c) && this._imageGenSeenServer.has(c));
+            this.cardImageGeneratingCids = [...new Set([...nextCids, ...optimistic])];
+            if (finished.length) {
+              this.cardHasImageCids = [...new Set([
+                ...this.cardHasImageCids.map((c) => this._normCardCid(c)).filter((c) => c != null),
+                ...finished,
+              ])];
+            }
           }
           if (this.cardImageGeneratingCids.length > 0) this.cardImagePollTimer = setTimeout(poll, 2000);
           else this.cardImagePollTimer = null;
@@ -3675,7 +3710,54 @@ export default {
           if (this.cardImageGeneratingCids.length > 0) this.cardImagePollTimer = setTimeout(poll, 2000);
         });
       };
-      if (!this.cardImagePollTimer) this.cardImagePollTimer = setTimeout(poll, 2000);
+      if (this.cardImagePollTimer) {
+        clearTimeout(this.cardImagePollTimer);
+        this.cardImagePollTimer = null;
+      }
+      this.cardImagePollTimer = setTimeout(poll, 800);
+    },
+
+    onSingleCardHtmlRequested(cid) {
+      const id = this._normCardCid(cid);
+      if (id == null) return;
+      if (!this._htmlGenSeenServer) this._htmlGenSeenServer = new Set();
+      this._htmlGenSeenServer.delete(id);
+      this.cardHtmlGeneratingCids = [
+        ...new Set([
+          ...this.cardHtmlGeneratingCids.map((c) => this._normCardCid(c)).filter((c) => c != null),
+          id,
+        ]),
+      ];
+      const username = localStorage.getItem('userId');
+      if (!username) return;
+      let emptyPolls = 0;
+      const poll = () => {
+        card_get_html_generating_status({ username }).then(r => {
+          const d = r.data || r;
+          if (d.error_num === 0) {
+            const nextCids = (d.generating_cids || [])
+              .map((c) => this._normCardCid(c))
+              .filter((c) => c != null);
+            const prevSet = new Set(this.cardHtmlGeneratingCids);
+            const nextSet = new Set(nextCids);
+            nextCids.forEach((c) => this._htmlGenSeenServer.add(c));
+            if (nextCids.length) emptyPolls = 0;
+            else emptyPolls += 1;
+            let optimistic = [...prevSet].filter((c) => !nextSet.has(c) && !this._htmlGenSeenServer.has(c));
+            if (!nextCids.length && emptyPolls >= 4) optimistic = [];
+            this.cardHtmlGeneratingCids = [...new Set([...nextCids, ...optimistic])];
+          }
+          if (this.cardHtmlGeneratingCids.length > 0) this.cardHtmlPollTimer = setTimeout(poll, 2000);
+          else this.cardHtmlPollTimer = null;
+        }).catch(() => {
+          if (this.cardHtmlGeneratingCids.length > 0) this.cardHtmlPollTimer = setTimeout(poll, 2000);
+        });
+      };
+      if (this.cardHtmlPollTimer) {
+        clearTimeout(this.cardHtmlPollTimer);
+        this.cardHtmlPollTimer = null;
+      }
+      this.cardHtmlPollTimer = setTimeout(poll, 800);
     },
 
     // 检查是否有卡片操作权限（作者或群组协作用户）

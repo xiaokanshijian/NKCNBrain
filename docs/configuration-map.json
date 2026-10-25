@@ -1,0 +1,174 @@
+{
+  "KIMI_API_KEY": [
+    "backend/app_chat/card_analyzer.py",
+    "backend/app_chat/deepseek_api.py",
+    "backend/app_chat/dsreasoner_api.py",
+    "backend/app_chat/keyword_analyzer.py",
+    "backend/app_chat/kimi_api.py",
+    "backend/app_chat/mutil_agent_dabate.py",
+    "backend/app_chat/mutil_agent_loop.py",
+    "backend/app_chat/views.py",
+    "backend/app_chat/views_old.py",
+    "backend/llm_langchain/chat_kimi_model.py",
+    "backend/zym/React.py"
+  ],
+  "DEEPSEEK_API_KEY": [
+    "backend/app_chat/card_keyword_extract.py",
+    "backend/app_chat/config/model_config/deepseek-v4-flash.json",
+    "backend/app_chat/config/model_config/deepseek-v4-pro.json",
+    "backend/app_chat/cross_notebook_context.py",
+    "backend/app_chat/cross_reorganize_skills.py",
+    "backend/app_chat/deepseek_api.py",
+    "backend/app_chat/doc_structure.py",
+    "backend/app_chat/dsreasoner_api.py",
+    "backend/app_chat/nk2026_final_personal_report_grading.py",
+    "backend/app_chat/question_enhance_small_model.py",
+    "backend/app_chat/semantic_keyword_service.py",
+    "backend/app_chat/semantic_reorganize_pipeline.py",
+    "backend/app_chat/skill_generate.py",
+    "backend/app_chat/views.py",
+    "backend/app_chat/views_card_image.py",
+    "backend/app_chat/views_old.py",
+    "backend/llm_langchain/chat_deepseek_model.py",
+    "backend/llm_langchain/chat_dsreasoner_model.py",
+    "backend/llm_langchain/chat_qwq_model.py",
+    "backend/llm_langchain/parse_input.py"
+  ],
+  "NKCN_LLM_DASHSCOPE_API_KEY": [
+    "backend/app_chat/ci/_llm.py",
+    "backend/app_chat/ci/auto_iteration.py",
+    "backend/app_chat/ci/overlay_layer.py",
+    "backend/app_chat/ci/snippet_recognizer.py",
+    "backend/app_chat/config/model_config/DeepSeekR1.json",
+    "backend/app_chat/config/model_config/Qwq.json",
+    "backend/app_chat/homework_grading/llm_clients.py",
+    "backend/app_chat/qwen_vl_api.py",
+    "backend/app_chat/views.py",
+    "backend/app_chat/views_analyze_cognitive_state.py",
+    "backend/app_chat/views_continuous_image.py",
+    "backend/app_chat/views_old.py",
+    "backend/llm_langchain/chat_dsreasoner_model.py",
+    "backend/llm_langchain/chat_qwq_model.py",
+    "backend/llm_langchain/parse_input.py",
+    "backend/llm_langchain/util.py"
+  ],
+  "NKCN_LLM_DMXAPI_API_KEY": [
+    "backend/app_chat/ci/_llm.py",
+    "backend/app_chat/ci/auto_iteration.py",
+    "backend/app_chat/ci/overlay_layer.py",
+    "backend/app_chat/config/model_config/claude-sonnet-4.5-other.json",
+    "backend/app_chat/config/model_config/gemini-3-pro-preview.json",
+    "backend/app_chat/config/model_config/gemini-3.1-pro-preview.json",
+    "backend/app_chat/config/model_config/kimi-k3-dmx.json",
+    "backend/app_chat/group_twin_gxx.py",
+    "backend/app_chat/homework_grading/llm_clients.py",
+    "backend/app_chat/nk2026_final_personal_report_grading.py",
+    "backend/app_chat/scene_models.py",
+    "backend/app_chat/views_analyze_cognitive_state.py",
+    "backend/app_chat/views_card_image.py",
+    "backend/app_chat/views_continuous_image.py"
+  ],
+  "NKCN_R_LAYER_GEMINI_REPRO_API_KEY": [
+    "backend/app_chat/ci/r_layer.py",
+    "backend/app_chat/views_card_image.py"
+  ],
+  "OPENAI_API_KEY": [
+    "backend/app_chat/ci/snippet_recognizer.py",
+    "backend/app_chat/claude_api.py",
+    "backend/app_chat/config/model_config/GLM-long.json",
+    "backend/app_chat/config/model_config/GLM.json",
+    "backend/app_chat/config/model_config/GPT4o.json",
+    "backend/app_chat/config/model_config/GPT5-Codex.json",
+    "backend/app_chat/config/model_config/GPT5.json",
+    "backend/app_chat/config/model_config/GPT5CodexLow.json",
+    "backend/app_chat/config/model_config/GPT5CodexMedium.json",
+    "backend/app_chat/config/model_config/Gemini.json",
+    "backend/app_chat/config/model_config/Grok-r.json",
+    "backend/app_chat/config/model_config/Grok.json",
+    "backend/app_chat/config/model_config/claude-4-sonnet.json",
+    "backend/app_chat/config/model_config/claude-4.json",
+    "backend/app_chat/config/model_config/claude-opus-4.6-thinking.json",
+    "backend/app_chat/config/model_config/claude-opus-4.6.json",
+    "backend/app_chat/config/model_config/claude-opus-4.7.json",
+    "backend/app_chat/config/model_config/claude-opus-4.8.json",
+    "backend/app_chat/config/model_config/claude-opus-5.5.json",
+    "backend/app_chat/config/model_config/claude-sonnet-4.5.json",
+    "backend/app_chat/config/model_config/claude-sonnet-4.6-thinking.json",
+    "backend/app_chat/config/model_config/claude-sonnet-4.6.json",
+    "backend/app_chat/config/model_config/claude-sonnet-5.json",
+    "backend/app_chat/config/model_config/gpt-5.4.json",
+    "backend/app_chat/config/model_config/grok-4.json",
+    "backend/app_chat/cross_reorganize_skills.py",
+    "backend/app_chat/gemini_api.py",
+    "backend/app_chat/gpt4_api.py",
+    "backend/app_chat/nk2026_final_personal_report_grading.py",
+    "backend/app_chat/notebook_memory.py",
+    "backend/app_chat/scene_models.py",
+    "backend/app_chat/views.py",
+    "backend/app_chat/views_card_image.py",
+    "backend/app_chat/views_old.py",
+    "backend/llm_langchain/chat_claude_model.py",
+    "backend/llm_langchain/chat_gemini_model.py",
+    "backend/llm_langchain/chat_gpt_model.py",
+    "backend/llm_langchain/parse_input.py"
+  ],
+  "NKCN_CLAUDE_API_API_KEY": [
+    "backend/app_chat/claude_api.py",
+    "backend/llm_langchain/all_test/open_ai_model.py"
+  ],
+  "NKCN_BAICHUAN_M2_OPENAI_API_KEY": [
+    "backend/app_chat/config/model_config/Baichuan-M2.json"
+  ],
+  "NKCN_DEEPSEEKR1_TENCENT_OPENAI_API_KEY": [
+    "backend/app_chat/config/model_config/DeepSeekR1-Tencent.json"
+  ],
+  "NKCN_CLAUDE_3_5_NATIVET_ANTHROPIC_API_KEY": [
+    "backend/app_chat/config/model_config/claude-3.5-nativeT.json"
+  ],
+  "NKCN_DOUBAO_SEED_2_0_PRO_OPENAI_API_KEY": [
+    "backend/app_chat/config/model_config/doubao-seed-2.0-pro.json"
+  ],
+  "NKCN_KIMI_K3_OPENAI_API_KEY": [
+    "backend/app_chat/config/model_config/kimi-k3.json"
+  ],
+  "NKCN_GPT4_API_API_KEY": [
+    "backend/app_chat/gpt4_api.py"
+  ],
+  "NVIDIA_API_KEY": [
+    "backend/app_chat/llama_api.py",
+    "backend/app_chat/views.py",
+    "backend/app_chat/views_old.py",
+    "backend/llm_langchain/chat_llama3_model.py"
+  ],
+  "XFYUN_APP_ID": [
+    "backend/app_chat/tts.py"
+  ],
+  "XFYUN_API_SECRET": [
+    "backend/app_chat/tts.py"
+  ],
+  "XFYUN_API_KEY": [
+    "backend/app_chat/tts.py"
+  ],
+  "NKCN_VIEWS_CARD_IMAGE_API_KEY": [
+    "backend/app_chat/views_card_image.py"
+  ],
+  "VOLCANO_TTS_ACCESS_TOKEN": [
+    "backend/app_chat/volcanotts.py"
+  ],
+  "DJANGO_SECRET_KEY": [
+    "backend/djangoProject/settings.py"
+  ],
+  "DJANGO_DB_PASSWORD": [
+    "backend/djangoProject/settings.py"
+  ],
+  "NKCN_HUGGFACE_GET_MODEL_API_KEY": [
+    "backend/llm_langchain/all_test/Huggface_get_model.py",
+    "backend/llm_langchain/all_test/open_ai_model.py"
+  ],
+  "NKCN_CHAT_MIXTRAL_MODEL_API_KEY": [
+    "backend/llm_langchain/chat_mixtral_model.py"
+  ],
+  "VOLCANO_TTS_APP_ID": [
+    "backend/app_chat/volcanotts.py"
+  ]
+}

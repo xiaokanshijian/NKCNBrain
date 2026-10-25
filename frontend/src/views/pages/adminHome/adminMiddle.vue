@@ -19,7 +19,7 @@
     <div class="section model-1">
       <h1 class="section-title">基座模型</h1>
       <div v-if="changeFineTuneModel" class="image-container">
-        <img src="@/assets/testResult/1.png" alt="Model 1 Assessment">
+        <img src="@/assets/public-example.svg" alt="Model 1 Assessment">
       </div>
     </div>
 
@@ -27,7 +27,7 @@
     <div class="section model-2">
       <h1 class="section-title">微调模型</h1>
       <div v-if="changeFineTuneModel" class="image-container">
-        <img src="@/assets/testResult/2.png" alt="Model 2 Assessment">
+        <img src="@/assets/public-example.svg" alt="Model 2 Assessment">
       </div>
     </div>
   </div>

@@ -1,6 +1,6 @@
+import nkcn_public_config as _public_config
 import base64
 import math
-import os
 import re
 import time
 import unicodedata
@@ -13,10 +13,10 @@ from typing import Any, Dict, List, Tuple
 from openai import OpenAI
 
 # D 版面自动迭代识字（Gemini）：固定 cloudapi + gemini-3.1-flash-image-preview
-_GEMINI_BASE_URL = 'https://chat.cloudapi.vip/v1/'
-_GEMINI_API_KEY = os.environ.get("NKCN_LLM_API_KEY", "")
+_GEMINI_BASE_URL = _public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/')
+_GEMINI_API_KEY = _public_config.secret('OPENAI_API_KEY')
 
-_QWEN_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
+_QWEN_API_KEY = _public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY')
 _QWEN_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
 
 # 上下文截断长度（字符）

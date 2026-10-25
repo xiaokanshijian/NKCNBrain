@@ -1,5 +1,6 @@
 """面向中小学作业批改质量的“证据 × 教学”红蓝卡标。"""
 from __future__ import annotations
+from .stage_dependencies import artifact_compatible
 
 import datetime as dt
 from .feedback_runtime import stamp_feedback
@@ -90,6 +91,11 @@ def load_red_blue_review(paths: Dict[str, str]) -> Dict[str, Any]:
         return {'status': 'missing', 'schema_version': SCHEMA_VERSION}
     try:
         value = safe_json_load(path)
+        if isinstance(value, dict) and value.get('delivery_basis'):
+            from .delivery_basis import delivery_basis
+            basis = value['delivery_basis']
+            if basis.get('files') != delivery_basis(paths, {})['files']:
+                return {'status': 'failed', 'schema_version': SCHEMA_VERSION, 'error': '评分依据已变化，请重新评分'}
         return value if isinstance(value, dict) else {'status': 'failed', 'schema_version': SCHEMA_VERSION}
     except Exception:
         return {'status': 'failed', 'schema_version': SCHEMA_VERSION, 'error': '卡标文件不可读'}
@@ -233,6 +239,8 @@ def _slim_audit(value: Dict[str, Any]) -> Dict[str, Any]:
     result = {
         key: value.get(key)
         for key in (
+            'status',
+            'error',
             'total_discrepancies',
             'corrections_applied',
             'corrections_applied_count',
@@ -266,7 +274,7 @@ def build_review_evidence(paths: Dict[str, str], manifest: Dict[str, Any], *, fe
     if feedback_runtime is not None:
         from .utils import sorted_json_pages, safe_json_load
         for value in [report, ontology] + [safe_json_load(p) for p in sorted_json_pages(paths['pass1_json'])]:
-            if value.get('feedback_execution', {}).get('config_fingerprint') != feedback_runtime.fingerprint:
+            if not artifact_compatible(value, feedback_runtime):
                 raise ValueError('质量检查输入配置不一致')
     verification = _load_optional(os.path.join(paths['pass2_report'], f'{subject}_{sample_id}_verification.json'))
     answer_verification = _load_optional(
@@ -315,6 +323,10 @@ def build_review_evidence(paths: Dict[str, str], manifest: Dict[str, Any], *, fe
     ontology_zones = ontology.get('zones') if isinstance(ontology.get('zones'), dict) else {}
     return stamp_feedback({
         'evaluation_target': 'AI批改结果质量，不是学生成绩',
+        'notebook_skill_context': [
+            {key: member.get(key) for key in ('name', 'source', 'text_hash', 'sections')}
+            for member in ((feedback_runtime.dependencies['references'].get('notebook_skills') or {}).get('members', [])
+                           if feedback_runtime is not None else [])],
         'sample_meta': {
             'subject': subject,
             'subject_label': manifest.get('subject_label') or '',
@@ -581,6 +593,8 @@ def evaluate_homework_red_blue(paths: Dict[str, str], manifest: Dict[str, Any], 
             'session_ids': list(iteration_context.get('session_ids') or []),
             'feedback_policy': dict(iteration_context.get('feedback_policy') or {}),
         }
+    from .delivery_basis import delivery_basis
+    review['delivery_basis'] = delivery_basis(paths, manifest)
     safe_json_dump(review_path(paths), stamp_feedback(review, feedback_runtime, 'quality'))
     return review
 

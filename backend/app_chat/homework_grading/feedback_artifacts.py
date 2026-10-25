@@ -16,6 +16,12 @@ def _read_object(path):
 
 
 def validate_artifacts(paths, pages, manifest, target, *, expected_pages=None):
+    # 批改配置卡：只布置部分页时，不得要求未布置页也有 Pass1 产物
+    gc = manifest.get('grading_config') if isinstance(manifest, dict) else None
+    if isinstance(gc, dict) and gc.get('assigned_pages'):
+        assigned = {int(p) for p in gc['assigned_pages']}
+        pages = [page for page in pages if int(page['page']) in assigned]
+        expected_pages = None
     numbers = [page['page'] for page in pages]
     if not numbers or len(set(numbers)) != len(numbers):
         raise ValueError('批改页面缺失或重复')
@@ -40,6 +46,8 @@ def validate_artifacts(paths, pages, manifest, target, *, expected_pages=None):
         if not items:
             warnings.append(f'第{page["page"]}页未识别到题目，请核对原页是否为空白或非题目内容')
     if target == 'grading':
+        from .completion import final_material_evidence
+        manifest['material_evidence'] = final_material_evidence(paths)
         if questions == 0:
             raise ValueError('整份材料未识别到题目，不能生成空批改成功；请核对原页')
         subject = manifest.get('subject') or 'unknown'
@@ -55,6 +63,10 @@ def validate_artifacts(paths, pages, manifest, target, *, expected_pages=None):
 
 def mark_stage(paths, manifest, stage):
     from app_chat.ci.file_io import atomic_json
+    from .execution_control import current_execution
+    execution = current_execution()
+    if execution is not None:
+        execution.mark(stage)
     manifest['processing_stage'] = stage
     atomic_json(paths['manifest'], manifest)
 

@@ -1,5 +1,5 @@
+import nkcn_public_config as _public_config
 import json
-import os
 import asyncio
 from langchain.chains.llm import LLMChain
 from langchain_community.chat_models import ChatOpenAI
@@ -104,8 +104,8 @@ AI_User_end_messages = [
 ]
 
 
-# OPEN_AI_KEY = os.environ.get("OPENAI_API_KEY", "")  # GPT
-OPEN_AI_KEY = os.environ.get("KIMI_API_KEY", "")  # kimi
+# OPEN_AI_KEY = "[redacted]"  # GPT
+OPEN_AI_KEY = _public_config.secret('KIMI_API_KEY')  # kimi
 base_url = "https://api.moonshot.cn/v1"
 
 

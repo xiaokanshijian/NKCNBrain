@@ -1,7 +1,10 @@
 from threading import RLock
 
 from django.shortcuts import render, HttpResponse, redirect
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
+from django.views.decorators.cache import never_cache
+from django.utils.crypto import constant_time_compare
+from app1.session_auth import clear_user_session, establish_user_session
 
 from app_chat.views import global_lock
 # from app_chat.global_state import GLOBAL_STATE
@@ -84,14 +87,20 @@ def show_users(request):
     return JsonResponse(response)
 
 
-@require_http_methods(["GET"])
+@never_cache
+@require_http_methods(["POST"])
+@csrf_protect
 def verify_user(request):
     response = {}
-    print('nihao')
+    # A failed login/account switch must not retain an earlier signed-in identity.
+    clear_user_session(request)
     try:
-        username = request.GET.get('username')
-        password = request.GET.get('password')
-        choose = request.GET.get('choose')
+        data = json.loads(request.body) if request.content_type == 'application/json' else request.POST
+        username = data.get('username')
+        password = data.get('password')
+        choose = data.get('choose')
+        if not isinstance(username, str) or not username or not isinstance(password, str) or not password:
+            return JsonResponse({'msg': 'Invalid password', 'error_num': 0, 'name': '0'})
 
         # 在这里添加用户验证逻辑，例如检查数据库中是否存在该用户，并验证密码
         # 这里假设有一个名为 User 的模型来表示用户
@@ -105,7 +114,7 @@ def verify_user(request):
         if not matching_user:
             raise User.DoesNotExist
 
-        if (user.password == password) and (user.allowed == 1):
+        if constant_time_compare(user.password, password) and (user.allowed == 1):
             # 登录成功
             # parse_input.load_user(username)
             # global_lock[username] = RLock()
@@ -203,6 +212,7 @@ def verify_user(request):
                         usparams=params
                     )
 
+            establish_user_session(request, user)
             response['msg'] = 'success'
             response['error_num'] = 0
             response['name'] = username

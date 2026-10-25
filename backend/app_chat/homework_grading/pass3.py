@@ -151,6 +151,18 @@ def _validate(result: Dict[str, Any], memory_a: Optional[Dict[str, Any]] = None,
     for key in ('transfer_links', 'habit_diagnosis', 'priority', 'summary'):
         if key not in result:
             raise ValueError(f'Pass3 返回缺少 {key}')
+    from .model_output import object_list, string_list
+    if not isinstance(result['summary'], str):
+        raise ValueError('summary必须为文字')
+    for key in ('transfer_links', 'habit_diagnosis', 'priority'):
+        for item in object_list(result[key], key):
+            refs = item.get('evidence_question_ids') or {}
+            if not isinstance(refs, dict):
+                raise ValueError('evidence_question_ids必须为分学科对象')
+            for subject, ids in refs.items():
+                string_list(ids, 'evidence_question_ids.' + subject)
+            if key == 'priority' and 'rank' in item and type(item['rank']) is not int:
+                raise ValueError('priority.rank必须为整数')
     if memory_a is None or memory_b is None:
         return
     valid_ids = {subject_a: _collect_valid_qids(memory_a), subject_b: _collect_valid_qids(memory_b)}
@@ -223,35 +235,22 @@ def cross_subject_analyze(student_id: str, subject_a: str, subject_b: str,
     summary_path = os.path.join(out_dir, 'summary.md')
     thinking_path = os.path.join(out_dir, 'cross_subject_report.thinking.txt')
 
-    last_raw = ''
-    last_error: Optional[Exception] = None
-    for attempt in range(2):
-        messages = list(base_messages)
-        if attempt == 1:
-            messages += [
-                {'role': 'assistant', 'content': last_raw},
-                {'role': 'user', 'content': f'上次返回不是合法 JSON（{last_error}），请只输出一个可被 json.loads 解析的 JSON 对象。'},
-            ]
-        response = client.chat.completions.create(messages=messages, **kwargs)
-        message = response.choices[0].message
-        reasoning = getattr(message, 'reasoning_content', None) or ''
-        if reasoning:
-            with open(thinking_path, 'w', encoding='utf-8') as f:
-                f.write(reasoning)
-        last_raw = message.content or ''
-        try:
-            result = _loads_json_with_retry_text(last_raw)
-            _validate(result, memory_a, memory_b, subject_a, subject_b)
-            result.setdefault('student_id', student_id)
-            result.setdefault('subject_pair', [subject_a, subject_b])
-            safe_json_dump(report_path, result)
-            with open(summary_path, 'w', encoding='utf-8') as f:
-                f.write(render_summary_md(result, subject_a, subject_b))
-            return result
-        except (json.JSONDecodeError, ValueError) as exc:
-            last_error = exc
+    from .model_output import request_json_object
 
-    error_path = os.path.join(out_dir, 'cross_subject_report.error.txt')
-    with open(error_path, 'w', encoding='utf-8') as f:
-        f.write(last_raw)
-    raise ValueError(f'Pass3 返回不是合法 JSON，原始返回已保存到 {error_path}: {last_error}')
+    def validate(result):
+        _validate(result, memory_a, memory_b, subject_a, subject_b)
+        result.setdefault('student_id', student_id)
+        result.setdefault('subject_pair', [subject_a, subject_b])
+        # 渲染所需字段也在接收边界验证，避免落盘后才因类型错误中断。
+        render_summary_md(result, subject_a, subject_b)
+        return result
+
+    result = request_json_object(
+        lambda current: client.chat.completions.create(messages=current, **kwargs), base_messages,
+        parser=_loads_json_with_retry_text, validate=validate,
+        audit_path=os.path.join(out_dir, 'cross_subject_report.responses.json'), stage='双科诊断',
+        thinking_path=thinking_path, error_path=os.path.join(out_dir, 'cross_subject_report.error.txt'))
+    safe_json_dump(report_path, result)
+    with open(summary_path, 'w', encoding='utf-8') as file:
+        file.write(render_summary_md(result, subject_a, subject_b))
+    return result

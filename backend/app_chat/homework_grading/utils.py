@@ -50,10 +50,9 @@ def windows_io_path(path: str) -> str:
 
 
 def safe_json_dump(path: str, data: Dict[str, Any]) -> None:
-    path = windows_io_path(path)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w', encoding='utf-8') as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
+    from app_chat.ci.file_io import atomic_json
+    # 同目录写完、flush/fsync后替换；失败保留旧文件，兼容Windows长路径。
+    atomic_json(windows_io_path(path), data)
 
 
 def safe_json_load(path: str) -> Dict[str, Any]:
@@ -127,27 +126,25 @@ def page_filename(subject: str, sample_id: str, page_num: int) -> str:
 
 
 def parse_page_num(filename: str) -> int:
-    match = re.search(r'_page(\d+)\.(?:png|json)$', filename)
+    # 正式命名为{subject}_{sample}_pageN，同时兼容旧版pageN/page_N命名。
+    match = re.search(r'(?:^|_)page_?(\d+)\.(?:png|json)$', os.path.basename(filename))
     if not match:
         return 0
     return int(match.group(1))
 
 
 def is_final_pass1_page_json(name: str) -> bool:
-    if not name.endswith('.json'):
-        return False
-    if name.endswith('.detect.json') or name.endswith('.grade.json') or name.endswith('.review.json'):
-        return False
-    if '.error' in name or '.thinking' in name:
-        return False
-    return True
+    # 正向识别正式页面，不能将同目录的响应审计、检测、复核等JSON当成页面。
+    # 真正页面即使内容损坏也仍返回，由下游校验明确报错，不能按内容静默跳过。
+    return name.endswith('.json') and parse_page_num(name) > 0
 
 
 def sorted_json_pages(pass1_dir: str) -> List[str]:
     if not os.path.isdir(pass1_dir):
         return []
     return sorted(
-        [os.path.join(pass1_dir, name) for name in os.listdir(pass1_dir) if is_final_pass1_page_json(name)],
+        [os.path.join(pass1_dir, name) for name in os.listdir(windows_io_path(pass1_dir))
+         if is_final_pass1_page_json(name) and os.path.isfile(windows_io_path(os.path.join(pass1_dir, name)))],
         key=lambda path: (parse_page_num(os.path.basename(path)), os.path.basename(path)),
     )
 

@@ -801,6 +801,10 @@ PASS2_SYSTEM_BASE = '''你是一位中小学认知诊断专家，擅长从批改
 
 {curriculum_block}
 
+## 课标导向·反馈微批参考建议（通则）
+
+撰写 diagnosis / zone_classification / per_question_feedback 时一并参考：反馈是素养证据的对话，含判分但不只是判分；把表现看成在哪一档、往哪走，优先用追问问题/变式/小任务/牵引反思引发下一次思考，可以不直接点明；有证据时除知识技能外可点思想方法/活动经验/发现问题中一面。此为评价原则的推导性参考，非「课标原文规定必须这样写批语」。
+
 ## L4 约束（避免幻觉）
 
 - 若 zone_classification 某条结论无法对应到上述任一课标 id，则禁止编造 id，将该条移到 uncertain 数组，comment 写明"课标证据不足，建议人工复核"。
@@ -820,13 +824,13 @@ PASS2_SYSTEM_BASE = '''你是一位中小学认知诊断专家，擅长从批改
 
 1. 综合 error_questions、knowledge_point_frequency、error_type_distribution，识别各知识点所属区域，并引用课标 id 作为证据。
 2. 对 error_questions 中的每道题，结合所在区域给出精准批语（comment）：盲区指出根本概念欠缺并给最基础理解路径；内耗区指出干扰来源并给消除混淆的方法；最近发展区肯定进步并给一个突破点提示。
-3. 输出整体学情诊断（diagnosis），叙述应指向核心素养层面。
+3. 输出整体学情诊断（diagnosis），叙述应指向核心素养层面；枢纽判断与下一步尽量符合上文「反馈微批参考建议」。
 
 ## 输出 schema（严格遵守，输出纯 JSON 对象）
 
 {{
   "diagnosis": {{
-    "summary": "整篇诊断（指向核心素养）",
+    "summary": "整篇诊断，必须含行首【看到了什么】【这说明什么】【下一步做什么】",
     "cognitive_stage": "学生整体认知阶段的一句话描述",
     "strengths": ["优势"],
     "main_problems": ["主要问题"],
@@ -922,7 +926,7 @@ PASS_L5_SYSTEM_BASE = '''你是一位中小学**学习过程理解**专家。下
 | ① 错因同质性筛分 | 对同一 KP 的多次错题，按错因聚类（如同一 KP 下"进位"和"运算顺序"算两个不同障碍），在 error_clusters[*].cause 写出聚类。 |
 | ② 偶然 vs 稳定筛分 | 结合 recurrence_hint + session 顺序，给每个障碍标 stability ∈ {{transient, persistent}}：transient = 已改善或仅偶发；persistent = 跨多次 session 反复出现。 |
 | ③ 三区语义归属 | 对每个 KP 给三区归属，必须基于课标 cognitive_level（了解/理解/掌握/应用）+ 时序趋势，不再机械按 correct_count==0。 |
-| ④ 演化叙事压缩 | 用 ≤150 字写一段"这份作业里这个学生发生了什么学习过程"（哪次开始掌握 / 哪个障碍始终未解决），写入 evolution_narrative。 |
+| ④ 演化叙事 | 用白话三问写整篇学习过程观察（【看到了什么】【这说明什么】【下一步做什么】），写入 evolution_narrative；分点写完整，不要一面墙。 |
 
 ## 关键铁律
 
@@ -932,8 +936,9 @@ PASS_L5_SYSTEM_BASE = '''你是一位中小学**学习过程理解**专家。下
 - **三区非空**：blind_spot / friction_zone / zpd 三个数组都不能为空。如果学生整体表现良好，zpd 也要从"下一步可拓展提升"角度给出至少 1 条建议；全份作业全对时，仍须给 blind_spot / friction_zone 兜底（可写"本次未观察到显著盲区/内耗，建议保持"，并把 knowledge_point 写为 no_observed、evidence 与 error_clusters 写为空数组、confidence 设低；禁止为无观察项编造证据题号）。
 - **mastery_trajectory**：把跨 session 出现 ≥2 次的 KP 列入；timeline 每项含 order_index / accuracy / state ∈ {{struggling, consolidating, acquired}}，final_state 与 trend 与最终 session 一致。
 - **rationale 必须有实**：每个 zone 条目的 rationale 至少 30 字，必须引用 session 序号 + qid_global；禁止"该生掌握不足"等空话。
-- **展示文本必须中文化**：evolution_narrative、rationale、suggested_next_step、error_clusters[*].cause 是给教师/家长阅读的自然语言，必须使用中文教育诊断用语。禁止在这些字段出现 session、word_problem、operation_law、transient、acquired 等英文或 snake_case 内部标签；应写作"第3次练习""应用题""运算律""阶段性""基本掌握"等中文表述。
-- **结构字段保留内部标签**：knowledge_point、trend、stability、state 等 schema 字段仍按下方 JSON 规范输出英文枚举或 KP 标签，不要改成中文。
+- **展示文本可读、勿露课标码**：evolution_narrative、rationale、suggested_next_step、error_clusters[*].cause 给教师/家长看。禁止出现 EN_S2_040、MA_S2_005 这类课标码；`[tense_usage, 理解, 语音]` 以及后面的中文说明可以保留（人能看懂）。自然语言优先写中文教育用语（如"第3次练习""基本掌握"）。
+- **结构字段**：knowledge_point 填课标 label（如 expressing_feelings）或可读说明；curriculum_id 填课标码（如 EN_S2_040，仅内部字段）；trend、stability、state 等仍按下方 JSON 规范。knowledge_point 禁止只写课标码。
+- **逐页素材白灰黑可信度（若证据包含 wgb_trust）**：分档把握，勿非黑即白。每题已标交叉情形与 trust_tier、black_n。critical=采信更谨慎（优先用更稳题支撑主要结论，黑区题可作辅助参考；一步黑≠全盘否定，两步/三步黑再谨慎一档）；careful=说法稍留余地；normal=正常分析；confident=可写得更细腻，但勿说得太满。不要因个别黑区整段诊断不写。对用户可见文案只用「需加强核实」「建议留意加强核实」「对照原卷」等平常说法。Skill 与既有流程照常。
 
 ## 三区语义
 
@@ -980,7 +985,7 @@ PASS_L5_SYSTEM_BASE = '''你是一位中小学**学习过程理解**专家。下
         "confidence": <0~1>}}
     ]
   }},
-  "evolution_narrative": "≤150 字时序演化叙事"
+  "evolution_narrative": "白话三问整篇观察（看到了什么 / 这说明什么 / 下一步做什么）"
 }}'''
 
 
@@ -1021,8 +1026,25 @@ def ontology_system(subject: str, stage: Optional[int], evidence_pack: Optional[
 
 
 def ontology_user(evidence_pack: Dict[str, Any]) -> str:
+    trust_preface = ''
+    wt = evidence_pack.get('wgb_trust') if isinstance(evidence_pack, dict) else None
+    if isinstance(wt, dict) and wt.get('protocol_hint'):
+        trust_preface = str(wt.get('protocol_hint') or '') + '\n'
+    if 'open_observations' in evidence_pack:
+        return (
+            trust_preface
+            + '以下是作文／笔记的内容与标注观察。区分观察事实和意图推测，按本轮定义生成三区，不推断页序学习进步。\n'
+            + json.dumps(evidence_pack, ensure_ascii=False)
+        )
+    if evidence_pack.get('evidence_mode') == 'notes':
+        return (
+            trust_preface
+            + '以下是笔记观察证据，页序不代表练习时间。输出约定的诊断JSON。\n'
+            + json.dumps(evidence_pack, ensure_ascii=False)
+        )
     return (
-        '以下是这份作业的**时序证据包**（按 session 顺序排列）。'
+        trust_preface
+        + '以下是这份作业的**时序证据包**（按 session 顺序排列）。'
         '请按照系统提示输出 student_ontology JSON 对象。\n\n'
         + json.dumps(evidence_pack, ensure_ascii=False)
     )
@@ -1057,11 +1079,32 @@ def _format_ontology_zones_for_pass2(ontology: Optional[Dict[str, Any]]) -> str:
     )
 
 
+OPEN_MATERIAL_OUTPUT_CONTRACT = '''
+【开放材料输出协议】
+输出顶层必须包含 open_material_overview。
+open_material_overview 严格包含：subject_and_layout（非空文字）、content_review（非空文字）、next_steps（一至两条非空文字）。
+职责拆分：overview=线（事实链+克制判断≤3短点）；diagnosis.summary=面（一句枢纽+三问支撑）；禁止两块互相复述整段。
+若本轮已注入外部方法：三个字段合起来可读出白话三问，但不要提前写完整育人落点与三区处方；
+要用中文写出方法概念痕迹；禁止英文/拼音方法名与表格章节出处，禁止注水冗长。
+不得写成与未启用方法时几乎同构的目录复述或零散补丁。
+逐单元批语必须覆盖输入中的每个书写单元，包括 verdict=correct 的单元；题号、页码必须沿用输入。不得输出百分制分数。'''
+
+
+def _with_open_material_output_contract(system: str, feedback_runtime) -> str:
+    from .feedback_material_kinds import is_open_material
+    if is_open_material((feedback_runtime.context or {}).get('material_type')):
+        return system + OPEN_MATERIAL_OUTPUT_CONTRACT
+    return system
+
+
 def pass2_system(subject: str, memory: Optional[Dict[str, Any]] = None, profile: Optional[Dict[str, Any]] = None, ontology: Optional[Dict[str, Any]] = None, *, feedback_runtime=None) -> str:
     """构建 Pass2 system prompt：注入认知三区 + 教育目标 + 课标（按 memory 过滤） + ontology 三区。"""
     if feedback_runtime is not None:
         from .feedback_prompts import diagnostic_system
-        return diagnostic_system(feedback_runtime, 'pass2_full', memory=memory, ontology=ontology)
+        return _with_open_material_output_contract(
+            diagnostic_system(feedback_runtime, 'pass2_full', memory=memory, ontology=ontology),
+            feedback_runtime,
+        )
     stage = ontology.get('stage') if isinstance(ontology, dict) else None
     all_entries = load_curriculum_entries(subject, stage=stage)
     entries = _filter_curriculum_by_memory(all_entries, memory)
@@ -1081,10 +1124,11 @@ PASS2_FEEDBACK_SYSTEM_BASE = '''你是一位中小学批改老师。下面已经
 
 - **以三区结论为准**：每条 `per_question_feedback` 必须从给定 zones 中选择最贴近的区域（blind_spot / friction_zone / zpd），不要新创区域，也不要把"已正确"的题目纳入。
 - **若某题对应的知识点未出现在任一区域**：`zone` 留空字符串 `""`，`comment` 写"信息不足，建议人工复核"。
-- **comment ≤50 字**：直接指出问题或方向，不要套话。
+- **comment ≤50 字**：直接指出问题或方向，不要套话；并可合理吸收课标反馈通则。
 - **禁止引用课标原文/文件名**（如"义务教育数学课程标准 2022 年版"）。
 - **题号一律使用 `qid_global`**，格式 `p<page>:<id>`。
 - **批语应与三区 rationale 口径一致**：盲区→指出根本概念欠缺；内耗区→指出干扰来源；最近发展区→肯定进步并给一个突破点提示。
+- **若错题带有 wgb_trust_tier**：critical 批语略留余地（两步/三步黑可提一句「建议对照原卷加强核实」；一步黑不必句句提醒）；careful 稍留余地；confident/normal 按常规写。可见文案勿用生僻自造词。
 
 ## 输出 schema（严格遵守，输出纯 JSON 对象，不加 Markdown 围栏）
 
@@ -1102,10 +1146,12 @@ PASS2_FEEDBACK_SYSTEM_BASE = '''你是一位中小学批改老师。下面已经
 
 
 def pass2_feedback_system(subject: str, *, feedback_runtime=None) -> str:
+    from .page_feedback import PAGE_FEEDBACK_PROTOCOL
     if feedback_runtime is not None:
         from .feedback_prompts import diagnostic_system
-        return diagnostic_system(feedback_runtime, 'pass2')
-    return PASS2_FEEDBACK_SYSTEM_BASE
+        system = diagnostic_system(feedback_runtime, 'pass2')
+        return _with_open_material_output_contract(system, feedback_runtime) + '\n' + PAGE_FEEDBACK_PROTOCOL
+    return PASS2_FEEDBACK_SYSTEM_BASE + '\n' + PAGE_FEEDBACK_PROTOCOL
 
 
 def pass2_feedback_user(memory: Dict[str, Any], ontology: Dict[str, Any], *, feedback_runtime=None) -> str:
@@ -1121,6 +1167,7 @@ def pass2_feedback_user(memory: Dict[str, Any], ontology: Dict[str, Any], *, fee
         out: List[Dict[str, Any]] = []
         for entry in entries or []:
             evidence = list(entry.get('evidence') or [])
+            evidence.extend(entry.get('content_context_evidence') or [])
             for cluster in entry.get('error_clusters') or []:
                 evidence.extend(cluster.get('evidence') or [])
             out.append({
@@ -1129,6 +1176,8 @@ def pass2_feedback_user(memory: Dict[str, Any], ontology: Dict[str, Any], *, fee
                 'evidence_question_ids': list(dict.fromkeys(evidence))[:8],
                 'stability': entry.get('stability'),
                 'trend': entry.get('trend'),
+                'evidence_basis': entry.get('evidence_basis', 'content'),
+                **({'content_context_evidence': list(entry['content_context_evidence'])} if entry.get('content_context_evidence') else {}),
             })
         return out
 
@@ -1141,14 +1190,23 @@ def pass2_feedback_user(memory: Dict[str, Any], ontology: Dict[str, Any], *, fee
         'student_answer', 'correct_answer', 'error_type', 'knowledge_point',
     )
     if open_material:
-        fields = fields + ('understanding',)
+        fields = fields + ('understanding', 'note_role', 'annotation_links', 'assessment_status',
+                           'diagnostic_eligible', 'page_origin', 'cross_page', 'cross_page_resolved',
+                           'material_check', 'assessment_reason', 'printed_text_marked',
+                           'handwritten_text_marked', 'marking_warnings', 'observation_eligible')
     slim_errors: List[Dict[str, Any]] = []
-    for question in memory.get('error_questions') or []:
+    from .material_markings import open_units
+    feedback_units = open_units(memory, feedback_runtime.context['material_type']) if open_material else memory.get('error_questions') or []
+    for question in feedback_units:
         slim_errors.append({
             key: question[key]
             for key in fields
             if key in question
         })
+    # 附上逐题白灰黑可信度，批语措辞分层
+    from .wgb_trust import attach_trust_to_questions
+    wgb_trust = ontology.get('wgb_trust') if isinstance(ontology, dict) else None
+    slim_errors = attach_trust_to_questions(slim_errors, wgb_trust)
 
     payload = {
         'subject': memory.get('subject'),
@@ -1156,19 +1214,31 @@ def pass2_feedback_user(memory: Dict[str, Any], ontology: Dict[str, Any], *, fee
         'zones': zone_view,
         'error_questions': slim_errors,
         'evolution_narrative': ontology.get('evolution_narrative', ''),
+        'page_understanding': memory.get('page_understanding', []),
     }
+    if isinstance(wgb_trust, dict) and wgb_trust.get('tier_counts'):
+        payload['wgb_trust_summary'] = {
+            'tier_counts': wgb_trust.get('tier_counts'),
+            'cross_counts': wgb_trust.get('cross_counts'),
+            'need_verify_count': len(wgb_trust.get('need_verify') or []),
+            'unit_word': wgb_trust.get('unit_word'),
+            'protocol_hint': wgb_trust.get('protocol_hint'),
+        }
     if open_material:
         intro = (
             '以下是该学生在本份作文/笔记上的三区结论与全部书写单元（含正确单元）。\n'
             '请整合 understanding 与 correct_answer 中的形成性评价，按系统提示输出纯 JSON：'
-            '仅含 `per_question_feedback`；每个单元都必须有批语，并尽量给出质量分。\n\n'
+            '顶层包含 `open_material_overview` 和 `per_question_feedback`，每个单元都必须有批语。\n\n'
         )
     else:
         intro = (
             '以下是该学生在本份作业上的三区结论与所有错题列表。\n'
             '请按系统提示输出纯 JSON：仅含 `per_question_feedback` 字段。\n\n'
         )
-    return intro + json.dumps(payload, ensure_ascii=False)
+    from .page_feedback import PAGE_FEEDBACK_PROTOCOL
+    return intro.replace('仅含 `per_question_feedback` 字段', '包含 `per_question_feedback` 字段') + (
+        PAGE_FEEDBACK_PROTOCOL + '\n' if payload['page_understanding'] else ''
+    ) + json.dumps(payload, ensure_ascii=False)
 
 MATH_VERIFICATION_SUFFIX = '''
 【验算要求】

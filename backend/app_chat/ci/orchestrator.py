@@ -88,12 +88,23 @@ def query_ci_analyses(username: str, files: List[str]) -> Dict[str, Any]:
         return {'singles': [], 'groups': [], 'superset_match': None}
 
     file_set = set(files)
+    from app_chat.feedback_material_identity import source_digest, record_digest
+    file_digests = {filename: source_digest(username, filename) for filename in files
+                    if filename.lower().endswith('.pdf')}
+    digests = {d for d in file_digests.values() if d}
     all_analyses = CIIndexManager.load(username)
 
     singles = []
     groups = []
     for record in all_analyses:
         record_files = set(record.get('files', []))
+        if record.get('analysis_type') == 'homework_grading':
+            digest = record_digest(username, record)
+            if digest in digests:
+                aliases = [name for name, value in file_digests.items() if value == digest]
+                singles.append({**record, 'files': sorted(record_files | set(aliases)),
+                                'source_document_sha256': digest})
+            continue
         if record.get('mode') == 'single':
             if record_files & file_set:
                 singles.append(record)

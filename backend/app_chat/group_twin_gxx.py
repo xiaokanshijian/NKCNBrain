@@ -4,6 +4,7 @@ NK2026 组本素材 → 每组 Gxx.md 摘录短文生成（与文档交叉梳理
 产出为四个一级章节（一～四，第四节为相较既有 Gxx 的周际变化）；模型主备顺序见 generate_gxx_markdown_with_fallback（与输入总字数相关）。
 """
 from __future__ import annotations
+import nkcn_public_config as _public_config
 
 import json
 import os
@@ -32,10 +33,10 @@ from app_chat.automation_nk2026 import (
 from app_chat.views_card_html import _image_layers_text, _is_ladder_fill_image_filename
 
 # 与 views_continuous_image 中 dmxapi Gemini 对齐（可按环境变量覆盖）
-_GEMINI_FALLBACK_BASE = os.environ.get("NKCN_DMT_GEMINI_BASE_URL", "https://www.dmxapi.cn/v1")
+_GEMINI_FALLBACK_BASE = os.environ.get("NKCN_DMT_GEMINI_BASE_URL", _public_config.endpoint('NKCN_REVIEW_GATEWAY_V1_URL', 'http://localhost:9999/v1'))
 _GEMINI_FALLBACK_KEY = os.environ.get(
     "NKCN_DMT_GEMINI_API_KEY",
-    os.environ.get("DMX_API_KEY", ""),
+    _public_config.secret('NKCN_LLM_DMXAPI_API_KEY'),
 )
 _GEMINI_FALLBACK_MODEL = os.environ.get("NKCN_DMT_GEMINI_MODEL", "gemini-3.1-pro-preview")
 
@@ -103,7 +104,7 @@ def _load_claude_46_cfg() -> Dict[str, str]:
     return resolve_openai_cfg_from_abbr(
         abbr,
         default_model='claude-sonnet-4-6-X',
-        default_base='https://chat.cloudapi.vip/v1/',
+        default_base=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
         default_key='',
     )
 

@@ -1,3 +1,4 @@
+import nkcn_public_config as _public_config
 import os
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import HumanMessagePromptTemplate
@@ -7,8 +8,8 @@ from langchain_core.prompts import HumanMessagePromptTemplate, MessagesPlacehold
 from langchain_experimental.llms import ChatLlamaAPI
 from openai import AsyncOpenAI, OpenAI
 
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
-DEEPSEEK_API_KEY_ALI= os.environ.get("DASHSCOPE_API_KEY", "")
+DEEPSEEK_API_KEY = _public_config.secret('DEEPSEEK_API_KEY')
+DEEPSEEK_API_KEY_ALI= _public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY')
 DEEPSEEK_ENGINE = "deepseek-r1" #"deepseek-reasoner"  # DeepSeek模型名称
 
 class DEEPSEEK_CONFIG:

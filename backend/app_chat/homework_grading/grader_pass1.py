@@ -229,7 +229,8 @@ def _normalize_pronunciation_grade_answers(
 
 
 def _normalize_detect_result(result: Dict[str, Any], subject: str, page_num: int) -> Dict[str, Any]:
-    result['page'] = result.get('page') or page_num
+    # page是服务器传入的PDF序号；模型识别的印刷页码仅属于page_origin。
+    result['page'] = page_num
     result['subject'] = result.get('subject') or subject
     result['page_header'] = str(result.get('page_header') or '').strip()
     result['boundary'] = _normalize_boundary(result.get('boundary'))
@@ -252,6 +253,9 @@ def _normalize_detect_result(result: Dict[str, Any], subject: str, page_num: int
             'final_unit_requirement': question.get('final_unit_requirement'),
         }
         item['final_unit_requirement'] = normalize_final_unit_requirement(item, subject)
+        for field in ('note_role', 'annotation_links', 'printed_text_marked', 'marking_warnings'):
+            if field in question:
+                item[field] = copy.deepcopy(question[field])
         layout_confidence = _clamp_confidence(question.get('layout_confidence'))
         if layout_confidence is not None:
             item['layout_confidence'] = layout_confidence
@@ -270,6 +274,8 @@ def _normalize_detect_result(result: Dict[str, Any], subject: str, page_num: int
                 'reason': 'empty_auto_question',
             })
             continue
+        from .material_markings import normalize_markings
+        normalize_markings(item, layout=True)
         normalized_questions.append(item)
     result['questions'] = normalized_questions
     if dropped_layout_artifacts:
@@ -283,6 +289,8 @@ def _is_empty_auto_layout_artifact(question: Any) -> bool:
         return False
     qid = str(question.get('id') or '').strip().lower()
     if not qid.startswith('auto-'):
+        return False
+    if question.get('printed_text_marked') or question.get('handwritten_text_marked') or question.get('annotation_links'):
         return False
     if any(
         str(question.get(field) or '').strip()
@@ -305,7 +313,7 @@ def _is_empty_auto_layout_artifact(question: Any) -> bool:
 
 
 def _normalize_pass1_result(result: Dict[str, Any], subject: str, page_num: int) -> Dict[str, Any]:
-    result['page'] = result.get('page') or page_num
+    result['page'] = page_num
     result['subject'] = result.get('subject') or subject
     result['page_header'] = str(result.get('page_header') or '').strip()
     result['boundary'] = _normalize_boundary(result.get('boundary'))
@@ -429,53 +437,35 @@ def _call_qwen_json_with_retry(
     require_questions: bool = True,
     error_dump_path: Optional[str] = None,
     temperature: Optional[float] = 0.1,
-feedback_runtime=None) -> Tuple[Dict[str, Any], Any]:
-    last_raw = ''
-    last_error: Optional[Exception] = None
-    max_attempts = _pass1_max_attempts(**({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
+feedback_runtime=None, expected_question_ids=None) -> Tuple[Dict[str, Any], Any]:
+    from .model_output import request_json_object, object_list
+    last_response = None
 
-    for attempt in range(max_attempts):
-        call_messages = messages
-        if attempt > 0:
-            call_messages = messages + [
-                {'role': 'assistant', 'content': last_raw or '{}'},
-                {
-                    'role': 'user',
-                    'content': _pass1_retry_hint(last_error, require_questions),
-                },
-            ]
-        try:
-            response = _call_qwen_json(call_messages, extra_body, temperature=temperature, **({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
-        except Exception as exc:
-            last_error = exc
-            logger.warning('%s API 调用失败 attempt=%s/%s: %s', stage_label, attempt + 1, max_attempts, exc)
-            continue
+    def invoke(current):
+        nonlocal last_response
+        last_response = _call_qwen_json(current, extra_body, temperature=temperature,
+            **({'feedback_runtime': feedback_runtime} if feedback_runtime is not None else {}))
+        return last_response
 
-        message = response.choices[0].message
-        last_raw = message.content or ''
-        try:
-            result = _loads_json_with_retry_text(last_raw)
-        except json.JSONDecodeError as exc:
-            last_error = exc
-            logger.warning('%s JSON 解析失败 attempt=%s/%s', stage_label, attempt + 1, max_attempts)
-            continue
+    def validate(result):
+        if require_questions:
+            questions = object_list(result.get('questions'), 'questions')
+            ids = [str(q.get('id') or f'auto-{index}').strip() for index, q in enumerate(questions, 1)]
+            if len(set(ids)) != len(ids):
+                raise ValueError('题目身份重复，必须逐区域核对id')
+            if expected_question_ids is not None and set(ids) != set(expected_question_ids):
+                raise ValueError('理解结果与检测单元不一一对应，必须返回全部且仅返回已有id')
+        return result
 
-        if not isinstance(result, dict):
-            last_error = ValueError(f'{stage_label} 返回不是 JSON 对象')
-            logger.warning('%s 返回非对象 attempt=%s/%s', stage_label, attempt + 1, max_attempts)
-            continue
-
-        if require_questions and not isinstance(result.get('questions'), list):
-            last_error = ValueError(f'{stage_label} 返回缺少 questions 数组')
-            logger.warning('%s 缺少 questions attempt=%s/%s', stage_label, attempt + 1, max_attempts)
-            continue
-
-        return result, message
-
-    if error_dump_path and last_raw:
-        _write_text(error_dump_path, last_raw)
-    detail = f'{last_error}; raw={last_raw[:200]!r}' if last_raw else str(last_error)
-    raise ValueError(f'{stage_label} 在 {max_attempts} 次尝试后仍失败: {detail}')
+    result = request_json_object(invoke, messages, parser=_loads_json_with_retry_text,
+        validate=validate, attempts=_pass1_max_attempts(feedback_runtime=feedback_runtime),
+        audit_path=error_dump_path + '.responses.json' if error_dump_path else None,
+        stage=stage_label, retry_prompt=lambda error: _pass1_retry_hint(error, require_questions),
+        error_path=error_dump_path, retry_call_errors=True)
+    if last_response is None:
+        from types import SimpleNamespace
+        return result, SimpleNamespace(content=json.dumps(result, ensure_ascii=False), reasoning_content='')
+    return result, last_response.choices[0].message
 
 
 def _cross_page_needs_uncertain(question: Dict[str, Any], *, material_type: str = '') -> bool:
@@ -507,11 +497,10 @@ def _merge_detect_and_grade(
     *,
     feedback_runtime=None,
 ) -> Dict[str, Any]:
-    from .feedback_material_kinds import is_open_material
+    from .material_markings import MARKING_FIELDS, normalize_markings, open_material_runtime
     material_type = ''
     if feedback_runtime is not None:
         material_type = str((feedback_runtime.context or {}).get('material_type') or '')
-    open_material = is_open_material(material_type)
     detect = _normalize_detect_result(detect, subject, page_num)
     grade_items = grade.get('questions') if isinstance(grade.get('questions'), list) else []
     grade_by_id = {
@@ -544,6 +533,17 @@ def _merge_detect_and_grade(
             'knowledge_point': str(graded.get('knowledge_point') or '').strip(),
             'recurrence_hint': graded.get('recurrence_hint') or 'na',
         })
+        if open_material_runtime(feedback_runtime):
+            for field in (*MARKING_FIELDS, 'note_role'):
+                if field in graded:
+                    merged[field] = copy.deepcopy(graded[field])
+            normalize_markings(merged)
+        if material_type == 'notes':
+            from .note_evidence import normalize_note_fields
+            for field in ('note_role', 'annotation_links'):
+                if field in graded:
+                    merged[field] = copy.deepcopy(graded[field])
+            normalize_note_fields(merged)
         if isinstance(graded.get('choice_slot_guard'), dict):
             merged['choice_slot_guard'] = dict(graded['choice_slot_guard'])
         if isinstance(graded.get('fixed_english_page15_guard'), dict):
@@ -561,13 +561,6 @@ def _merge_detect_and_grade(
             merged['verdict'] = 'uncertain'
             if not merged.get('cross_page_note'):
                 merged['cross_page_note'] = '跨页题目，单页上下文不足'
-        # 作文/笔记已给出形成性结论时，跨页仅表示书写延续，视为上下文已可评价
-        if (
-            open_material
-            and merged.get('cross_page')
-            and merged.get('verdict') not in ('uncertain', 'unanswered', '', None)
-        ):
-            merged['cross_page_resolved'] = True
         merged_questions.append(merged)
 
     for qid, graded in grade_by_id.items():
@@ -592,6 +585,11 @@ def _merge_detect_and_grade(
         merged_questions[-1]['final_unit_requirement'] = normalize_final_unit_requirement(
             merged_questions[-1], subject,
         )
+        if open_material_runtime(feedback_runtime):
+            for field in (*MARKING_FIELDS, 'note_role'):
+                if field in graded:
+                    merged_questions[-1][field] = copy.deepcopy(graded[field])
+            normalize_markings(merged_questions[-1])
         for field in ('recognition_confidence', 'understanding_confidence', 'grading_confidence'):
             confidence = _clamp_confidence(graded.get(field))
             if confidence is not None:
@@ -613,6 +611,12 @@ def _merge_detect_and_grade(
         'questions': merged_questions,
         'pass1_mode': 'two_stage',
     }
+    if material_type == 'notes':
+        from .note_evidence import normalize_page_origin, normalize_note_fields
+        result['page_origin'] = normalize_page_origin(detect.get('page_origin'))
+        result['note_page_link_candidates'] = detect.get('note_page_link_candidates', [])
+        for question in merged_questions:
+            normalize_note_fields(question)
     return _normalize_pass1_result(result, subject, page_num)
 
 
@@ -829,6 +833,7 @@ def grade_page_questions(
             messages,
             extra_body,
             stage_label='Pass 1 批改阶段',
+            expected_question_ids=[q['id'] for q in detected.get('questions', [])],
             require_questions=True,
             error_dump_path=error_dump_path,
         **({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
@@ -1143,6 +1148,14 @@ def _grade_page_one_shot(
             with open(out_json_path.replace('.json', '.thinking.txt'), 'w', encoding='utf-8') as file:
                 file.write(reasoning)
     result = _normalize_pass1_result(result, subject, page_num)
+    from .material_markings import normalize_markings, open_material_runtime
+    if open_material_runtime(feedback_runtime):
+        for question in result.get('questions') or []:
+            normalize_markings(question)
+    if feedback_runtime is not None and feedback_runtime.context.get('material_type') == 'notes':
+        from .note_evidence import normalize_note_fields
+        for question in result.get('questions') or []:
+            normalize_note_fields(question)
     (apply_fixed_english_page15_guard(
         result,
         page_num=page_num,
@@ -1211,7 +1224,10 @@ def grade_page_from_detect(
         stage=stage,
         iteration_guidance=iteration_guidance,
     **({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
-    safe_json_dump(detect_path, stamp_feedback(detected, feedback_runtime, 'grade_page_from_detect'))
+    # 冻结流程的版面产物已有回执，理解阶段只消费其内存副本。
+    # 规范化或补充槽位后回写会使正常续跑误判版面失效；理解结果仍写入下方产物。
+    if feedback_runtime is None:
+        safe_json_dump(detect_path, detected)
     result = _merge_detect_and_grade(
         detected, graded, subject, page_num, feedback_runtime=feedback_runtime,
     )

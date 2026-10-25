@@ -1,3 +1,4 @@
+import nkcn_public_config as _public_config
 # -*- coding:utf-8 -*-
 #
 #   author: iflytek
@@ -93,8 +94,8 @@ class Ws_Param(object):
         return url
 
 
-wsParam = Ws_Param(APPID='', APISecret='',
-                   APIKey='',
+wsParam = Ws_Param(APPID=_public_config.secret('XFYUN_APP_ID'), APISecret=_public_config.secret('XFYUN_API_SECRET'),
+                   APIKey=_public_config.secret('XFYUN_API_KEY'),
                    Text='请介绍你自己')
 
 audio_base64_list = []
@@ -215,8 +216,8 @@ def generate_base64_array(message):
     global audio_base64_list
     audio_base64_list = []
 
-    wsParam = Ws_Param(APPID='', APISecret='',
-                       APIKey='',
+    wsParam = Ws_Param(APPID=_public_config.secret('XFYUN_APP_ID'), APISecret=_public_config.secret('XFYUN_API_SECRET'),
+                       APIKey=_public_config.secret('XFYUN_API_KEY'),
                        Text="大语言模型，指使用大量文本数据训练的深度学习模型，可以生成自然语言文本或理解语言文本的含义")
     websocket.enableTrace(False)
     wsUrl = wsParam.create_url()
@@ -262,8 +263,8 @@ def convert_pcm_to_webm(pcm_file_path, webm_file_path):
 
 if __name__ == "__main__":
     # 测试时候在此处正确填写相关信息即可运行
-    wsParam = Ws_Param(APPID='', APISecret='',
-                       APIKey='',
+    wsParam = Ws_Param(APPID=_public_config.secret('XFYUN_APP_ID'), APISecret=_public_config.secret('XFYUN_API_SECRET'),
+                       APIKey=_public_config.secret('XFYUN_API_KEY'),
                        Text="大语言模型，指使用大量文本数据训练的深度学习模型，可以生成自然语言文本或理解语言文本的含义")
     websocket.enableTrace(False)
     wsUrl = wsParam.create_url()

@@ -1,5 +1,9 @@
 import request from '@/utils/request'
 
+export function listNotebookSkills(data) {
+  return request.post('/api/skill_list', data, { timeout: 20000 })
+}
+
 export function feedbackMaterialSettings(data) {
   return request.post('/api/ci/material-settings', data)
 }
@@ -10,7 +14,7 @@ export function feedbackMaterialSettings(data) {
 
 /** 查询记录及服务端材料解析；支持 requested_action / feedback_overrides。 */
 export function queryCIAnalyses(data) {
-  return request.post('/api/ci/query', data)
+  return request.post('/api/ci/query', data, { timeout: 20000 })
 }
 
 /** 启动分析；响应保留冻结 feedback_context、config_fingerprint、run_id 和 warnings。 */
@@ -34,12 +38,12 @@ export function startImageUnderstanding(data) {
 
 /** 轮询分析进度 */
 export function getCIProgress(taskId) {
-  return request.get(`/api/ci/progress/${taskId}/`)
+  return request.get(`/api/ci/progress/${taskId}/`, { timeout: 20000 })
 }
 
 /** 按 analysis_id 获取结果 { username, analysis_id, run_id? } */
 export function getCIResult(data) {
-  return request.post('/api/ci/result', data)
+  return request.post('/api/ci/result', data, { timeout: 60000 })
 }
 
 /** 列出作业批改历史版本 { username, analysis_id } */
@@ -62,6 +66,35 @@ export function rerunCIHomework(data) {
 /** 仅重试当前作业版本的红蓝卡标评分 */
 export function retryCIHomeworkRedBlue(data) {
   return request.post('/api/ci/homework/red_blue/retry', data)
+}
+
+export function pinCIHomeworkResultCards(data) {
+  return request.post('/api/ci/homework/pin_result_cards', data, { timeout: 60000 })
+}
+
+/** 轮询重新沉淀进度（可含先生成可点短句） */
+export function getCIHomeworkPinResultCardsStatus(data) {
+  return request.post('/api/ci/homework/pin_result_cards_status', data)
+}
+
+/** 人工核验闭环：保存单条核验 */
+export function saveCIHomeworkVerify(data) {
+  return request.post('/api/ci/homework/verify_save', data)
+}
+
+/** 人工核验闭环：列出已提交核验 */
+export function listCIHomeworkVerify(data) {
+  return request.post('/api/ci/homework/verify_list', data)
+}
+
+/** 人工核验闭环：启动局部重批回写 */
+export function startCIHomeworkVerifyIterate(data) {
+  return request.post('/api/ci/homework/verify_iterate', data, { timeout: 60000 })
+}
+
+/** 人工核验闭环：轮询进度 */
+export function getCIHomeworkVerifyIterateStatus(data) {
+  return request.post('/api/ci/homework/verify_iterate_status', data)
 }
 
 /** 迭代理解层（不迭代 D 层 OCR）{ username, analysis_id, redo_scope?: 'mt'|'t' } */

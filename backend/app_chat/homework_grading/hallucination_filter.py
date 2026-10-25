@@ -10,6 +10,7 @@
 """
 
 from __future__ import annotations
+from .stage_dependencies import artifact_compatible
 
 from .feedback_runtime import stamp_feedback
 from .feedback_curriculum import curriculum_entries
@@ -204,7 +205,7 @@ def _apply_zone_corrections(zones_root: Dict[str, Any], valid_qids: Set[str], va
                 applied.append({'zone': zone, 'index': idx, 'field': 'knowledge_point',
                                 'before': kp, 'after': ''})
                 item['knowledge_point'] = ''
-            for field in ('evidence_question_ids', 'evidence'):
+            for field in ('evidence_question_ids', 'evidence', 'content_context_evidence'):
                 if field not in item:
                     continue
                 cleaned = normalize_question_evidence(item[field], valid_qids)
@@ -300,6 +301,14 @@ def _filter_ontology(ontology_path: str, valid_qids: Set[str], label_whitelist: 
                 if str(qid) not in valid_qids:
                     issues.append({**ctx, 'field': 'evidence', 'value': qid,
                                   'hallucination_type': 'invalid_id', 'suggestion': None})
+            for qid in evidence_values(item.get('content_context_evidence')):
+                if str(qid) not in valid_qids:
+                    issues.append({**ctx, 'field': 'content_context_evidence', 'value': qid,
+                                   'hallucination_type': 'invalid_id', 'suggestion': None})
+            for qid in evidence_values(item.get('content_context_evidence')):
+                if str(qid) not in valid_qids:
+                    issues.append({'source': 'pass2', **ctx, 'field': 'content_context_evidence', 'value': qid,
+                                   'hallucination_type': 'invalid_id', 'suggestion': None})
             for ec_idx, ec in enumerate(item.get('error_clusters') or []):
                 if not isinstance(ec, dict):
                     continue
@@ -320,7 +329,10 @@ def _build_retry_prompt(issue: Dict[str, Any], label_whitelist: Set[str],
     htype = issue.get('hallucination_type')
     val = issue.get('value', '')
     if htype == 'invalid_kp':
-        candidates = sorted(label_whitelist)[:30]
+        # 占位状态不是知识点，不能用来替换仍有观察证据的诊断。
+        candidates = sorted(label_whitelist - _ONTOLOGY_PLACEHOLDER_FALLBACKS)[:30]
+        if not candidates:
+            return None
         return (f'以下知识点标签 "{val}" 不在课标白名单中。'
                 f'请从下列合法标签中选出最相近的一个，只输出标签字符串，不附任何解释：\n'
                 + ', '.join(candidates))
@@ -368,7 +380,7 @@ def retry_field(issue: Dict[str, Any], label_whitelist: Set[str],
     if not prompt:
         return {'field': issue.get('field'), 'old_value': issue.get('value'), 'new_value': None, 'attempts': 0}
     htype = issue.get('hallucination_type')
-    valid_set = (label_whitelist if htype == 'invalid_kp'
+    valid_set = (label_whitelist - _ONTOLOGY_PLACEHOLDER_FALLBACKS if htype == 'invalid_kp'
                  else valid_qids if htype == 'invalid_id'
                  else valid_curr_ids)
     for attempt in range(1, max_attempts + 1):
@@ -390,6 +402,9 @@ def _pre_patch_with_retry(pass1_dir: str, report_path: str, ontology_path: Optio
             continue
         source = issue.get('source')
         field = issue.get('field')
+        if field == 'knowledge_point' and new_val in _ONTOLOGY_PLACEHOLDER_FALLBACKS:
+            # 即使调用方直接提供retry_map，也不能把真实观察变成占位项。
+            continue
         if source == 'pass1':
             for json_path in sorted_json_pages(pass1_dir):
                 try:
@@ -425,7 +440,7 @@ def _pre_patch_with_retry(pass1_dir: str, report_path: str, ontology_path: Optio
             item = items[idx]
             if not isinstance(item, dict) or not item.get(field):
                 continue
-            if field in ('evidence', 'evidence_question_ids', 'evidence_curriculum_ids'):
+            if field in ('evidence', 'evidence_question_ids', 'evidence_curriculum_ids', 'content_context_evidence'):
                 # retry仅修复被报告的成员，不能将整个证据数组覆盖为字符串。
                 before = item[field]
                 if not isinstance(before, list) or issue.get('value') not in before:
@@ -469,8 +484,24 @@ def run_hallucination_filter(
         for path in (report_path, ontology_path):
             if path:
                 doc = safe_json_load(path)
-                if doc.get('feedback_execution', {}).get('config_fingerprint') != feedback_runtime.fingerprint:
+                if not artifact_compatible(doc, feedback_runtime):
                     raise ValueError('过滤输入与本轮配置不一致')
+        from .material_markings import open_material_runtime, open_units
+        if open_material_runtime(feedback_runtime):
+            # 作文/笔记允许有证据的中文评价维度，不要求等于逐页的粗粒度标签。
+            # 只承认经当前原页证据校验的诊断，不能将Pass2任意新增标签加入白名单。
+            if not ontology_path:
+                raise ValueError('开放材料过滤缺少诊断证据')
+            from .memory import build_memory
+            from .note_evidence import validate_note_ontology
+            ontology = safe_json_load(ontology_path)
+            memory = build_memory(pass1_dir, subject, ontology.get('sample_id', ''), feedback_runtime=feedback_runtime)
+            validate_note_ontology(ontology, open_units(memory, feedback_runtime.context['material_type']))
+            for bucket in ('blind_spot', 'friction_zone', 'zpd'):
+                for entry in ontology['zones'][bucket]:
+                    label = entry.get('knowledge_point')
+                    if isinstance(label, str) and label.strip() and label not in _ONTOLOGY_PLACEHOLDER_FALLBACKS:
+                        label_whitelist.add(label)
     valid_qids = _collect_question_ids(pass1_dir)
 
     pass1_issues = _filter_pass1(pass1_dir, label_whitelist, page_nums=page_nums)

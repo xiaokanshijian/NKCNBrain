@@ -1,9 +1,31 @@
+import nkcn_public_config as _public_config
 from openai import OpenAI
-import os
 import time
 import string
 import re
 from llm_langchain import global_var
+
+# moonshot-v1-32k 已下线；标题/补全走 kimi-k 系列
+KIMI_CHAT_MODEL = 'kimi-k3'
+
+
+def _kimi_create_kwargs(messages):
+    model = KIMI_CHAT_MODEL
+    kwargs = {
+        'model': model,
+        'messages': messages,
+        'max_tokens': global_var.kimiConfig.get('max_tokens', 8888),
+        'n': global_var.kimiConfig.get('n', 1),
+    }
+    name = (model or '').strip().lower()
+    if name == 'kimi-k3' or name.startswith('kimi-k3') or name.startswith('kimi-k2.7'):
+        kwargs['temperature'] = 1.0
+    else:
+        kwargs['temperature'] = global_var.kimiConfig.get('temperature', 0.8)
+        kwargs['top_p'] = global_var.kimiConfig.get('top_p', 0.95)
+        kwargs['frequency_penalty'] = global_var.kimiConfig.get('frequency_penalty', 0)
+        kwargs['presence_penalty'] = global_var.kimiConfig.get('presence_penalty', 0)
+    return kwargs
 
 
 def find_word_in_string(w, s):
@@ -63,7 +85,7 @@ def post_process_kimi_response(response):
 def make_requests(prompt, api_key, is_completion, temperature=0.8):
 
     if api_key is None:
-        API_KEY = os.environ.get("KIMI_API_KEY", "")
+        API_KEY = _public_config.secret('KIMI_API_KEY')
     else:
         API_KEY = api_key
 
@@ -78,27 +100,20 @@ def make_requests(prompt, api_key, is_completion, temperature=0.8):
     )
 
     response = client.chat.completions.create(
-        model="moonshot-v1-32k",
-        messages=[
+        **_kimi_create_kwargs([
             {"role": "system", "content": role},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=global_var.kimiConfig["temperature"],
-        top_p=global_var.kimiConfig["top_p"],
-        frequency_penalty=global_var.kimiConfig["frequency_penalty"],
-        presence_penalty=global_var.kimiConfig["presence_penalty"],
-        max_tokens=global_var.kimiConfig["max_tokens"],
-        n=global_var.kimiConfig["n"]
+            {"role": "user", "content": prompt},
+        ])
     )
 
-    print("temperature="+str(global_var.kimiConfig["temperature"]))
+    print("kimi_model=" + KIMI_CHAT_MODEL)
     return response
 
 
 async def make_requests_async(prompt, api_key, is_completion, system_prompt, temperature=0.8):
 
     if api_key is None:
-        API_KEY = os.environ.get("KIMI_API_KEY", "")
+        API_KEY = _public_config.secret('KIMI_API_KEY')
     else:
         API_KEY = api_key
 
@@ -114,25 +129,18 @@ async def make_requests_async(prompt, api_key, is_completion, system_prompt, tem
     )
 
     response = client.chat.completions.create(
-        model="moonshot-v1-32k",
-        messages=[
+        **_kimi_create_kwargs([
             {"role": "system", "content": role},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=global_var.kimiConfig["temperature"],
-        top_p=global_var.kimiConfig["top_p"],
-        frequency_penalty=global_var.kimiConfig["frequency_penalty"],
-        presence_penalty=global_var.kimiConfig["presence_penalty"],
-        max_tokens=global_var.kimiConfig["max_tokens"],
-        n=global_var.kimiConfig["n"]
+            {"role": "user", "content": prompt},
+        ])
     )
 
-    print("temperature="+str(global_var.kimiConfig["temperature"]))
+    print("kimi_model=" + KIMI_CHAT_MODEL)
     return response
 
 
 if __name__ == '__main__':
-    MOONSHOT_API_KEY = os.environ.get("KIMI_API_KEY", "") # from chen lei
+    MOONSHOT_API_KEY = _public_config.secret('KIMI_API_KEY') # from chen lei
     # prompt_completion = "按照相同格式提出若干相关的问题：1.西红柿炒鸡蛋怎么做？2.拍黄瓜是哪里的凉菜？3.枸杞在烹饪中的作用有哪些？4."
     prompt_completion = 'Come up with a series of tasks with the same format:\n1. 如何使用信息技术为思政教育赋能？\n2. 请详细说明劳模精神、劳动精神、工匠精神的内涵和作用分别是什么，以及如何培育这些精神\n3. 红蓝融合中，理论和实践哪一个更重要？\n4. 见义勇为是否值得提倡？\n5. 信息时代，如何激发创新活力，产出创新成果？\n6. 请列举几个知行合一的名人事例\n7. 领导让我作一周工作的汇报总结，但我这周没有做实质性的工作，我该怎么办？\n8. 为什么要讲红蓝融合，其内涵是什么？\n9.'
     res = make_requests(prompt_completion, None, True, 0.8)

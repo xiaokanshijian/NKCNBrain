@@ -166,6 +166,12 @@ def _save_page_image(img, out_path: str) -> None:
     if not ok:
         raise ValueError('批改图编码失败')
     buf.tofile(out_path)
+    # 重画 PNG 后立刻重压预览，避免前端继续吃旧 .preview_w*.jpg
+    try:
+        from app_chat.homework_grading.layout_preview import refresh_previews
+        refresh_previews(out_path)
+    except Exception:
+        pass
 
 
 def _page_subject(data: dict, json_path: str) -> str:

@@ -1,11 +1,5 @@
 {
-  "experiment_mode": "glyph_description_v1",
-  "description": "C 模式仅验证非标准字形的局部视觉描述。evaluation 仅供调用完成后的离线评测，绝不进入模型请求。",
-  "case": {
-    "case_id": "cn1_p11_q1_2_nonstandard",
-    "homework_id": "homework_52ada7c57b87",
-    "image_relpath": "homework_grading/clean/chinese_52ada7c5_page11.png",
-    "question_roi": [470, 180, 885, 315],
-    "evaluation": {"target_index": 1, "target_expected_char": "藤"}
-  }
+  "experiment_mode": "",
+  "description": "",
+  "case": {}
 }

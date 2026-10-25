@@ -2,6 +2,7 @@
 """
 🔥 认知状态分析相关的视图函数
 """
+import nkcn_public_config as _public_config
 import json
 import base64
 import asyncio
@@ -23,15 +24,15 @@ import re
 def get_small_model_server_url(username):
     """
     根据username从全局变量获取小模型ID，返回对应的服务器URL
-    3007 -> 192.0.2.1
-    3001-3006 -> 192.0.2.1
+    3007 -> 127.0.0.1
+    3001-3006 -> 127.0.0.1
     """
     from app_chat.global_state import GLOBAL_STATE
     model_id = GLOBAL_STATE.user_little_model_id.get(username, "3003")
     if str(model_id) == "3007":
-        return "http://192.0.2.1:8000"
+        return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
     else:
-        return "http://192.0.2.1:8000"
+        return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
 
 
 def analyze_cognitive_state_with_tribal_md(username, scene_name, tribal_md, network_image_base64=None):
@@ -514,8 +515,8 @@ def analyze_cognitive_state(request):
             try:
                 model_name = "gemini-3.1-pro-preview"
                 client = OpenAI(
-                    api_key=os.environ.get("DMX_API_KEY", ""),
-                    base_url='https://www.dmxapi.cn/v1/'
+                    api_key=_public_config.secret('NKCN_LLM_DMXAPI_API_KEY'),
+                    base_url=_public_config.endpoint('NKCN_REVIEW_GATEWAY_V1_URL', 'http://localhost:9999/v1/')
                 )
 
                 messages = [
@@ -592,7 +593,7 @@ def analyze_cognitive_state(request):
 
                     def call_qwen():
                         return MultiModalConversation.call(
-                            api_key=os.environ.get("DASHSCOPE_API_KEY", ""),
+                            api_key=_public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY'),
                             model='qwen3.6-plus',
                             messages=messages,
                             vl_high_resolution_images=True
@@ -666,7 +667,7 @@ def analyze_cognitive_state(request):
                 try:
                     # 模拟execute_commands的调用
                     text = full_content.replace("\n", "\\n")
-                    # command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","text":"{text}"}}\' http://192.0.2.1:8000/invoke_rate'
+                    # command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","text":"{text}"}}\' http://localhost:8000/invoke_rate'
                     server_url = get_small_model_server_url(username)
                     command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","text":"{text}"}}\' {server_url}/invoke_rate'
                     result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE,

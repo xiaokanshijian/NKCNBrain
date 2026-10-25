@@ -3,6 +3,7 @@
 🔥 本子输出文章生成相关的视图函数
 根据目录卡片生成完整的输出文章
 """
+import nkcn_public_config as _public_config
 import json
 import os
 import re
@@ -27,15 +28,15 @@ from app_chat.iteration_debug_utils import detect_and_log_anomalies, save_iterat
 def get_small_model_server_url(username):
     """
     根据username从全局变量获取小模型ID，返回对应的服务器URL
-    3007 -> 192.0.2.1
-    3001-3006 -> 192.0.2.1
+    3007 -> 127.0.0.1
+    3001-3006 -> 127.0.0.1
     """
     from app_chat.global_state import GLOBAL_STATE
     model_id = GLOBAL_STATE.user_little_model_id.get(username, "3003")
     if str(model_id) == "3007":
-        return "http://192.0.2.1:8000"
+        return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
     else:
-        return "http://192.0.2.1:8000"
+        return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
 
 
 def _clean_4byte_utf8_chars(text):

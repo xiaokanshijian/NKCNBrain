@@ -3,9 +3,9 @@
 使用关键词方法进行初步判定
 当关键词判定为空时，调用kimi LLM进行精准判定
 """
+import nkcn_public_config as _public_config
 from openai import OpenAI
 import concurrent.futures
-import os
 import time
 
 from app_chat.card_value_filter import (
@@ -271,7 +271,7 @@ def analyze_four_color_type_with_llm(content, scene_name=None, sub_scene_name=No
 请判断四色类型："""
 
         # 调用kimi API
-        API_KEY = os.environ.get("KIMI_API_KEY", "")
+        API_KEY = _public_config.secret('KIMI_API_KEY')
         client = OpenAI(
             api_key=API_KEY,
             base_url="https://api.moonshot.cn/v1",
@@ -368,7 +368,7 @@ def analyze_dmt_level_with_llm(content, scene_name=None, sub_scene_name=None, sc
 请判断DMT层次："""
 
         # 调用kimi API
-        API_KEY = os.environ.get("KIMI_API_KEY", "")
+        API_KEY = _public_config.secret('KIMI_API_KEY')
         client = OpenAI(
             api_key=API_KEY,
             base_url="https://api.moonshot.cn/v1",
@@ -446,7 +446,7 @@ def analyze_knowledge_type_with_llm(content, scene_name=None, sub_scene_name=Non
 
 {content[:4000]}"""
 
-        API_KEY = os.environ.get("KIMI_API_KEY", "")
+        API_KEY = _public_config.secret('KIMI_API_KEY')
         client = OpenAI(api_key=API_KEY, base_url="https://api.moonshot.cn/v1")
         response = client.chat.completions.create(
             model=KIMI_CLASSIFY_MODEL,
@@ -799,7 +799,7 @@ def analyze_card_value_with_llm(card, scene_name=None, sub_scene_name=None, scen
 请判断："""
 
         # 调用kimi API
-        API_KEY = os.environ.get("KIMI_API_KEY", "")
+        API_KEY = _public_config.secret('KIMI_API_KEY')
         client = OpenAI(
             api_key=API_KEY,
             base_url="https://api.moonshot.cn/v1",

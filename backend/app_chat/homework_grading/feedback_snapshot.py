@@ -45,7 +45,9 @@ def prepare_feedback_snapshot(destination, *, source_path, analysis_id, context,
                                   'model_config': model_config, 'preprocessing': preprocessing, 'retrieval': retrieval})
     payload = fingerprint_payload(data, **dependencies)
     # 执行配置只保存参与指纹的配置；凭据不应被调用者传入此接口。
-    execution = {key: payload[key] for key in ('model_config', 'preprocessing', 'retrieval')}
+    execution = {key: copy.deepcopy(payload[key]) for key in ('model_config', 'preprocessing', 'retrieval')}
+    if model_config.get('dependency_schema') == 'grading-stage-dependencies-v1' and 'consumer_code_hashes' in model_config:
+        execution['model_config']['consumer_code_hashes'] = copy.deepcopy(model_config['consumer_code_hashes'])
     manifest = {'analysis_type': 'homework_grading', 'group_id': analysis_id,
                 'source_document_sha256': source_hash, 'config_fingerprint': content_sha256(payload),
                 'feedback_execution': execution,

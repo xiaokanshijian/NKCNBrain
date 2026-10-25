@@ -7,7 +7,7 @@ import re
 from .file_io import FileLock, atomic_json
 
 PROGRESS_FIELDS = {'current_item', 'total_items', 'current_section', 'completed', 'error',
-                   'status', 'failure_stage', 'warnings', 'content_validation', 'updated_at'}
+                   'status', 'failure_stage', 'warnings', 'content_validation', 'updated_at', 'completion'}
 TERMINAL = {'completed', 'failed', 'interrupted'}
 
 

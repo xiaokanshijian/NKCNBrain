@@ -26,18 +26,16 @@
 </template>
   
 <script>
+import { requestVoiceSession } from '@/api/voiceSession'
 
-const APPID = "";
-const API_SECRET = "";
-const API_KEY = "";
 import AudioPlayer from '@/components/dist/index.umd.js';
-import CryptoJS from 'crypto-js';
 import { Base64 } from 'js-base64';
 
 export default {
     name: 'TextToSpeech',
     data() {
         return {
+            voiceAppId: '',
             tts_text: '《春江花月夜》是唐代诗人张若虚创作的七言歌行。',
             tts_base64: '',
             speed: 50,
@@ -62,19 +60,10 @@ export default {
         };
     },
     methods: {
-        getWebSocketUrl(apiKey, apiSecret) {
-            var url = "wss://tts-api.xfyun.cn/v2/tts";
-            var host = location.host;
-            var date = new Date().toGMTString();
-            var algorithm = "hmac-sha256";
-            var headers = "host date request-line";
-            var signatureOrigin = `host: ${host}\ndate: ${date}\nGET /v2/tts HTTP/1.1`;
-            var signatureSha = CryptoJS.HmacSHA256(signatureOrigin, apiSecret);
-            var signature = CryptoJS.enc.Base64.stringify(signatureSha);
-            var authorizationOrigin = `api_key="${apiKey}", algorithm="${algorithm}", headers="${headers}", signature="${signature}"`;
-            var authorization = btoa(authorizationOrigin);
-            url = `${url}?authorization=${authorization}&date=${date}&host=${host}`;
-            return url;
+        async getWebSocketUrl() {
+            const session = await requestVoiceSession('tts')
+            this.voiceAppId = session.app_id
+            return session.url
         },
         encodeText(text, type) {
             if (type === "unicode") {
@@ -94,9 +83,11 @@ export default {
                 return Base64.encode(text);
             }
         },
-        connectWebSocket() {
+        async connectWebSocket() {
             this.tts_base64 = '';
-            const url = this.getWebSocketUrl(API_KEY, API_SECRET);
+            let url;
+            try { url = await this.getWebSocketUrl(); }
+            catch (error) { this.$message.error(error.message || '语音连接失败'); return; }
             if ("WebSocket" in window) {
                 this.ttsWS = new WebSocket(url);
             } else if ("MozWebSocket" in window) {
@@ -118,7 +109,7 @@ export default {
                 var tte = this.tte ? "unicode" : "UTF8";
                 var params = {
                     common: {
-                        app_id: APPID,
+                        app_id: this.voiceAppId,
                     },
                     business: {
                         aue: "raw",

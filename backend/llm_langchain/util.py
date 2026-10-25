@@ -1,3 +1,4 @@
+import nkcn_public_config as _public_config
 import asyncio
 import base64
 import io
@@ -216,7 +217,7 @@ def image_2_summary_bypath(image_path):
     gpt_vision = chat_gpt_model.get_model()
     # vision_model = ChatOpenAI(
     #     temperature=0,
-    #     openai_api_key=os.environ.get("DASHSCOPE_API_KEY", ""),
+    #     openai_api_key='[redacted]',
     #     openai_api_base='https://dashscope.aliyuncs.com/compatible-mode/v1',
     #     default_headers={"x-foo": "true"},
     #     # openai_api_base=base_url,
@@ -303,7 +304,7 @@ def image_2_summary(image):
     gpt_vision = chat_gpt_model.get_model()
     # vision_model = ChatOpenAI(
     #     temperature=0,
-    #     openai_api_key=os.environ.get("DASHSCOPE_API_KEY", ""),
+    #     openai_api_key='[redacted]',
     #     openai_api_base='https://dashscope.aliyuncs.com/compatible-mode/v1',
     #     default_headers={"x-foo": "true"},
     #     # openai_api_base=base_url,
@@ -421,7 +422,7 @@ def image_2_summary_enhance(image_path):
                                 {'text': user_prompt}]}]
     response = MultiModalConversation.call(
         # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx"
-        api_key=os.environ.get("DASHSCOPE_API_KEY", ""),
+        api_key=_public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY'),
         model='qwen-vl-max-latest',  # 此处以qwen-vl-max-latest为例，可按需更换模型名称。模型列表：https://help.aliyun.com/zh/model-studio/models
         messages=messages,
         vl_high_resolution_images=True
@@ -1581,7 +1582,7 @@ def get_docs_by_seq_limit(user_name, doc_name):
     return return_segments
 
 
-def get_relevant_docs(question, vector_store, docs_name, user_name, use_tab_enhance=False):
+def get_relevant_docs(question, vector_store, docs_name, user_name, use_tab_enhance=False, page_scopes=None, structure_plans=None):
     """
     获取相关文档segments
 
@@ -1591,25 +1592,130 @@ def get_relevant_docs(question, vector_store, docs_name, user_name, use_tab_enha
         docs_name: 文档名列表
         user_name: 用户名
         use_tab_enhance: 是否使用了Tab增强（如果使用了，k=5, fetch_k=10；否则k=8, fetch_k=16）
+        page_scopes: 可选 {doc_name: [(p0,p1), ...]}，1-based 页码闭区间；有则收窄 RAG
+        structure_plans: 可选，DocStructure 配额取样计划（优先于纯页码后过滤）
     """
     querys = []
-    query = {}
     for doc_name in docs_name:
         file_path = construct_file_path(user_name, doc_name)
         querys.append(file_path)
-    query["source"] = {"$in": querys}
 
-    # 一段是500字符，汉字差不多tokens，10段5000-10000tokens
-    # docs = vector_store.similarity_search(question, 8, filter=query)
-    # texts = docs[0:min(8, len(docs))]
+    k_target = 5 if use_tab_enhance else 8
 
-    # 使用MMR搜索替代简单的相似性搜索
-    # 参数说明：
-    # k=8: 最终返回8个文档
-    # fetch_k=16: 先获取16个候选文档供MMR算法选择（通常设为k的2-3倍）
-    # lambda_mult=0.7: 平衡相似性(0.7)和多样性(0.3)，可根据需要调整
+    # 有结构计划：按章/节配额从页内池取样，不再依赖「相似检索碰巧命中章内」
+    if structure_plans:
+        try:
+            from app_chat.rag_structure_scope import (
+                pages_of_segment,
+                select_segments_for_plans,
+            )
+            pooled = []
+            vector = vector_store
+            for doc_name in docs_name:
+                ranges = None
+                if page_scopes and isinstance(page_scopes, dict):
+                    ranges = (
+                        page_scopes.get(doc_name)
+                        or page_scopes.get(os.path.basename(doc_name))
+                    )
+                if not ranges:
+                    continue
+                file_path = construct_file_path(user_name, doc_name)
+                try:
+                    raw = vector.get(where={"source": file_path})
+                except Exception:
+                    raw = None
+                if not raw or not raw.get("ids"):
+                    continue
+                for i, metadata in enumerate(raw.get("metadatas") or []):
+                    seg = Document(
+                        page_content=(raw.get("documents") or [""])[i] or "",
+                        metadata=dict(metadata or {}),
+                    )
+                    pages = pages_of_segment(seg)
+                    hit = False
+                    for pair in ranges:
+                        try:
+                            p0, p1 = int(pair[0]), int(pair[1])
+                        except Exception:
+                            continue
+                        if p1 < p0:
+                            p0, p1 = p1, p0
+                        if any(p0 <= p <= p1 for p in pages):
+                            hit = True
+                            break
+                    if hit:
+                        pooled.append(seg)
+            print(
+                f"[get_relevant_docs] 结构配额取样 pool={len(pooled)} k={k_target}",
+                flush=True,
+            )
+            picked = select_segments_for_plans(pooled, structure_plans, k_target)
+            if picked:
+                print(
+                    f"[get_relevant_docs] 结构配额选用 {len(picked)}",
+                    flush=True,
+                )
+                return picked
+            print("[get_relevant_docs] 结构配额无结果，回退页码后过滤", flush=True)
+        except Exception as e:
+            print(f"[get_relevant_docs] 结构配额失败，回退页码后过滤: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
 
-    # 🔥 如果使用了Tab增强，使用10取5；否则使用16取8（保持原逻辑）
+    # 默认：按 source 过滤（页码收窄在召回后用 Python 过滤，比 Chroma 复合 page where 更稳）
+    query = {"source": {"$in": querys}}
+
+    def _norm_src(p):
+        return (p or "").replace("\\", "/").strip()
+
+    def _norm_ranges(ranges):
+        out = []
+        for pair in ranges or []:
+            try:
+                a, b = int(pair[0]), int(pair[1])
+            except Exception:
+                continue
+            if a <= 0 or b <= 0:
+                continue
+            if b < a:
+                a, b = b, a
+            out.append((a, b))
+        return out
+
+    # doc_name / basename / full path → ranges（统一正斜杠，避免 Windows 路径对不上）
+    scope_lookup = {}
+    if page_scopes and isinstance(page_scopes, dict):
+        for doc_name in docs_name:
+            ranges = _norm_ranges(
+                page_scopes.get(doc_name)
+                or page_scopes.get(os.path.basename(doc_name))
+            )
+            if not ranges:
+                continue
+            fp = construct_file_path(user_name, doc_name)
+            for key in (
+                doc_name,
+                os.path.basename(doc_name),
+                fp,
+                _norm_src(fp),
+                _norm_src(os.path.basename(doc_name)),
+            ):
+                if key:
+                    scope_lookup[key] = ranges
+        if scope_lookup:
+            print(
+                f"[get_relevant_docs] 启用页码收窄(后过滤) "
+                f"docs={list(page_scopes.keys())}",
+                flush=True,
+            )
+        elif page_scopes:
+            print(
+                f"[get_relevant_docs] page_scopes 有值但与 docs_name 对不上，"
+                f"忽略收窄 scopes={list(page_scopes.keys())} docs={docs_name}",
+                flush=True,
+            )
+
     if use_tab_enhance:
         k = 5
         fetch_k = 10
@@ -1619,33 +1725,271 @@ def get_relevant_docs(question, vector_store, docs_name, user_name, use_tab_enha
         fetch_k = 16
         print(f"[get_relevant_docs] 使用正常模式：k={k}, fetch_k={fetch_k}")
 
-    # 🔥 使用混合MMR查询（支持同时查询主库和从库）
+    # 有页码范围时多召回一些，再按页过滤，避免顶层被其他章占满
+    search_k = k
+    search_fetch = fetch_k
+    if scope_lookup:
+        search_k = max(k * 3, 24)
+        search_fetch = max(fetch_k * 3, 48)
+
     docs = parse_input.mmr_search_with_merge(
         vector_store=vector_store,
         user_name=user_name,
         query=question,
-        k=k,
-        fetch_k=fetch_k,
+        k=search_k,
+        fetch_k=search_fetch,
         lambda_mult=0.7,
-        filter=query
+        filter=query,
     )
-    # MMR已经返回了优化的结果，直接使用
-    texts = docs  # 不需要再次切片，MMR已经返回了k个最优文档
 
-    # images = []
-    # seqs = []
-    # for doc in docs:
-    #    if "type" in doc.metadata and doc.metadata["type"] == "image":
-    #        images.append(global_var.store_memory[user_name]["images"][util.back_file_path(doc.metadata["source"])]
-    #                      [doc.metadata["seq"] - 1])
-    #        seqs.append(doc.metadata["seq"])
-    # for doc in docs:
-    #    print(doc)
+    # OCR 文档常无 metadata.page，页码写在正文「第 N 页」里（1-based）
+    _page_in_text_re = re.compile(r"第\s*(\d+)\s*页")
+
+    def _pages_1based(doc):
+        """返回片段涉及的 1-based 页码列表（metadata 优先，否则从正文解析）。"""
+        pages = []
+        meta = getattr(doc, "metadata", None) or {}
+        if "page" in meta and meta["page"] is not None:
+            page_num = meta["page"]
+            try:
+                if isinstance(page_num, int):
+                    pages.append(page_num + 1)  # chroma 存 0-based
+                else:
+                    pages.append(int(page_num) + 1)
+            except Exception:
+                pass
+        content = getattr(doc, "page_content", None) or ""
+        for m in _page_in_text_re.finditer(content):
+            try:
+                pages.append(int(m.group(1)))
+            except Exception:
+                pass
+        # 去重保序
+        seen = set()
+        out = []
+        for p in pages:
+            if p > 0 and p not in seen:
+                seen.add(p)
+                out.append(p)
+        return out
+
+    def _in_page_ranges(pages, ranges):
+        if not pages or not ranges:
+            return False
+        return any(p0 <= p <= p1 for p in pages for p0, p1 in ranges)
+
+    def _ranges_for(doc):
+        meta = getattr(doc, "metadata", None) or {}
+        src = meta.get("source") or ""
+        return (
+            scope_lookup.get(src)
+            or scope_lookup.get(_norm_src(src))
+            or scope_lookup.get(os.path.basename(src))
+            or scope_lookup.get(_norm_src(os.path.basename(src)))
+            or None
+        )
+
+    def _filter_by_scope(doc_list):
+        kept = []
+        no_page = 0
+        for doc in doc_list:
+            ranges = _ranges_for(doc)
+            if not ranges:
+                continue
+            pages = _pages_1based(doc)
+            if not pages:
+                no_page += 1
+                continue
+            if _in_page_ranges(pages, ranges):
+                kept.append(doc)
+        return kept, no_page
+
+    texts = docs
+    if scope_lookup:
+        filtered, no_page_n = _filter_by_scope(docs)
+        if no_page_n and not filtered:
+            print(
+                f"[get_relevant_docs] 召回 {len(docs)} 条均无可用页码"
+                f"(metadata/正文)，no_page={no_page_n}",
+                flush=True,
+            )
+        if len(filtered) >= max(2, k // 2):
+            texts = filtered[:k]
+            print(
+                f"[get_relevant_docs] 页码后过滤保留 {len(texts)}/{len(docs)} "
+                f"(目标 k={k})",
+                flush=True,
+            )
+        else:
+            # 章内太少：加大召回后再按页过滤；仍不够则硬取页内段
+            print(
+                f"[get_relevant_docs] 后过滤过少({len(filtered)})，加大召回后再按页过滤",
+                flush=True,
+            )
+            try:
+                big_docs = parse_input.mmr_search_with_merge(
+                    vector_store=vector_store,
+                    user_name=user_name,
+                    query=question,
+                    k=max(64, k * 8),
+                    fetch_k=max(96, fetch_k * 8),
+                    lambda_mult=0.7,
+                    filter=query,
+                )
+                big_filtered, _ = _filter_by_scope(big_docs)
+                if len(big_filtered) >= max(1, k // 2):
+                    texts = big_filtered[:k]
+                    print(
+                        f"[get_relevant_docs] 加大召回后页内保留 {len(texts)}",
+                        flush=True,
+                    )
+                else:
+                    # 硬取：vector.get 该文档全部片段，按正文/metadata 页码筛
+                    from llm_langchain import parse_input as _pi
+                    pooled = []
+                    vector = _pi.get_vector_by_user(user_name)
+                    for doc_name in docs_name:
+                        ranges = _norm_ranges(
+                            page_scopes.get(doc_name)
+                            or page_scopes.get(os.path.basename(doc_name))
+                        )
+                        if not ranges:
+                            continue
+                        file_path = construct_file_path(user_name, doc_name)
+                        try:
+                            raw = vector.get(where={"source": file_path})
+                        except Exception:
+                            raw = None
+                        if not raw or not raw.get("ids"):
+                            # 兼容 source 路径写法差异：再试 basename 匹配拉全库不现实，跳过
+                            continue
+                        for i, metadata in enumerate(raw.get("metadatas") or []):
+                            seg = Document(
+                                page_content=(raw.get("documents") or [""])[i] or "",
+                                metadata=dict(metadata or {}),
+                            )
+                            pages = _pages_1based(seg)
+                            if _in_page_ranges(pages, ranges):
+                                pooled.append(seg)
+
+                    def _seg_order(d):
+                        pages = _pages_1based(d)
+                        pg = pages[0] if pages else 10**9
+                        meta = getattr(d, "metadata", None) or {}
+                        sq = meta.get("seq")
+                        try:
+                            sq = int(sq) if sq is not None else 0
+                        except Exception:
+                            sq = 0
+                        return (pg, sq)
+
+                    def _fill_to_k(preferred, pool, target_k):
+                        """相关优先，不足则从页内池均匀补齐到 k（不再因 ranked 只有 1 条就停）。"""
+                        def _fp(d):
+                            return (getattr(d, "page_content", None) or "")[:240]
+
+                        out = []
+                        seen = set()
+                        for d in preferred or []:
+                            fp = _fp(d)
+                            if not fp or fp in seen:
+                                continue
+                            seen.add(fp)
+                            out.append(d)
+                            if len(out) >= target_k:
+                                return out
+                        rest = []
+                        for d in sorted(pool or [], key=_seg_order):
+                            fp = _fp(d)
+                            if not fp or fp in seen:
+                                continue
+                            seen.add(fp)
+                            rest.append(d)
+                        need = target_k - len(out)
+                        if need <= 0 or not rest:
+                            return out
+                        if len(rest) <= need:
+                            out.extend(rest)
+                            return out
+                        # 沿章内页序均匀抽样，避免全挤在章首
+                        picked = []
+                        picked_fp = set()
+                        for i in range(need):
+                            idx = int(round(i * (len(rest) - 1) / max(1, need - 1)))
+                            d = rest[idx]
+                            fp = _fp(d)
+                            if fp in picked_fp:
+                                continue
+                            picked_fp.add(fp)
+                            picked.append(d)
+                        if len(picked) < need:
+                            for d in rest:
+                                if len(picked) >= need:
+                                    break
+                                fp = _fp(d)
+                                if fp in picked_fp:
+                                    continue
+                                picked_fp.add(fp)
+                                picked.append(d)
+                        out.extend(picked)
+                        return out[:target_k]
+
+                    if pooled:
+                        preferred = list(filtered) + list(big_filtered)
+                        try:
+                            scored = parse_input.similarity_search_with_merge(
+                                vector_store=vector_store,
+                                user_name=user_name,
+                                query=question,
+                                k=min(max(len(pooled), k * 4), 80),
+                                filter=query,
+                            )
+                            ranked, _ = _filter_by_scope(scored)
+                            preferred = list(ranked) + preferred
+                        except Exception:
+                            pass
+                        texts = _fill_to_k(preferred, pooled, k)
+                        print(
+                            f"[get_relevant_docs] 页段硬取后选用 {len(texts)} "
+                            f"(池={len(pooled)}, 相关优先再补齐)",
+                            flush=True,
+                        )
+                    elif filtered or big_filtered:
+                        texts = (big_filtered or filtered)[:k]
+                    else:
+                        print(
+                            "[get_relevant_docs] 页码收窄无结果，回退全量",
+                            flush=True,
+                        )
+                        texts = parse_input.mmr_search_with_merge(
+                            vector_store=vector_store,
+                            user_name=user_name,
+                            query=question,
+                            k=k,
+                            fetch_k=fetch_k,
+                            lambda_mult=0.7,
+                            filter=query,
+                        )
+            except Exception as e:
+                print(f"[get_relevant_docs] 页码加强路径失败，回退全量: {e}", flush=True)
+                import traceback
+                traceback.print_exc()
+                texts = parse_input.mmr_search_with_merge(
+                    vector_store=vector_store,
+                    user_name=user_name,
+                    query=question,
+                    k=k,
+                    fetch_k=fetch_k,
+                    lambda_mult=0.7,
+                    filter=query,
+                )
+    else:
+        texts = docs[:k] if len(docs) > k else docs
 
     return texts
 
 
-def get_docs_all_split(user_name, docs_name_list, segment_get_way_list, text_for_search=None, core_keyword=None):
+def get_docs_all_split(user_name, docs_name_list, segment_get_way_list, text_for_search=None, core_keyword=None, page_scopes=None, structure_plans=None, grading_selection=None):
     segment_get_way_list = _normalize_segment_get_way_list(docs_name_list, segment_get_way_list, default_way=3)
     doc_all_get_list = []
     doc_seq_get_list = []
@@ -1684,7 +2028,12 @@ def get_docs_all_split(user_name, docs_name_list, segment_get_way_list, text_for
     # LUI1过来这里doc_list[3]是空的，要通过这个判断来分开LUI1和LUI2
     if doc_list[3] != []:
         # 🔥 根据是否使用Tab增强，决定相似搜索的参数（10取5 或 16取8）
-        cur_segments = get_relevant_docs(text_for_search, vector, doc_list[3], user_name, use_tab_enhance=use_tab_enhance)
+        cur_segments = get_relevant_docs(
+            text_for_search, vector, doc_list[3], user_name,
+            use_tab_enhance=use_tab_enhance,
+            page_scopes=page_scopes,
+            structure_plans=structure_plans,
+        )
         # 🔥 为RAG检索到的segments补充页码信息（如果page_content中没有）
         for segment in cur_segments:
             if segment.metadata and "page" in segment.metadata:
@@ -1720,6 +2069,17 @@ def get_docs_all_split(user_name, docs_name_list, segment_get_way_list, text_for
         # 没有使用Tab增强，使用正常的相似搜索逻辑（16取8），直接返回
         print(f"[get_docs_all_split] 未使用Tab增强，使用正常相似搜索逻辑（16取8）")
 
+    if docs_name_list:
+        from app_chat.homework_grading.grading_rag import append_grading_context
+        try:
+            all_segments = append_grading_context(all_segments, user_name, docs_name_list, text_for_search,
+                                                  selection=grading_selection, enhanced=bool(use_tab_enhance))
+        except Exception:
+            # 批改参考不可用不能破坏原有文档问答。
+            if grading_selection is not None:
+                grading_selection['result_status'] = [
+                    {'filename': name, 'status': 'failed', 'message': '批改参考暂不可用，本轮仅使用原文。'}
+                    for name in docs_name_list]
     return all_segments
 
 
@@ -1851,7 +2211,7 @@ def image_2_summary_initial(image_path, use_enhance=False):
                          'content': [{"image": base64_image},
                                      {'text': user_prompt}]}]
             response = MultiModalConversation.call(
-                api_key=os.environ.get("DASHSCOPE_API_KEY", ""),
+                api_key=_public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY'),
                 model='qwen-vl-max-latest',
                 # model='qwen3.6-plus',
                 messages=messages,
@@ -1952,7 +2312,7 @@ def image_2_summary_final(image_path, initial_description, depth_suggestion, use
                          'content': [{"image": base64_image},
                                      {'text': user_prompt}]}]
             response = MultiModalConversation.call(
-                api_key=os.environ.get("DASHSCOPE_API_KEY", ""),
+                api_key=_public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY'),
                 model='qwen-vl-max-latest',
                 # model='qwen3.6-plus',
                 messages=messages,

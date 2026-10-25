@@ -1,4 +1,5 @@
 """P02受控校验调度；无专项仍执行结构/证据与资料不足检查。"""
+from .stage_dependencies import artifact_compatible
 import copy
 import os
 import shutil
@@ -10,7 +11,7 @@ from .utils import safe_json_load, safe_json_dump, sorted_json_pages
 def validate_page(data, runtime):
     if not isinstance(data,dict) or type(data.get('page')) is not int or data['page']<1 or not isinstance(data.get('questions'),list):
         raise ValueError('题目页面结构无效')
-    if data.get('feedback_execution',{}).get('config_fingerprint') != runtime.fingerprint:
+    if not artifact_compatible(data, runtime):
         raise ValueError('题目页面配置与当前运行不一致')
     ids=set()
     for q in data['questions']:
@@ -30,8 +31,11 @@ def verify_with_runtime(subject, pass1_dir, out_report_path, *, feedback_runtime
     selected=None if page_nums is None else set(map(int,page_nums))
     pages=[]
     for path in sorted_json_pages(pass1_dir):
-        data=safe_json_load(path)
-        validate_page(data,runtime)
+        try:
+            data=safe_json_load(path)
+            validate_page(data,runtime)
+        except ValueError as exc:
+            raise ValueError(f'{os.path.basename(path)}：{exc}') from exc
         if selected is None or data['page'] in selected:pages.append((path,data))
     enabled=runtime.has_specialized(subject) and (kind!='answer_statement' or subject=='math')
     statuses=[];details=[];applied=0

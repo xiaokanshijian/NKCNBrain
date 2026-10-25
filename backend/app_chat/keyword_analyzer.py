@@ -2,8 +2,8 @@
 关键词四色和DMT属性判定工具
 复用卡片分析逻辑，但针对关键词进行适配
 """
+import nkcn_public_config as _public_config
 import json
-import os
 
 from openai import OpenAI
 
@@ -230,7 +230,7 @@ def analyze_keyword_four_color_dmt_with_llm(keyword, card_content, scene_name=No
         from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
         def call_kimi_first():
-            API_KEY = os.environ.get("KIMI_API_KEY", "")
+            API_KEY = _public_config.secret('KIMI_API_KEY')
             client = OpenAI(
                 api_key=API_KEY,
                 base_url="https://api.moonshot.cn/v1",
@@ -288,7 +288,7 @@ def analyze_keyword_four_color_dmt_with_llm(keyword, card_content, scene_name=No
         # 🔥 第二次尝试
         try:
             client = OpenAI(
-                api_key=os.environ.get("KIMI_API_KEY", ""),
+                api_key=_public_config.secret('KIMI_API_KEY'),
                 base_url="https://api.moonshot.cn/v1",
                 timeout=15.0
             )

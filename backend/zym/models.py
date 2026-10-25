@@ -20,6 +20,8 @@ class UserNotebook(models.Model):
     keywordFourColorDMT = models.TextField(default="")
     # 🔥 文档预处理章节摘要状态（JSON格式：{"filename": true/false}，true表示已完成，false表示未处理）
     documentPreSummaryStatus = models.TextField(default="")
+    # 🔥 文档 Skill 生成状态（JSON：{"filename": true/false/"pending"}）
+    documentSkillStatus = models.TextField(default="")
     # 🔥 问题链智能排序状态（Boolean，true表示已完成排序，false表示未排序）
     questionChainSorted = models.BooleanField(default=False)
     # 🔥 问题链排序后的CID顺序（JSON格式：["cid1", "cid2", ...]）

@@ -1,10 +1,10 @@
-import os
+import nkcn_public_config as _public_config
 from openai import OpenAI
 
 
 client = OpenAI(
-    api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-    base_url='https://chat.cloudapi.vip/v1/',
+    api_key=_public_config.secret('OPENAI_API_KEY'),
+    base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
     default_headers={"x-foo": "true"},
 )
 

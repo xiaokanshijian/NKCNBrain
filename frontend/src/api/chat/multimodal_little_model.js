@@ -45,7 +45,7 @@ export function callMultimodalLittleModel(params) {
     })
   } catch (e) {}
 
-  const apiUrl = 'http://192.0.2.1:8000/respllm/predict'
+  const apiUrl = (process.env.VUE_APP_SERVICE_8000_RESPLLM_PREDICT_URL || "http://localhost:8000/respllm/predict")
   return axios.post(apiUrl, formData, {
     headers: { 'Content-Type': 'multipart/form-data', 'Connection': 'close' },
     timeout: 60000,

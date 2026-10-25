@@ -4,7 +4,8 @@ import os
 import re
 import time
 import traceback
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import as_completed
+from .execution_control import ThreadPoolExecutor, retryable_transport
 from typing import Any, Dict, List, Optional, Set
 
 from llm_langchain import global_var
@@ -78,6 +79,7 @@ from app_chat.homework_grading.staged_pipeline import (
     load_homework_clean_pages,
     normalize_homework_target_stage,
 )
+from .completion import summarize_completion, finish_delivery, available_actions, saved_report_ready
 
 ANALYSIS_TYPE = 'homework_grading'
 DEFAULT_PASS1_PARALLELISM = 5
@@ -108,6 +110,8 @@ def _run_pass1_page_with_retry(page_num: int, label: str, fn):
         except Exception as exc:
             last_exc = exc
             traceback.print_exc()
+            if not retryable_transport(exc):
+                raise
             if attempt + 1 >= attempts:
                 break
             time.sleep(min(2 ** attempt, 6))
@@ -129,7 +133,7 @@ def build_homework_analysis_id(username: str, filename: str) -> str:
     return f'homework_{digest}'
 
 
-def prepare_homework_workspace(username: str, analysis_id: str, run_id: Optional[str] = None) -> Dict[str, str]:
+def prepare_homework_workspace(username: str, analysis_id: str, run_id: Optional[str] = None, *, create=True) -> Dict[str, str]:
     root = resolve_homework_run_root(username, analysis_id, run_id)
     base = os.path.join(root, 'homework_grading')
     paths = {
@@ -146,9 +150,10 @@ def prepare_homework_workspace(username: str, analysis_id: str, run_id: Optional
         'annotated_understanding': os.path.join(base, 'annotated_understanding'),
         'manifest': os.path.join(root, 'manifest.json'),
     }
-    for key in ('root', 'base', 'raw', 'clean', 'preprocess_candidates', 'pass1_json',
-                'pass2_report', 'annotated', 'annotated_layout', 'annotated_understanding'):
-        os.makedirs(paths[key], exist_ok=True)
+    if create:
+        for key in ('root', 'base', 'raw', 'clean', 'preprocess_candidates', 'pass1_json',
+                    'pass2_report', 'annotated', 'annotated_layout', 'annotated_understanding'):
+            os.makedirs(paths[key], exist_ok=True)
     return paths
 
 
@@ -297,12 +302,23 @@ def check_homework_stage_ready(
     if not os.path.isfile(paths['manifest']):
         return False
     manifest = safe_json_load(paths['manifest'])
+    from .artifact_transaction import transaction_pending
+    if transaction_pending(paths['base']):
+        return False
+    if manifest.get('content_validation', {}).get('status') == 'needs_review':
+        return False
+    if (stage or HOMEWORK_STAGE_GRADING) == HOMEWORK_STAGE_GRADING:
+        if any(item['stage'] != 'quality' for item in summarize_completion(manifest)['issues']):
+            return False
     if preprocess_mode is not None and not preprocess_mode_matches_manifest(manifest, preprocess_mode):
         return False
     pages = load_homework_clean_pages(paths)
     if not pages:
         return False
     if manifest.get('config_fingerprint'):
+        from .execution_checkpoints import receipt_matches
+        if not receipt_matches(paths, manifest, stage or HOMEWORK_STAGE_GRADING):
+            return False
         from .feedback_artifacts import validate_artifacts
         try:
             validate_artifacts(paths, pages, manifest, stage or HOMEWORK_STAGE_GRADING,
@@ -343,7 +359,11 @@ def run_homework_grading(
         )
         if scope_page_nums is not None:
             complete_homework_session_rerun(username, analysis_id)
-        _update_task(task_id, current_section='完成', completed=True, error='')
+        final_manifest = safe_json_load(paths['manifest'])
+        completion = summarize_completion(final_manifest)
+        _update_task(task_id, current_section=completion['message'], completed=True, error='', completion=completion)
+        from .grading_rag import schedule_index
+        schedule_index(username, filename)
     except Exception as exc:
         traceback.print_exc()
         failure_stage = 'startup'
@@ -360,6 +380,7 @@ def run_homework_grading(
 def run_homework_red_blue_review(task_id: str, username: str, analysis_id: str, *, feedback_runtime=None, run_id=None) -> None:
     """仅重评当前版本卡标，不触发 OCR、判分或渲染。"""
     paths = prepare_homework_workspace(username, analysis_id, run_id=run_id)
+    manifest = None
     try:
         if not os.path.isfile(paths['manifest']):
             raise ValueError('当前作业批改结果不存在')
@@ -371,6 +392,8 @@ def run_homework_red_blue_review(task_id: str, username: str, analysis_id: str, 
         )
         if stages.get(HOMEWORK_STAGE_GRADING) != 'done':
             raise ValueError('完整批改尚未完成，暂不能生成红蓝卡标')
+        if not saved_report_ready(paths, manifest):
+            raise ValueError('批改复核或原产物尚未核验通过，暂不能重新评分')
         _update_task(
             task_id,
             current_item=0,
@@ -379,7 +402,18 @@ def run_homework_red_blue_review(task_id: str, username: str, analysis_id: str, 
             completed=False,
             error='',
         )
-        review = evaluate_homework_red_blue(paths, manifest, feedback_runtime=feedback_runtime)
+        from .stage_dependencies import enabled as scoped_dependencies
+        if scoped_dependencies(feedback_runtime):
+            from .execution_control import Execution, execution_scope
+            from .execution_checkpoints import record_stage_receipt
+            execution = Execution(feedback_runtime, paths['base'], False)
+            execution.mark('quality')
+            with execution_scope(execution):
+                review = evaluate_homework_red_blue(paths, manifest, feedback_runtime=feedback_runtime)
+                if review.get('status') == 'ready':
+                    record_stage_receipt(paths, manifest, 'quality')
+        else:
+            review = evaluate_homework_red_blue(paths, manifest, feedback_runtime=feedback_runtime)
         manifest['red_blue_review'] = {
             'status': review.get('status', 'failed'),
             'score': review.get('score'),
@@ -387,14 +421,23 @@ def run_homework_red_blue_review(task_id: str, username: str, analysis_id: str, 
             'error': review.get('error', ''),
         }
         manifest['updated_at'] = datetime.datetime.now().isoformat()
+        completion = finish_delivery(manifest)
         safe_json_dump(paths['manifest'], manifest)
+        CIIndexManager.update_status(username, analysis_id, manifest['status'])
         if review.get('status') != 'ready':
             raise ValueError(review.get('error') or '批改质量评分未成功，请查看原运行记录')
-        CIIndexManager.update_status(username, analysis_id, 'completed')
-        _update_task(task_id, current_item=1, total_items=1, current_section='完成', completed=True, error='')
+        _update_task(task_id, current_item=1, total_items=1, current_section=completion['message'],
+                     completed=True, error='', completion=completion)
     except Exception as exc:
         traceback.print_exc()
-        _update_task(task_id, current_section='失败', completed=True, error=str(exc), failure_stage='quality')
+        completion = None
+        if manifest is not None:
+            manifest['red_blue_review'] = {'status': 'failed', 'score': None, 'color': '', 'error': str(exc)}
+            completion = finish_delivery(manifest)
+            safe_json_dump(paths['manifest'], manifest)
+            CIIndexManager.update_status(username, analysis_id, manifest['status'])
+        _update_task(task_id, current_section='质量评分未完成', completed=True, error=str(exc),
+                     failure_stage='quality', completion=completion)
 
 
 def _load_report(paths: Dict[str, str], manifest: Dict[str, Any]) -> Dict[str, Any]:
@@ -456,6 +499,9 @@ def _load_pass1_questions(json_path: str, page_num: int) -> List[Dict[str, Any]]
             'understanding_confidence': question.get('understanding_confidence'),
             'grading_confidence': question.get('grading_confidence'),
         })
+        from .material_markings import MARKING_FIELDS, normalize_markings
+        questions[-1].update({key: question[key] for key in MARKING_FIELDS if key in question})
+        normalize_markings(questions[-1], layout='student_answer' not in question)
     return questions
 
 
@@ -469,10 +515,18 @@ def _load_pass1_boundary(json_path: str) -> Dict[str, Any]:
 
 def _build_page_units(paths: Dict[str, str], filename: str, analysis_id: str) -> List[Dict[str, Any]]:
     root = paths['root']
+    if not os.path.isdir(paths['clean']):
+        return []
     clean_files = sorted(
         [name for name in os.listdir(paths['clean']) if name.lower().endswith('.png')],
         key=lambda name: (parse_page_num(name), name),
     )
+    def _mtime(path: str) -> int:
+        try:
+            return int(os.path.getmtime(path)) if path and os.path.isfile(path) else 0
+        except OSError:
+            return 0
+
     units = []
     for name in clean_files:
         page_num = parse_page_num(name)
@@ -482,6 +536,15 @@ def _build_page_units(paths: Dict[str, str], filename: str, analysis_id: str) ->
         layout_path = os.path.join(paths['annotated_layout'], name)
         understanding_path = os.path.join(paths['annotated_understanding'], name)
         json_path = os.path.join(paths['pass1_json'], os.path.splitext(name)[0] + '.json')
+        stem = os.path.splitext(name)[0]
+        preview_path = os.path.join(paths['annotated'], f'.preview_w1600_{stem}.jpg')
+        asset_mtime = max(
+            _mtime(annotated_path),
+            _mtime(layout_path),
+            _mtime(understanding_path),
+            _mtime(preview_path),
+            _mtime(json_path),
+        )
         units.append({
             'unit_id': f'u{page_num:03d}',
             'source_file': filename,
@@ -493,6 +556,7 @@ def _build_page_units(paths: Dict[str, str], filename: str, analysis_id: str) ->
             'annotated_layout_image_path': relpath_under(layout_path, root) if os.path.exists(layout_path) else '',
             'annotated_understanding_image_path': relpath_under(understanding_path, root) if os.path.exists(understanding_path) else '',
             'pass1_json_path': relpath_under(json_path, root) if os.path.exists(json_path) else '',
+            'asset_mtime': asset_mtime or None,
         })
     return units
 
@@ -657,9 +721,27 @@ def _build_curriculum_mastery(memory: Dict[str, Any], subject: str, domain_map=N
 
 def get_homework_grading_result(username: str, analysis_id: str, run_id: Optional[str] = None) -> Dict[str, Any]:
     active_run_id = (run_id or '').strip() or CURRENT_RUN_ID
-    paths = prepare_homework_workspace(username, analysis_id, run_id=active_run_id)
+    try:
+        paths = prepare_homework_workspace(username, analysis_id, run_id=active_run_id, create=False)
+    except (ValueError, OSError):
+        if active_run_id != CURRENT_RUN_ID:
+            raise
+        from .homework_versions import list_homework_versions
+        history = list_homework_versions(username, analysis_id)
+        if not any(not item['is_current'] for item in history):
+            raise
+        message = '当前结果不可读取，请选择历史版本查看；原目录已保留。'
+        return {'error_num': 0, 'analysis_type': 'homework_grading', 'analysis_id': analysis_id,
+                'run_id': CURRENT_RUN_ID, 'username': username, 'current_unavailable': True,
+                'manifest': {}, 'pages': [], 'snapshot_status': 'invalid',
+                'completion': {'status': 'unverified', 'report_usable': False, 'message': message, 'issues': []},
+                'available_actions': {key: {'enabled': False, 'reason': message}
+                                      for key in ('resume', 'rerun_grading', 'retry_quality')}}
     if not os.path.exists(paths['manifest']):
         return {'error_num': 1, 'msg': f'作业批改结果 {analysis_id} 不存在'}
+    from .artifact_transaction import transaction_pending
+    if transaction_pending(paths['base']):
+        return {'error_num': 1, 'msg': '结果正在发布，请稍后重试'}
     manifest = safe_json_load(paths['manifest'])
     from .feedback_result_basis import result_basis
     basis, feedback_runtime, kp_names, kp_domains = result_basis(paths['root'], manifest)
@@ -686,9 +768,9 @@ def get_homework_grading_result(username: str, analysis_id: str, run_id: Optiona
         if isinstance(manifest.get('red_blue_review'), dict)
         else {}
     )
-    if red_blue_review.get('status') == 'missing' and manifest_review.get('status') == 'failed':
+    if manifest_review.get('status') in ('failed', 'pending', 'running', 'blocked'):
         red_blue_review = {
-            'status': 'failed',
+            'status': manifest_review['status'],
             'schema_version': 'homework-red-blue-v1',
             'error': manifest_review.get('error') or '评分待补充',
         }
@@ -700,6 +782,7 @@ def get_homework_grading_result(username: str, analysis_id: str, run_id: Optiona
     report = _load_report(paths, manifest)
     feedback_map = _build_feedback_map(report)
     pages = []
+    assets_version = 0
     for unit in _build_page_units(paths, filename, analysis_id):
         json_abs = os.path.join(paths['root'], unit.get('pass1_json_path', '')) if unit.get('pass1_json_path') else ''
         questions = _load_pass1_questions(json_abs, unit['page']) if json_abs else []
@@ -708,14 +791,39 @@ def get_homework_grading_result(username: str, analysis_id: str, run_id: Optiona
             feedback = feedback_map.get(_feedback_key(question['page'], question['id'])) or {}
             question['feedback'] = feedback
             question['trend'] = kp_trend_by_page.get(question['page'], {}).get(question.get('knowledge_point', ''), '')
-        pages.append({**unit, 'boundary': boundary, 'questions': questions})
+        from .page_feedback import display_context
+        try:
+            assets_version = max(assets_version, int(unit.get('asset_mtime') or 0))
+        except (TypeError, ValueError):
+            pass
+        pages.append({**unit, 'boundary': boundary, 'questions': questions,
+                      'feedback_context': display_context(unit['page'], report, basis.get('feedback_context'), manifest)})
+    from .feedback_task_recovery import task_reference
+    task, task_error = task_reference(username, analysis_id, manifest, paths['root']) if active_run_id == CURRENT_RUN_ID else (None, '')
+    from .completion import final_material_evidence
+    manifest['material_evidence'] = final_material_evidence(paths)
+    completion = summarize_completion(manifest, report)
+    artifacts_ok = saved_report_ready(paths, manifest) if completion['report_usable'] else False
+    if completion['status'] == 'complete' and completion['report_usable'] and not artifacts_ok:
+        completion = summarize_completion(manifest, report, artifacts_valid=False)
+    actions = available_actions(manifest, completion, snapshot_ok=basis.get('snapshot_status') == 'complete',
+                                current=active_run_id == CURRENT_RUN_ID, task=task,
+                                artifacts_ok=artifacts_ok,
+                                task_error=task_error)
+    from .notebook_skills import usage_summary
     return {
         'error_num': 0,
         'analysis_id': analysis_id,
         'run_id': active_run_id,
         'analysis_type': ANALYSIS_TYPE,
         'manifest': manifest,
+        'completion': completion,
+        'available_actions': actions,
+        'notebook_skill_usage': usage_summary(feedback_runtime, paths['base']),
+        'task': task,
+        'task_lookup_error': task_error,
         'pages': pages,
+        'assets_version': assets_version or None,
         'report': report,
         'feedback_by_page_question': feedback_map,
         'student_profile': {},

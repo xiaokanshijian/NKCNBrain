@@ -1,6 +1,6 @@
 from django.urls import path, re_path
 
-from app1 import views
+from app1 import views, session_views
 
 urlpatterns = [
     # path('admin/', admin.site.urls),
@@ -8,7 +8,10 @@ urlpatterns = [
     # path('login/', views.login),
     re_path('add_user$', views.add_user),
     re_path('show_users/', views.show_users),
-    re_path('verify_user/', views.verify_user),
+    re_path(r'^verify_user/?$', views.verify_user),
+    path('auth/csrf', session_views.csrf_token),
+    path('auth/session', session_views.current_session),
+    path('auth/logout', session_views.logout_session),
     re_path('ban_user/', views.ban_user),
     re_path('open_user/', views.open_user),
     re_path('user_exit/', views.user_exit),

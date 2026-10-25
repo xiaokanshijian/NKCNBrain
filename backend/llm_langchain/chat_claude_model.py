@@ -1,3 +1,4 @@
+import nkcn_public_config as _public_config
 import os
 
 from langchain_community.chat_models.openai import ChatOpenAI
@@ -7,17 +8,17 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, AIMessage, HumanMessage
 from langchain_core.prompts import HumanMessagePromptTemplate, MessagesPlaceholder, SystemMessagePromptTemplate
 
-os.environ["http_proxy"] = "http://localhost:7890"
-os.environ["https_proxy"] = "http://localhost:7890"
+# os.environ["http_proxy"] = "http://localhost:7890"
+# os.environ["https_proxy"] = "http://localhost:7890"
 
-# os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "")   # openai old
-# os.environ["ANTHROPIC_API_KEY"] = os.environ.get("ANTHROPIC_API_KEY", "")  # openai new
-# ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-os.environ["ANTHROPIC_API_KEY"] = os.environ.get("NKCN_LLM_API_KEY", "")  # openai new
-ANTHROPIC_API_KEY = os.environ.get("NKCN_LLM_API_KEY", "")
+# os.environ["OPENAI_API_KEY"] = "[redacted]"   # openai old
+# os.environ["ANTHROPIC_API_KEY"] = "[redacted]"  # openai new
+# ANTHROPIC_API_KEY = "[redacted]"
+os.environ.setdefault("ANTHROPIC_API_KEY", _public_config.secret('OPENAI_API_KEY'))  # openai new
+ANTHROPIC_API_KEY = _public_config.secret('OPENAI_API_KEY')
 
-# OPEN_AI_KEY = os.environ.get("OPENAI_API_KEY", "")
-# base_url = "https://ai98.vip/v1"
+# OPEN_AI_KEY = "[redacted]"
+# base_url = "http://localhost:9999/v1"
 
 # chat_model = ChatAnthropic(temperature=0.5,
 #                            api_key=ANTHROPIC_API_KEY,
@@ -28,7 +29,7 @@ ANTHROPIC_API_KEY = os.environ.get("NKCN_LLM_API_KEY", "")
 chat_model = ChatOpenAI(temperature=0.5,
                         api_key=ANTHROPIC_API_KEY,
                         # openai_api_base=base_url,
-                        openai_api_base='https://chat.cloudapi.vip/v1/',
+                        openai_api_base=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
                         default_headers={"x-foo": "true"},
                         # streaming=True,
                         model="claude-sonnet-4-20250514",

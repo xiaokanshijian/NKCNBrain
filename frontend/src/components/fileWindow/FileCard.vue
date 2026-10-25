@@ -92,7 +92,7 @@
     <img src="@/assets/img/fileImg/excel.png" alt="" v-else-if="fileType == 2" @contextmenu="hideContextMenu"/>
     <img src="@/assets/img/fileImg/ppt.png" alt="" v-else-if="fileType == 3" @contextmenu="hideContextMenu"/>
     <img src="@/assets/img/fileImg/pdf.png" alt="" v-else-if="fileType == 4" @click="showFileDialog" @contextmenu="hideContextMenu"/>
-    <img src="@/assets/img/fileImg/zpi.png" alt="" v-else-if="fileType == 5" @contextmenu="hideContextMenu"/>
+    <img src="@/assets/img/fileImg/zpi.png" alt="" v-else-if="fileType == 5" @click="showFileDialog" @contextmenu="hideContextMenu"/>
     <img src="@/assets/img/fileImg/txt.png" alt="" v-else-if="fileType == 6" @contextmenu="hideContextMenu"/>
     <img src="@/assets/img/fileImg/png.png" alt="" v-else-if="fileType == 7" @contextmenu="hideContextMenu"/>
     <img src="@/assets/img/fileImg/jpg.png" alt="" v-else-if="fileType == 8" @contextmenu="hideContextMenu"/>
@@ -116,6 +116,13 @@
         {{ file.name || '未知' }}
       </span>
       <span>{{ file.size }}</span>
+      <div
+        v-if="skillStatusLabel"
+        class="skill-status-badge"
+        :class="skillStatusClass"
+        :title="skillStatusTitle"
+        @click.stop="onSkillStatusClick"
+      >{{ skillStatusLabel }}</div>
     </div>
     
     <!-- 文档置信度悬浮框 - 移到外部 -->
@@ -147,6 +154,174 @@
     <div class="menu-item" @click="deleteFile">删除文件</div>
     <div class="menu-item" @click="editDocumentFourColor">修改主辅四色属性</div>
     <div class="menu-item" v-if="String(file.name || '').toLowerCase().endsWith('.pdf')" @click="openMaterialSettings">材料设置</div>
+    <div class="menu-item" v-if="isSkillRelatedFile" :class="{ disabled: skillStatusPending }" @click="openSkillEnableDialog">
+      {{ skillStatusPending ? 'Skill 生成中…' : '禁用/启用对应 Skill' }}
+    </div>
+    <div class="menu-item" v-if="isSkillRelatedFile" :class="{ disabled: skillStatusPending }" @click="openSkillEditDialog">
+      {{ skillStatusPending ? 'Skill 生成中…' : '查看/编辑对应 Skill' }}
+    </div>
+    <div class="menu-item" v-if="canRetrySkill" @click="retrySkillGeneration">重试生成 Skill</div>
+  </div>
+
+  <!-- Skill 启用/禁用 -->
+  <div v-if="showSkillEnableDialog" class="skill-dlg-overlay" @click.self="showSkillEnableDialog=false">
+    <div class="skill-dlg skill-dlg--enable" @click.stop>
+      <div class="skill-dlg-header">
+        <div>
+          <h3>禁用 / 启用 Skill</h3>
+          <p class="skill-dlg-sub">来源：{{ file.name }}</p>
+        </div>
+        <button class="skill-dlg-close" type="button" @click="showSkillEnableDialog=false">×</button>
+      </div>
+      <div class="skill-dlg-body">
+        <div v-if="!skillForFileList.length" class="skill-empty">暂无关联 Skill（可能仍在生成中）</div>
+        <div v-else class="skill-enable-grid">
+          <div
+            v-for="s in skillForFileList"
+            :key="s.name"
+            class="skill-enable-card"
+            :class="{ 'is-off': !s.enabled }"
+          >
+            <div class="skill-enable-card-top">
+              <div class="skill-enable-card-title">
+                <span>{{ s.title || s.name }}</span>
+                <span v-if="s.is_hub" class="skill-hub-badge">Hub</span>
+              </div>
+              <el-switch v-model="s.enabled" @change="(v)=>toggleSkillEnabled(s, v)" />
+            </div>
+            <div class="skill-enable-card-name">{{ s.name }}</div>
+            <div
+              class="skill-md-snippet"
+              v-html="renderSkillMarkdown(s.description || '（无描述）')"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div class="skill-dlg-footer">
+        <button class="skill-btn skill-btn--ghost" type="button" @click="showSkillEnableDialog=false">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Skill 编辑（Markdown 预览 / 源码编辑） -->
+  <div v-if="showSkillEditDialog" class="skill-dlg-overlay" @click.self="showSkillEditDialog=false">
+    <div class="skill-dlg skill-dlg--edit" @click.stop>
+      <div class="skill-dlg-header">
+        <div>
+          <h3>查看 / 编辑 Skill</h3>
+          <p class="skill-dlg-sub">{{ editingSkillName || '未选择' }}</p>
+        </div>
+        <button class="skill-dlg-close" type="button" @click="showSkillEditDialog=false">×</button>
+      </div>
+      <div class="skill-dlg-toolbar">
+        <select
+          v-if="skillEditCandidates.length > 1"
+          v-model="editingSkillName"
+          class="skill-select"
+          @change="loadSkillRaw"
+        >
+          <option v-for="s in skillEditCandidates" :key="s.name" :value="s.name">
+            {{ s.title || s.name }}
+          </option>
+        </select>
+        <div class="skill-tabs">
+          <button
+            type="button"
+            class="skill-tab"
+            :class="{ active: skillEditMode === 'preview' }"
+            @click="skillEditMode = 'preview'"
+          >Markdown 预览</button>
+          <button
+            type="button"
+            class="skill-tab"
+            :class="{ active: skillEditMode === 'edit' }"
+            @click="skillEditMode = 'edit'"
+          >编辑源码</button>
+        </div>
+      </div>
+      <div class="skill-dlg-body skill-dlg-body--edit">
+        <div v-if="skillEditMode === 'preview'" class="skill-md-preview">
+          <div v-if="skillEditFrontmatterMeta.length" class="skill-fm-box">
+            <div class="skill-fm-title">Frontmatter</div>
+            <div class="skill-fm-row" v-for="(row, i) in skillEditFrontmatterMeta" :key="i">
+              <span class="skill-fm-key">{{ row.key }}</span>
+              <span
+                class="skill-fm-val"
+                :class="{ 'is-description': row.key === 'description' }"
+                v-html="formatSkillDescDisplay(row.value)"
+              ></span>
+            </div>
+          </div>
+          <div class="skill-md-body" v-html="skillEditPreviewHtml"></div>
+        </div>
+        <textarea
+          v-else
+          v-model="editingSkillRaw"
+          class="skill-md-editor"
+          spellcheck="false"
+          placeholder="在此编辑完整 SKILL.md（含 YAML frontmatter）…"
+          @input="onSkillEditRawInput"
+        ></textarea>
+      </div>
+      <div class="skill-dlg-footer">
+        <span class="skill-dlg-hint">{{ skillEditLineCount }} 行 · 保存写入完整 Markdown</span>
+        <div class="skill-dlg-footer-actions">
+          <button class="skill-btn skill-btn--ghost" type="button" @click="showSkillEditDialog=false">取消</button>
+          <button class="skill-btn skill-btn--primary" type="button" @click="saveSkillRaw">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Skill 包 ZIP 预览 -->
+  <div v-if="showSkillPackDialog" class="skill-dlg-overlay" @click.self="showSkillPackDialog=false">
+    <div class="skill-dlg skill-dlg--pack" @click.stop>
+      <div class="skill-dlg-header">
+        <div>
+          <h3>Skill 包</h3>
+          <p class="skill-dlg-sub">{{ file.name }} · {{ file.size || '' }}</p>
+        </div>
+        <button class="skill-dlg-close" type="button" @click="showSkillPackDialog=false">×</button>
+      </div>
+      <div class="skill-pack-stats" v-if="skillPackList.length">
+        <span>共 {{ skillPackList.length }} 个 Skill</span>
+        <span>已启用 {{ skillPackEnabledCount }}/{{ skillPackList.length }}</span>
+        <span v-if="skillPackHubName">Hub：{{ skillPackHubName }}</span>
+      </div>
+      <div class="skill-dlg-body">
+        <div v-if="skillPackLoading" class="skill-empty">正在加载 Skill 包内容…</div>
+        <div v-else-if="!skillPackList.length" class="skill-empty">
+          此 ZIP 尚未解析出 Skill（可能仍在导入，或不是有效 Skill 包）。可右键「查看/编辑对应 Skill」重试。
+        </div>
+        <div v-else class="skill-enable-grid">
+          <div
+            v-for="s in skillPackList"
+            :key="s.name"
+            class="skill-enable-card"
+            :class="{ 'is-off': !s.enabled, 'is-hub': s.is_hub }"
+          >
+            <div class="skill-enable-card-top">
+              <div class="skill-enable-card-title">
+                <span>{{ s.title || s.name }}</span>
+                <span v-if="s.is_hub" class="skill-hub-badge">Hub</span>
+              </div>
+              <el-switch v-model="s.enabled" @change="(v)=>toggleSkillEnabled(s, v)" />
+            </div>
+            <div class="skill-enable-card-name">{{ s.name }}</div>
+            <div
+              class="skill-md-snippet"
+              v-html="renderSkillMarkdown(s.description || '（无描述）')"
+            ></div>
+            <div class="skill-pack-card-actions">
+              <button class="skill-btn skill-btn--sm" type="button" @click="openEditFromPack(s)">查看 / 编辑 MD</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="skill-dlg-footer">
+        <button class="skill-btn skill-btn--ghost" type="button" @click="showSkillPackDialog=false">关闭</button>
+      </div>
+    </div>
   </div>
 
   <!-- 🔥 文档四色属性编辑对话框 -->
@@ -243,6 +418,7 @@
 import base from "@/api";
 import { get_file } from "@/api/card/get_card"
 import { API_BASE_URL } from '@/config/apiConfig';
+import { marked } from 'marked';
 
 import { startAutomation, getAutomationStatus, stopAutomation, resetAutomation, getFileAutomationStatus, saveFileAutomationStatus } from "@/api/automation"
 
@@ -283,7 +459,24 @@ export default {
       editingMainFourColor: '',
       editingSecondaryFourColor: '',
       colorOptions: ['R', 'B', 'P', 'G'],
-      colorOptionNames: { 'R': '红色', 'B': '蓝色', 'P': '紫色', 'G': '绿色' }
+      colorOptionNames: { 'R': '红色', 'B': '蓝色', 'P': '紫色', 'G': '绿色' },
+      // Skill
+      showSkillEnableDialog: false,
+      showSkillEditDialog: false,
+      showSkillPackDialog: false,
+      skillForFileList: [],
+      skillEditCandidates: [],
+      skillPackList: [],
+      skillPackLoading: false,
+      editingSkillName: '',
+      editingSkillRaw: '',
+      skillEditMode: 'preview', // preview | edit
+      editingSkillFrontmatter: null, // skill_get 解析后的 frontmatter（完整 description）
+      skillEditRawDirty: false,
+      skillEditRawBaseline: '',
+      skillGenStatus: null, // null | 'pending' | true | false
+      skillStatusPollTimer: null,
+      skillNullPollCount: 0,
     }
   },
   props: {
@@ -401,6 +594,73 @@ export default {
     isImageFileType() {
       return this.fileType === 7 || this.fileType === 8;
     },
+    isSkillRelatedFile() {
+      const n = String(this.file?.name || '').toLowerCase();
+      return n.endsWith('.pdf') || n.endsWith('.txt') || n.endsWith('.zip');
+    },
+    isDocSkillFile() {
+      const n = String(this.file?.name || '').toLowerCase();
+      return n.endsWith('.pdf') || n.endsWith('.txt');
+    },
+    skillStatusPending() {
+      return this.isDocSkillFile && this.skillGenStatus === 'pending';
+    },
+    canRetrySkill() {
+      return this.isDocSkillFile && this.skillGenStatus === false;
+    },
+    skillStatusLabel() {
+      if (!this.isDocSkillFile) return '';
+      if (this.skillGenStatus === 'pending') return 'Skill生成中';
+      if (this.skillGenStatus === false) return 'Skill失败·点重试';
+      return '';
+    },
+    skillStatusClass() {
+      if (this.skillGenStatus === 'pending') return 'pending';
+      if (this.skillGenStatus === false) return 'failed';
+      return '';
+    },
+    skillStatusTitle() {
+      if (this.skillGenStatus === 'pending') return '文档 Skill 正在后台生成';
+      if (this.skillGenStatus === false) return 'Skill 生成失败，点击重试';
+      return '';
+    },
+    skillEditLineCount() {
+      const raw = this.editingSkillRaw || '';
+      if (!raw) return 0;
+      return raw.split('\n').length;
+    },
+    skillEditParsed() {
+      const raw = this.editingSkillRaw || '';
+      if (!raw.startsWith('---')) {
+        return { frontmatterText: '', body: raw };
+      }
+      const end = raw.indexOf('\n---', 3);
+      if (end < 0) {
+        return { frontmatterText: '', body: raw };
+      }
+      return {
+        frontmatterText: raw.slice(3, end).trim(),
+        body: raw.slice(end + 4).replace(/^\r?\n/, ''),
+      };
+    },
+    skillEditFrontmatterMeta() {
+      // 优先用后端 yaml.safe_load 的结果（完整折叠 description）；源码被改过则本地重解析
+      const apiFm = this.editingSkillFrontmatter;
+      if (apiFm && typeof apiFm === 'object' && !this.skillEditRawDirty) {
+        return this.formatFrontmatterRows(apiFm);
+      }
+      return this.parseFrontmatterRowsFromText(this.skillEditParsed.frontmatterText || '');
+    },
+    skillEditPreviewHtml() {
+      return this.renderSkillMarkdown(this.skillEditParsed.body || '（正文为空）');
+    },
+    skillPackEnabledCount() {
+      return (this.skillPackList || []).filter((s) => s.enabled).length;
+    },
+    skillPackHubName() {
+      const hub = (this.skillPackList || []).find((s) => s.is_hub);
+      return hub ? (hub.title || hub.name) : '';
+    },
 
     // 计算进度百分比
     progressPercentage() {
@@ -498,8 +758,28 @@ export default {
       // 获取文档置信度
       this.fetchDocumentConfidence();
     }, 1000);
+
+    if (this.isDocSkillFile) {
+      this.skillNullPollCount = 0;
+      this.refreshSkillStatus();
+      this.skillStatusPollTimer = setInterval(() => {
+        if (this.skillGenStatus === 'pending') {
+          this.refreshSkillStatus();
+        } else if (this.skillGenStatus == null && this.skillNullPollCount < 20) {
+          // 等待旧本子后台补生成把状态写成 pending（约 80s 内）
+          this.refreshSkillStatus();
+        } else if (this.skillStatusPollTimer) {
+          clearInterval(this.skillStatusPollTimer);
+          this.skillStatusPollTimer = null;
+        }
+      }, 4000);
+    }
   },
   beforeDestroy() {
+    if (this.skillStatusPollTimer) {
+      clearInterval(this.skillStatusPollTimer);
+      this.skillStatusPollTimer = null;
+    }
     this.$refs.selects.removeEventListener('mouseenter', this.showSelects);
     this.$refs.filecard.removeEventListener('mouseleave', this.hideSelects);
 
@@ -836,6 +1116,11 @@ export default {
       this.$emit('update:fileChecked', this.isChecked, this.index);
     },
     showFileDialog() {
+      const name = String(this.file?.name || '').toLowerCase();
+      if (name.endsWith('.zip')) {
+        this.openSkillPackPreview();
+        return;
+      }
       this.isChecked = true; // 切换isChecked的值
       // 根据文件名获取文件内容
       this.$emit('update:fileChecked', this.isChecked, this.index);
@@ -872,6 +1157,369 @@ export default {
     openMaterialSettings() {
       this.hideContextMenu();
       this.$emit('material-settings', this.file.name);
+    },
+
+    renderSkillMarkdown(text) {
+      const src = String(text || '').trim();
+      if (!src) return '<p class="skill-md-empty">（无内容）</p>';
+      try {
+        marked.setOptions({ breaks: true, gfm: true });
+        const html = typeof marked.parse === 'function' ? marked.parse(src) : marked(src);
+        return html;
+      } catch (e) {
+        const escaped = src
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        return `<pre>${escaped}</pre>`;
+      }
+    },
+
+    async fetchSkillsForFile() {
+      const username = localStorage.getItem('userId');
+      const response = await fetch(`${API_BASE_URL}/api/skill_for_file`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, filename: this.file.name }),
+      });
+      const data = await response.json();
+      if (data.error_num !== 0) {
+        this.$message.error(data.msg || '获取 Skill 失败');
+        return [];
+      }
+      return data.skills || [];
+    },
+
+    async openSkillPackPreview() {
+      this.isChecked = true;
+      this.$emit('update:fileChecked', this.isChecked, this.index);
+      this.skillPackLoading = true;
+      this.skillPackList = [];
+      this.showSkillPackDialog = true;
+      try {
+        this.skillPackList = await this.fetchSkillsForFile();
+      } finally {
+        this.skillPackLoading = false;
+      }
+    },
+
+    async openEditFromPack(skill) {
+      if (!skill || !skill.name) return;
+      this.skillEditCandidates = this.skillPackList.length
+        ? this.skillPackList.slice()
+        : [{ name: skill.name, title: skill.title || skill.name }];
+      this.editingSkillName = skill.name;
+      this.skillEditMode = 'preview';
+      this.showSkillEditDialog = true;
+      await this.loadSkillRaw();
+    },
+
+    async openSkillEnableDialog() {
+      this.showContextMenu = false;
+      if (this.skillStatusPending) {
+        this.$message.info('Skill 仍在生成中，请稍候');
+        return;
+      }
+      this.skillForFileList = await this.fetchSkillsForFile();
+      this.showSkillEnableDialog = true;
+    },
+
+    async openSkillEditDialog() {
+      this.showContextMenu = false;
+      if (this.skillStatusPending) {
+        this.$message.info('Skill 仍在生成中，请稍候');
+        return;
+      }
+      this.skillEditCandidates = await this.fetchSkillsForFile();
+      if (!this.skillEditCandidates.length) {
+        this.$message.info(this.skillGenStatus === false ? 'Skill 生成失败，可右键重试' : '暂无关联 Skill（可能仍在生成中）');
+        return;
+      }
+      this.editingSkillName = this.skillEditCandidates[0].name;
+      this.skillEditMode = 'preview';
+      this.showSkillEditDialog = true;
+      await this.loadSkillRaw();
+    },
+
+    async refreshSkillStatus() {
+      if (!this.isDocSkillFile) return;
+      try {
+        const username = localStorage.getItem('userId');
+        const response = await fetch(`${API_BASE_URL}/api/skill_status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username }),
+        });
+        const data = await response.json();
+        const map = data.documentSkillStatus || {};
+        const st = map[this.file.name];
+        if (st === 'pending' || st === true || st === false) {
+          this.skillGenStatus = st;
+          this.skillNullPollCount = 0;
+          if (st === true && this.skillStatusPollTimer) {
+            clearInterval(this.skillStatusPollTimer);
+            this.skillStatusPollTimer = null;
+          }
+          return;
+        }
+        // 无状态记录：偶尔查一次磁盘 Skill，避免每 4s 打 skill_for_file
+        this.skillNullPollCount = (this.skillNullPollCount || 0) + 1;
+        if (this.skillNullPollCount === 1 || this.skillNullPollCount % 5 === 0) {
+          const skills = await this.fetchSkillsForFile();
+          if (skills.length) {
+            this.skillGenStatus = true;
+            if (this.skillStatusPollTimer) {
+              clearInterval(this.skillStatusPollTimer);
+              this.skillStatusPollTimer = null;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[SkillStatus] 拉取失败', e);
+      }
+    },
+
+    async onSkillStatusClick() {
+      if (this.skillGenStatus === false) {
+        await this.retrySkillGeneration();
+      }
+    },
+
+    async retrySkillGeneration() {
+      this.showContextMenu = false;
+      if (!this.isDocSkillFile) return;
+      try {
+        const username = localStorage.getItem('userId');
+        const response = await fetch(`${API_BASE_URL}/api/skill_regenerate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, filename: this.file.name }),
+        });
+        const data = await response.json();
+        if (data.error_num === 0) {
+          this.skillGenStatus = 'pending';
+          this.$message.success('已重新开始生成 Skill');
+          if (!this.skillStatusPollTimer) {
+            this.skillStatusPollTimer = setInterval(() => {
+              if (this.skillGenStatus === 'pending') {
+                this.refreshSkillStatus();
+              } else if (this.skillStatusPollTimer) {
+                clearInterval(this.skillStatusPollTimer);
+                this.skillStatusPollTimer = null;
+              }
+            }, 4000);
+          }
+        } else {
+          this.$message.error(data.msg || '重试失败');
+        }
+      } catch (e) {
+        this.$message.error('重试请求失败');
+      }
+    },
+
+    async loadSkillRaw() {
+      if (!this.editingSkillName) return;
+      const username = localStorage.getItem('userId');
+      const response = await fetch(`${API_BASE_URL}/api/skill_get`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, name: this.editingSkillName }),
+      });
+      const data = await response.json();
+      if (data.error_num === 0) {
+        const raw = data.raw || '';
+        this.editingSkillRaw = raw;
+        this.skillEditRawBaseline = raw;
+        this.skillEditRawDirty = false;
+        // 后端 yaml.safe_load 已正确合并折叠 description
+        this.editingSkillFrontmatter = data.frontmatter || null;
+      } else {
+        this.$message.error(data.msg || '读取失败');
+      }
+    },
+
+    onSkillEditRawInput() {
+      this.skillEditRawDirty = this.editingSkillRaw !== this.skillEditRawBaseline;
+    },
+
+    formatFrontmatterRows(fm) {
+      if (!fm || typeof fm !== 'object') return [];
+      const prefer = ['name', 'description', 'title', 'version', 'license', 'agent_created'];
+      const skip = new Set(['metadata', 'layers', 'compatibility', 'allowed-tools', 'allowed_tools']);
+      const rows = [];
+      const seen = new Set();
+      const pushKey = (key) => {
+        if (seen.has(key) || !(key in fm) || skip.has(key)) return;
+        seen.add(key);
+        const raw = fm[key];
+        if (raw == null) return;
+        if (typeof raw === 'object') return; // 嵌套对象不展示
+        const value = String(raw).trim();
+        if (!value) return;
+        rows.push({ key, value });
+      };
+      prefer.forEach(pushKey);
+      Object.keys(fm).forEach(pushKey);
+      return rows;
+    },
+
+    formatSkillDescDisplay(text) {
+      const src = String(text || '');
+      if (!src) return '';
+      const escaped = src
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      // Use when / NOT for 前换行并高亮（大小写不敏感）
+      return escaped
+        .replace(
+          /\s*(Use\s+when)\b/gi,
+          '<br><span class="skill-desc-mark">$1</span>'
+        )
+        .replace(
+          /\s*(NOT\s+for)\b/gi,
+          '<br><span class="skill-desc-mark">$1</span>'
+        );
+    },
+
+    parseFrontmatterRowsFromText(text) {
+      // 兼容 YAML 折叠纯量：description 首行后缩进续行（调试本子 fenquan-funeng / 文档 Skill 均为此格式）
+      if (!text) return [];
+      const skip = new Set(['metadata', 'layers', 'compatibility', 'allowed-tools', 'allowed_tools']);
+      const lines = text.split(/\r?\n/);
+      const rows = [];
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+        const m = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*)$/);
+        if (!m) {
+          i++;
+          continue;
+        }
+        const key = m[1];
+        let value = (m[2] || '').trim();
+        i++;
+
+        if (skip.has(key)) {
+          // 跳过嵌套块整段
+          while (i < lines.length) {
+            const next = lines[i];
+            if (/^[A-Za-z0-9_-]+\s*:/.test(next)) break;
+            i++;
+          }
+          continue;
+        }
+
+        if (value === '|' || value === '>') {
+          const block = [];
+          while (i < lines.length) {
+            const next = lines[i];
+            if (/^[A-Za-z0-9_-]+\s*:/.test(next)) break;
+            if (/^\s*$/.test(next)) {
+              block.push('');
+              i++;
+              continue;
+            }
+            if (!/^\s+/.test(next)) break;
+            block.push(next.replace(/^\s+/, ''));
+            i++;
+          }
+          value = block.join(value === '>' ? ' ' : '\n').replace(/[ \t]+\n/g, '\n').trim();
+        } else if (
+          (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
+          (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
+        ) {
+          value = value.slice(1, -1);
+        } else if (
+          (value.startsWith('"') && !value.endsWith('"')) ||
+          (value.startsWith("'") && !value.endsWith("'"))
+        ) {
+          const quote = value[0];
+          const parts = [value.slice(1)];
+          while (i < lines.length) {
+            const next = lines[i];
+            i++;
+            const qi = next.indexOf(quote);
+            if (qi >= 0) {
+              parts.push(next.slice(0, qi));
+              break;
+            }
+            parts.push(next.trim());
+          }
+          value = parts.join(' ').replace(/\s+/g, ' ').trim();
+        } else if (value !== '') {
+          // 折叠纯量续行：缩进行拼到 description
+          const cont = [value];
+          while (i < lines.length) {
+            const next = lines[i];
+            if (/^[A-Za-z0-9_-]+\s*:/.test(next)) break;
+            if (/^\s*$/.test(next)) break;
+            if (!/^\s+\S/.test(next)) break;
+            cont.push(next.replace(/^\s+/, ''));
+            i++;
+          }
+          value = cont.join(' ').replace(/\s+/g, ' ').trim();
+        } else {
+          // key: 后为空 → 嵌套块，跳过子行
+          while (i < lines.length) {
+            const next = lines[i];
+            if (/^[A-Za-z0-9_-]+\s*:/.test(next)) break;
+            if (/^\s*$/.test(next)) {
+              i++;
+              continue;
+            }
+            if (!/^\s+/.test(next) && !/^- /.test(next.trim())) break;
+            i++;
+          }
+          continue;
+        }
+
+        if (!value) continue;
+        rows.push({ key, value });
+      }
+      return rows;
+    },
+
+    async saveSkillRaw() {
+      const username = localStorage.getItem('userId');
+      const response = await fetch(`${API_BASE_URL}/api/skill_save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          name: this.editingSkillName,
+          raw: this.editingSkillRaw,
+        }),
+      });
+      const data = await response.json();
+      if (data.error_num === 0) {
+        this.$message.success('Skill 已保存');
+        this.skillEditRawBaseline = this.editingSkillRaw;
+        this.skillEditRawDirty = false;
+        this.showSkillEditDialog = false;
+      } else {
+        this.$message.error(data.msg || '保存失败');
+      }
+    },
+
+    async toggleSkillEnabled(skill, enabled) {
+      const username = localStorage.getItem('userId');
+      const response = await fetch(`${API_BASE_URL}/api/skill_set_enabled`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          names: [skill.name],
+          enabled: !!enabled,
+        }),
+      });
+      const data = await response.json();
+      if (data.error_num === 0) {
+        this.$message.success(enabled ? `已启用 ${skill.name}` : `已禁用 ${skill.name}`);
+      } else {
+        skill.enabled = !enabled;
+        this.$message.error(data.msg || '更新失败');
+      }
     },
 
     // 🔥 编辑文档四色属性
@@ -1048,6 +1696,31 @@ export default {
     span:last-child {
       font-size: 12px;
       color: rgb(44, 44, 44);
+    }
+
+    .skill-status-badge {
+      display: inline-block;
+      margin-top: 2px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 11px;
+      line-height: 1.4;
+      width: auto;
+      max-width: 90%;
+      white-space: nowrap;
+      &.pending {
+        color: #8a6d3b;
+        background: #fcf8e3;
+      }
+      &.failed {
+        color: #a94442;
+        background: #f2dede;
+        cursor: pointer;
+      }
+      &.ready {
+        color: #3c763d;
+        background: #dff0d8;
+      }
     }
   }
 }
@@ -1258,6 +1931,14 @@ export default {
   
   &:hover {
     background-color: #f5f5f5;
+  }
+
+  &.disabled {
+    color: #aaa;
+    cursor: not-allowed;
+    &:hover {
+      background-color: transparent;
+    }
   }
 }
 
@@ -1541,5 +2222,449 @@ export default {
   text-overflow: ellipsis;
   box-shadow: 0 1px 4px rgba(24, 38, 56, 0.18);
   z-index: 3;
+}
+
+/* ========== Skill 对话框 ========== */
+.skill-dlg-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(22, 28, 36, 0.48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10050;
+  padding: 24px;
+}
+
+.skill-dlg {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(20, 30, 50, 0.22);
+  display: flex;
+  flex-direction: column;
+  width: 920px;
+  max-width: 96vw;
+  max-height: 88vh;
+  overflow: hidden;
+}
+
+.skill-dlg--enable,
+.skill-dlg--pack {
+  width: 860px;
+  max-width: 96vw;
+}
+
+.skill-dlg--edit {
+  width: 980px;
+  max-width: 96vw;
+}
+
+.skill-dlg-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px 12px;
+  border-bottom: 1px solid #eef1f4;
+  flex-shrink: 0;
+}
+
+.skill-dlg-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  color: #1f2a37;
+  letter-spacing: 0.01em;
+}
+
+.skill-dlg-sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #7a8694;
+  word-break: break-all;
+}
+
+.skill-dlg-close {
+  border: none;
+  background: transparent;
+  color: #9aa5b1;
+  font-size: 26px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.skill-dlg-close:hover {
+  background: #f2f4f7;
+  color: #334155;
+}
+
+.skill-dlg-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px 0;
+  flex-shrink: 0;
+}
+
+.skill-select {
+  flex: 1 1 220px;
+  min-width: 180px;
+  max-width: 420px;
+  padding: 8px 10px;
+  border: 1px solid #d7dee7;
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fff;
+  color: #243447;
+}
+
+.skill-tabs {
+  display: inline-flex;
+  background: #f1f4f8;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.skill-tab {
+  border: none;
+  background: transparent;
+  color: #5b6b7c;
+  font-size: 13px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.skill-tab.active {
+  background: #fff;
+  color: #1f2a37;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(20, 30, 50, 0.08);
+}
+
+.skill-dlg-body {
+  padding: 14px 22px;
+  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.skill-dlg-body--edit {
+  display: flex;
+  flex-direction: column;
+}
+
+.skill-empty {
+  color: #8a96a3;
+  text-align: center;
+  padding: 36px 12px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.skill-enable-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.skill-enable-card {
+  border: 1px solid #e5ebf1;
+  border-radius: 10px;
+  background: #fbfcfe;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 140px;
+  height: auto;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.skill-enable-card.is-hub {
+  border-color: #c9b896;
+  background: linear-gradient(180deg, #fffdf8 0%, #fbfcfe 100%);
+}
+
+.skill-enable-card.is-off {
+  opacity: 0.72;
+  background: #f7f8fa;
+}
+
+.skill-enable-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.skill-enable-card-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 650;
+  color: #1f2a37;
+  line-height: 1.35;
+}
+
+.skill-enable-card-name {
+  font-size: 11px;
+  color: #8a96a3;
+  font-family: Consolas, 'SF Mono', monospace;
+  word-break: break-all;
+}
+
+.skill-hub-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #7a5c2e;
+  background: #f3e7cf;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.skill-md-snippet {
+  font-size: 12px;
+  color: #4b5968;
+  line-height: 1.55;
+  max-height: none;
+  overflow: visible;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.skill-md-snippet :deep(p),
+.skill-md-snippet :deep(ul),
+.skill-md-snippet :deep(ol),
+.skill-md-snippet :deep(h1),
+.skill-md-snippet :deep(h2),
+.skill-md-snippet :deep(h3) {
+  margin: 0 0 4px;
+  font-size: inherit;
+  font-weight: 500;
+}
+
+.skill-md-snippet :deep(h1),
+.skill-md-snippet :deep(h2),
+.skill-md-snippet :deep(h3) {
+  font-weight: 650;
+  color: #243447;
+}
+
+.skill-pack-card-actions {
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.skill-pack-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 10px 22px 0;
+  font-size: 12px;
+  color: #5b6b7c;
+  flex-shrink: 0;
+}
+
+.skill-pack-stats span {
+  background: #f1f4f8;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.skill-md-preview {
+  flex: 1;
+  min-height: 360px;
+  overflow: auto;
+  border: 1px solid #e5ebf1;
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px 18px;
+}
+
+.skill-fm-box {
+  border: 1px solid #ebe4d6;
+  background: #faf7f1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.skill-fm-title {
+  font-size: 11px;
+  font-weight: 650;
+  color: #8a6a3b;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.skill-fm-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 0;
+  align-items: start;
+}
+
+.skill-fm-key {
+  color: #8a6a3b;
+  font-family: Consolas, 'SF Mono', monospace;
+  padding-top: 1px;
+}
+
+.skill-fm-val {
+  color: #3d4a58;
+  word-break: break-word;
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
+.skill-fm-val.is-description {
+  line-height: 1.65;
+}
+
+.skill-fm-val :deep(.skill-desc-mark) {
+  display: inline-block;
+  margin-top: 6px;
+  font-weight: 700;
+  color: #8a6a3b;
+  letter-spacing: 0.02em;
+}
+
+.skill-md-body {
+  color: #243447;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.skill-md-body :deep(h1) {
+  font-size: 22px;
+  margin: 0 0 12px;
+  border-bottom: 1px solid #eef1f4;
+  padding-bottom: 8px;
+}
+
+.skill-md-body :deep(h2) {
+  font-size: 18px;
+  margin: 18px 0 8px;
+}
+
+.skill-md-body :deep(h3) {
+  font-size: 15px;
+  margin: 14px 0 6px;
+}
+
+.skill-md-body :deep(p),
+.skill-md-body :deep(ul),
+.skill-md-body :deep(ol) {
+  margin: 0 0 10px;
+}
+
+.skill-md-body :deep(code) {
+  background: #f1f4f8;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+}
+
+.skill-md-body :deep(pre) {
+  background: #f6f8fb;
+  border-radius: 8px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.skill-md-editor {
+  flex: 1;
+  min-height: 420px;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d7dee7;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-family: Consolas, 'SF Mono', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #1f2a37;
+  background: #fbfcfe;
+  resize: vertical;
+}
+
+.skill-md-editor:focus {
+  outline: none;
+  border-color: #6ea8fe;
+  box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.15);
+}
+
+.skill-dlg-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 22px 16px;
+  border-top: 1px solid #eef1f4;
+  flex-shrink: 0;
+  background: #fff;
+}
+
+.skill-dlg-hint {
+  font-size: 12px;
+  color: #8a96a3;
+}
+
+.skill-dlg-footer-actions {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.skill-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.skill-btn--primary {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.skill-btn--primary:hover {
+  background: #2563eb;
+}
+
+.skill-btn--ghost {
+  background: #eef1f5;
+  color: #445566;
+}
+
+.skill-btn--ghost:hover {
+  background: #e2e7ee;
+}
+
+.skill-btn--sm {
+  background: #edf4ff;
+  color: #2b6cb0;
+  padding: 6px 10px;
+  font-size: 12px;
+  width: 100%;
+}
+
+.skill-btn--sm:hover {
+  background: #dbeafe;
 }
 </style>

@@ -181,6 +181,10 @@ export function card_get_image_generating_status(params) {
     return request.get('/api/card_get_image_generating_status', { params });
 }
 
+export function card_get_html_generating_status(params) {
+    return request.get('/api/card_get_html_generating_status', { params });
+}
+
 export function card_generate_single_card_image(body) {
     return request.post('/api/card_generate_single_card_image', body, {
         headers: { 'Content-Type': 'application/json' }

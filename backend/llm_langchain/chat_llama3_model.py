@@ -1,3 +1,4 @@
+import nkcn_public_config as _public_config
 import os
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import HumanMessagePromptTemplate
@@ -6,7 +7,7 @@ from langchain_experimental.llms import ChatLlamaAPI
 from openai import AsyncOpenAI, OpenAI
 
 
-NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY", "")
+NVIDIA_API_KEY = _public_config.secret('NVIDIA_API_KEY')
 LLAMA3_ENGINE = "meta/llama-3.1-405b-instruct"   # llama3上下文只有8192，而llama3.1有128k
 class LLAMA3_CONFIG:
     def __init__(

@@ -9,19 +9,12 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
+import nkcn_public_config as _public_config
 import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-try:
-    from dotenv import load_dotenv
-    for _env_path in (BASE_DIR / ".env", BASE_DIR.parent / ".env"):
-        if _env_path.exists():
-            load_dotenv(_env_path, override=False)
-except ImportError:
-    pass
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 524288000  # POST最大的内存，传输文件的上限 500M
 
@@ -29,16 +22,12 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 524288000  # POST最大的内存，传输文件的
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or ''
+SECRET_KEY = _public_config.required("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() in ("1", "true", "yes")
+DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
 
-ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
-    if host.strip()
-]
+ALLOWED_HOSTS = [x.strip() for x in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if x.strip()]
 
 
 # Application definition
@@ -54,7 +43,7 @@ INSTALLED_APPS = [
     'app1.apps.App1Config',
     'app_chat.apps.AppChatConfig',
     'zym.apps.ZymConfig',
-    'app_seed.apps.AppSeedConfig',
+    # 'app_seed.apps.AppSeedConfig',
 ]
 
 MIDDLEWARE = [
@@ -104,13 +93,13 @@ WSGI_APPLICATION = 'djangoProject.wsgi.application'
 # }
 
 DATABASES = {
-    'default': {
-        'ENGINE': os.environ.get("DB_ENGINE", "django.db.backends.mysql"),
-        'NAME': os.environ.get("MYSQL_DATABASE", "bishe5"),
-        'USER': os.environ.get("MYSQL_USER", "root"),
-        'PASSWORD': os.environ.get("MYSQL_PASSWORD", ""),
-        'HOST': os.environ.get("MYSQL_HOST", "127.0.0.1"),
-        'PORT': os.environ.get("MYSQL_PORT", "3306"),
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": os.getenv("DJANGO_DB_NAME", "nkcn"),
+        "USER": os.getenv("DJANGO_DB_USER", "nkcn"),
+        "PASSWORD": _public_config.secret("DJANGO_DB_PASSWORD"),
+        "HOST": os.getenv("DJANGO_DB_HOST", "localhost"),
+        "PORT": os.getenv("DJANGO_DB_PORT", "3306"),
     }
 }
 
@@ -157,9 +146,21 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # 直接允许所有主机跨域
-CORS_ORIGIN_ALLOW_ALL = True
+CORS_ORIGIN_ALLOW_ALL = os.getenv("DJANGO_CORS_ALLOW_ALL", "0") == "1"
+CORS_ALLOWED_ORIGINS = [x.strip() for x in os.getenv("DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:8080").split(",") if x.strip()]
 
 SECURE_CROSS_ORIGIN_OPENER_POLICY = 'None'
 
 # CSRF信任的来源
-CSRF_TRUSTED_ORIGINS = ['http://localhost:8080', 'http://127.0.0.1:8080']
+CSRF_TRUSTED_ORIGINS = [x.strip() for x in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost:8080,http://127.0.0.1:8080").split(",") if x.strip()]
+CORS_ALLOW_CREDENTIALS = True
+# Distinct cookies avoid collisions with another local development checkout.
+SESSION_COOKIE_NAME = "nkcn_public_sessionid"
+CSRF_COOKIE_NAME = "nkcn_public_csrftoken"
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_AGE = int(os.getenv("DJANGO_SESSION_COOKIE_AGE", "43200"))
+SESSION_COOKIE_SAMESITE = os.getenv("DJANGO_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SAMESITE = SESSION_COOKIE_SAMESITE
+SESSION_COOKIE_SECURE = os.getenv("DJANGO_COOKIE_SECURE", "0") == "1"
+CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE

@@ -8,6 +8,8 @@ from .feedback_runtime import prepare_feedback_runtime, freeze_feedback_runtime
 from .feedback_snapshot_reader import read_feedback_snapshot, SNAPSHOT_FILES
 
 ENVIRONMENT_KEYS = (
+    'HOMEWORK_REQUEST_TIMEOUT', 'HOMEWORK_STAGE_TIMEOUT', 'HOMEWORK_TASK_TIMEOUT',
+    'HOMEWORK_PASS2_BATCH_SIZE',
     'HOMEWORK_PASS1_TWO_STAGE', 'HOMEWORK_PASS1_MAX_ATTEMPTS',
     'HOMEWORK_PASS1_PAGE_MAX_ATTEMPTS', 'HOMEWORK_PASS1_PARALLELISM',
     'HOMEWORK_PASS1_5_ENABLED', 'HOMEWORK_PASS1_5_MATH_THINKING',
@@ -35,15 +37,15 @@ def execution_configuration(preprocess_mode):
     if not mode:
         raise ValueError('预处理模式无效')
     # 参数常量由实际消费者定义；记录代码哈希使策略变化不会复用旧页面。
-    sources = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-               for path in sorted(Path(__file__).parent.glob('*.py'))
-               if not path.name.endswith('_test.py') and not path.name.startswith('test_')}
+    from .execution_control import code_identity
+    from .stage_dependencies import SCHEMA
+    sources = code_identity()['actual_code_hashes']
     models = {'roles': {
         'qwen': {'model': homework_qwen_model(), 'extra_body': {'enable_thinking': False}},
         'deepseek': {'model': homework_deepseek_model()},
         'review': {'model': homework_review_gemini_model()},
         'quality': {'model': HOMEWORK_RED_BLUE_MODEL, 'reasoning_effort': HOMEWORK_RED_BLUE_REASONING_EFFORT},
-    }, 'consumer_parameters_version': 'p03-v1', 'consumer_code_hashes': sources,
+    }, 'consumer_parameters_version': 'p03-v1', 'consumer_code_hashes': sources, 'dependency_schema': SCHEMA,
         'qwen_call_policy': {'version': 1, 'allowed_extra_bodies': [
             {'enable_thinking': False}, {'enable_thinking': True, 'thinking_budget': 4096}],
             'allowed_temperatures': [None, 0.0, 0.1]}}
@@ -61,7 +63,7 @@ def execution_configuration(preprocess_mode):
     return {'model_config': models, 'preprocessing': preprocessing, 'retrieval': retrieval}
 
 
-def build_request_runtime(metadata, data, *, preprocess_mode='auto'):
+def build_request_runtime(metadata, data, *, preprocess_mode=None, workspace=None):
     reference_text = data.get('reference_text', '')
     if not isinstance(reference_text, str):
         raise ValueError('reference_text必须为文字')
@@ -69,6 +71,25 @@ def build_request_runtime(metadata, data, *, preprocess_mode='auto'):
     references = {'status': 'provided_text_documents_not_read' if external else
                   'provided_text' if reference_text else 'not_provided',
                   'reference_text': reference_text, 'documents': []}
+    from .notebook_skills import freeze_selection
+    skill_ctx = {
+        'material_type': metadata.get('material_type'),
+        'material_name': metadata.get('material_name'),
+        'subject_code': metadata.get('subject_code'),
+        'subject_name': metadata.get('subject_name'),
+        'grade_label': metadata.get('grade_label'),
+        'reference_text': reference_text,
+        'filename': data.get('filename') or data.get('sample_id') or '',
+        'sample_id': data.get('sample_id') or '',
+    }
+    references['notebook_skills'] = freeze_selection(
+        workspace,
+        data.get('notebook_skill_selection', {'enabled': False, 'names': []}),
+        context=skill_ctx,
+    )
+    if preprocess_mode in (None, ''):
+        from .feedback_material_kinds import default_preprocess_mode
+        preprocess_mode = default_preprocess_mode(metadata.get('material_type'))
     configuration = execution_configuration(preprocess_mode)
     configuration['retrieval']['curriculum_selection'] = data.get('curriculum_selection', 'auto')
     return prepare_feedback_runtime(metadata, references=references,

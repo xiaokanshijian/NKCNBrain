@@ -4,14 +4,15 @@
 requires Python 3.6 or later
 pip install requests
 """
+import nkcn_public_config as _public_config
 import base64
 import json
 import uuid
 import requests
 
 # 填写平台申请的appid, access_token以及cluster
-appid = ""
-access_token= ""
+appid = _public_config.secret("VOLCANO_TTS_APP_ID")
+access_token= _public_config.secret('VOLCANO_TTS_ACCESS_TOKEN')
 cluster = "volcano_tts"
 
 voice_type = "BV700_V2_streaming"

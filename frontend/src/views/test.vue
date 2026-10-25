@@ -304,7 +304,7 @@ export default {
             // }).catch(error => {
             //     console.error('Error uploading audio.', error);
             // });
-            fetch('http://192.0.2.1:80/api/upload_audio',
+            fetch((process.env.VUE_APP_SERVICE_80_API_UPLOAD_AUDIO_URL || "http://localhost:80/api/upload_audio"),
                 {
                     method: 'POST',
                     body: formData,

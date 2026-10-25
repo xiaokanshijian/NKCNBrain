@@ -1,3 +1,4 @@
+import nkcn_public_config as _public_config
 import base64
 import copy
 import importlib.util
@@ -112,10 +113,10 @@ _D_REGION_AUDIT_SUBDIR = 'ci_audit'
 _D_REGION_AUDIT_FILENAME = 'd_region_recognition_audit.jsonl'
 _D_REGION_CONFIDENCE_FILENAME = 'd_region_confidence_scores.json'
 _D_REGION_AUTO_PICK_LOG_FILENAME = 'd_region_auto_iter_used.json'
-_JUDGE_GEMINI_BASE = 'https://www.dmxapi.cn/v1'
-_JUDGE_GEMINI_KEY = os.environ.get('NKCN_DMT_GEMINI_API_KEY') or os.environ.get("DMX_API_KEY", "")
+_JUDGE_GEMINI_BASE = _public_config.endpoint('NKCN_REVIEW_GATEWAY_V1_URL', 'http://localhost:9999/v1')
+_JUDGE_GEMINI_KEY = os.environ.get('NKCN_DMT_GEMINI_API_KEY') or _public_config.secret('NKCN_LLM_DMXAPI_API_KEY')
 _JUDGE_QWEN_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-_JUDGE_QWEN_KEY = os.environ.get('DEEPSEEK_API_KEY_ALI') or os.environ.get('DASHSCOPE_API_KEY') or os.environ.get('NKCN_SNIPPET_QWEN_API_KEY') or os.environ.get("DASHSCOPE_API_KEY", "")
+_JUDGE_QWEN_KEY = os.environ.get('DEEPSEEK_API_KEY_ALI') or os.environ.get('DASHSCOPE_API_KEY') or os.environ.get('NKCN_SNIPPET_QWEN_API_KEY') or _public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY')
 _JUDGE_RETRY_ATTEMPTS = 3
 
 

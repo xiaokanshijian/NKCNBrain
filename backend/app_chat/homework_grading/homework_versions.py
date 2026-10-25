@@ -1,6 +1,7 @@
 """Archive, invalidate, and list homework grading runs for the same PDF."""
 
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -47,6 +48,8 @@ HOMEWORK_VERSION_DIRS = (
     'annotated_understanding',
     'pass1_u1_shadow',
     'layout_evidence',
+    'checkpoints',
+    'artifact_transactions',
 )
 
 _GRADING_MANIFEST_KEYS = (
@@ -89,8 +92,9 @@ def _load_archives_index(username: str, analysis_id: str) -> Dict[str, Any]:
     index_path = _archives_index_path(username, analysis_id)
     if os.path.isfile(index_path):
         data = safe_json_load(index_path)
-        if isinstance(data.get('versions'), list):
+        if isinstance(data, dict) and isinstance(data.get('versions'), list):
             return data
+        raise ValueError('历史版本索引格式损坏，已保留原文件')
     return {'versions': []}
 
 
@@ -138,6 +142,15 @@ def _sample_id(analysis_id: str) -> str:
 
 
 def _red_blue_summary(run_root: str) -> Dict[str, Any]:
+    # 重评开始或失败时，清单状态优先于上一次评分文件，避免继续显示旧卡标。
+    manifest_path = os.path.join(run_root, 'manifest.json')
+    try:
+        current = safe_json_load(manifest_path).get('red_blue_review') or {}
+    except (OSError, ValueError, TypeError):
+        current = {}
+    if current.get('status') in ('pending', 'running', 'failed', 'blocked'):
+        return {'red_blue_status': current['status'], 'red_blue_score': None,
+                'red_blue_color': '', 'red_blue_color_label': ''}
     path = os.path.join(
         run_root,
         'homework_grading',
@@ -410,7 +423,6 @@ def complete_homework_session_rerun(username: str, analysis_id: str) -> Dict[str
 
 
 def resolve_homework_run_root(username: str, analysis_id: str, run_id: Optional[str] = None) -> str:
-    root = _analysis_root(username, analysis_id)
     clean_run_id = normalize_homework_run_id(run_id)
     if clean_run_id.startswith('p03_'):
         from .feedback_workspaces import run_directory
@@ -419,8 +431,12 @@ def resolve_homework_run_root(username: str, analysis_id: str, run_id: Optional[
             raise ValueError('批改运行不存在')
         return str(directory)
     if clean_run_id and clean_run_id != CURRENT_RUN_ID:
-        return os.path.join(_archives_root(username, analysis_id), clean_run_id)
-    return root
+        directory = os.path.join(_archives_root(username, analysis_id), clean_run_id)
+        _assert_inside(_container_root(username, analysis_id), directory)
+        if os.path.islink(directory):
+            raise ValueError('历史版本路径异常')
+        return directory
+    return _analysis_root(username, analysis_id)
 
 
 def _valid_archived_versions(root: str, versions: List[Any]) -> List[Dict[str, Any]]:
@@ -462,6 +478,26 @@ def _copy_homework_version_workspace(source: str, destination: str) -> None:
             shutil.copytree(item.path, target)
 
 
+def _legacy_snapshot_digest(root):
+    """旧布局仅在确实相同的正式文件集合下复用保全副本。"""
+    from pathlib import Path
+    root = Path(windows_io_path(root))
+    files = [root / 'manifest.json'] + [root / name for name in SNAPSHOT_FILES.values()]
+    workspace = root / 'homework_grading'
+    if workspace.is_dir():
+        files += [p for p in workspace.iterdir() if p.is_file()]
+        for name in HOMEWORK_VERSION_DIRS:
+            files += [p for p in (workspace / name).rglob('*') if p.is_file()]
+    digest = hashlib.sha256()
+    for path in sorted(set(files)):
+        if path.is_file():
+            if path.is_symlink():
+                raise ValueError('历史产物路径异常')
+            digest.update(path.relative_to(root).as_posix().encode('utf-8'))
+            digest.update(hashlib.sha256(path.read_bytes()).digest())
+    return digest.hexdigest()
+
+
 @_archive_transaction
 def archive_homework_run_if_exists(username: str, analysis_id: str, *, preserve_unrestorable=False) -> Optional[str]:
     """Snapshot the current formal workspace into _archives/. Returns run_id or None."""
@@ -475,6 +511,25 @@ def archive_homework_run_if_exists(username: str, analysis_id: str, *, preserve_
     snapshot_state = read_feedback_snapshot(root, manifest)
     if snapshot_state['snapshot_status'] not in ('complete', 'legacy_missing') and not preserve_unrestorable:
         raise ValueError('当前材料配置快照不完整或损坏，已保留原版本，未归档')
+    physical = manifest.get('run_id', '')
+    if physical.startswith('p03_') and os.path.normcase(os.path.abspath(root)) == os.path.normcase(
+            os.path.abspath(resolve_homework_run_root(username, analysis_id, physical))):
+        index_data = _load_archives_index(username, analysis_id)
+        versions = index_data.get('versions', [])
+        if not any(item.get('run_id') == physical for item in versions):
+            versions.append({'run_id': physical, 'storage': 'run', 'physical_run_id': physical,
+                'source_document_sha256': manifest.get('source_document_sha256'),
+                'archived_at': datetime.datetime.now().isoformat(),
+                'status': manifest.get('status', 'unverified'), 'is_key_version': False})
+            index_data['versions'] = versions
+            _save_archives_index(username, analysis_id, index_data)
+        return physical
+    legacy_digest = _legacy_snapshot_digest(root)
+    for item in _load_archives_index(username, analysis_id).get('versions', []):
+        if item.get('legacy_snapshot_digest') == legacy_digest:
+            previous = resolve_homework_run_root(username, analysis_id, item['run_id'])
+            if os.path.isdir(previous) and _legacy_snapshot_digest(previous) == legacy_digest:
+                return item['run_id']
     run_id = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     archive_parent = _archives_root(username, analysis_id)
     archive_root = os.path.join(archive_parent, run_id)
@@ -512,6 +567,7 @@ def archive_homework_run_if_exists(username: str, analysis_id: str, *, preserve_
         versions = index_data.get('versions') if isinstance(index_data.get('versions'), list) else []
         versions.append({
             'run_id': run_id,
+            'legacy_snapshot_digest': legacy_digest,
             'label': f'历史版本 {len(versions) + 1}',
             'archived_at': datetime.datetime.now().isoformat(),
             'source_created_at': manifest.get('created_at') or '',
@@ -773,53 +829,61 @@ def invalidate_homework_stage_for_rerun(
 
 
 def list_homework_versions(username: str, analysis_id: str) -> List[Dict[str, Any]]:
-    root = _analysis_root(username, analysis_id)
-    versions: List[Dict[str, Any]] = []
-    manifest_path = os.path.join(root, 'manifest.json')
-    if os.path.isfile(manifest_path):
-        manifest = safe_json_load(manifest_path)
-        versions.append({
-            'run_id': CURRENT_RUN_ID,
-            'label': '当前版本',
-            'is_current': True,
-            'is_key_version': False,
-            # Version labels represent when that version was last generated,
-            # not when the analysis workspace was first created.  A rerun
-            # intentionally keeps created_at, so using it here can make the
-            # current version appear older than the snapshot just archived.
-            'created_at': manifest.get('updated_at') or manifest.get('created_at') or '',
-            'status': manifest.get('status') or 'completed',
-            **_red_blue_summary(root),
-            **feedback_version_summary(root, manifest),
-        })
-
-    archived: List[Dict[str, Any]] = []
-    index_data = _load_archives_index(username, analysis_id)
-
-    for item in index_data.get('versions') or []:
-        if not isinstance(item, dict):
+    from pathlib import Path
+    versions = []
+    current_physical, warning = '', ''
+    try:
+        root = _analysis_root(username, analysis_id)
+        if os.path.isfile(os.path.join(root, 'manifest.json')):
+            manifest = safe_json_load(os.path.join(root, 'manifest.json'))
+            current_physical = manifest.get('run_id', '')
+            versions.append({'run_id': CURRENT_RUN_ID, 'physical_run_id': current_physical,
+                'label': '当前版本', 'is_current': True, 'is_key_version': False,
+                'created_at': manifest.get('updated_at') or manifest.get('created_at', ''),
+                'status': manifest.get('status', 'unverified'), **_red_blue_summary(root),
+                **feedback_version_summary(root, manifest)})
+    except (ValueError, OSError, TypeError):
+        warning = '当前版本不可读取，以下为可独立查看的历史记录。'
+        versions.append({'run_id': CURRENT_RUN_ID, 'label': '当前版本不可读取',
+                         'is_current': True, 'is_key_version': False, 'status': 'unverified',
+                         'created_at': '', 'history_warning': warning})
+    try:
+        indexed = _load_archives_index(username, analysis_id).get('versions', [])
+    except (ValueError, OSError):
+        indexed = []
+        warning = '历史索引不可读取，已列出可定位的独立运行；原索引保留。'
+    records = {item['run_id']: dict(item) for item in indexed if isinstance(item, dict) and item.get('run_id')}
+    archive_parent = Path(_archives_root(username, analysis_id))
+    if archive_parent.is_dir():
+        for child in archive_parent.iterdir():
+            if not child.name.startswith('.') and child.is_dir() and (child / 'manifest.json').is_file():
+                records.setdefault(child.name, {'run_id': child.name, 'storage': 'archive'})
+    runs = Path(_container_root(username, analysis_id)) / '_runs'
+    if runs.is_dir():
+        for child in runs.iterdir():
+            if child.name.startswith('p03_') and (child / 'manifest.json').is_file():
+                records.setdefault(child.name, {'run_id': child.name, 'storage': 'run'})
+    for run_id, item in records.items():
+        if run_id == current_physical:
             continue
         try:
-            run_id = normalize_homework_run_id(item.get('run_id'))
-        except ValueError:
-            continue
-        if not run_id or not os.path.isdir(os.path.join(_archives_root(username, analysis_id), run_id)):
-            continue
-        archive_root = os.path.join(_archives_root(username, analysis_id), run_id)
-        archived.append({
-            'run_id': run_id,
-            'label': item.get('label') or run_id,
-            'is_current': False,
-            'is_key_version': bool(item.get('is_key_version')),
-            'key_marked_at': item.get('key_marked_at') or '',
-            'created_at': item.get('archived_at') or item.get('source_created_at') or '',
-            'status': item.get('status') or 'completed',
-            **_red_blue_summary(archive_root),
-            **feedback_version_summary(archive_root),
-        })
-    archived.reverse()
-    versions.extend(archived)
-    return versions
+            root = resolve_homework_run_root(username, analysis_id, run_id)
+            if not os.path.isdir(root):
+                continue
+            manifest = safe_json_load(os.path.join(root, 'manifest.json')) if os.path.isfile(os.path.join(root, 'manifest.json')) else {}
+            versions.append({'run_id': run_id, 'physical_run_id': manifest.get('run_id', ''),
+                'label': item.get('label') or '历史版本 ' + (manifest.get('created_at') or run_id),
+                'is_current': False, 'is_key_version': bool(item.get('is_key_version')),
+                'key_marked_at': item.get('key_marked_at', ''),
+                'created_at': item.get('archived_at') or manifest.get('updated_at') or manifest.get('created_at', ''),
+                'status': manifest.get('status', 'unverified'), 'history_warning': warning,
+                **_red_blue_summary(root), **feedback_version_summary(root, manifest)})
+        except (ValueError, OSError, TypeError):
+            versions.append({'run_id': run_id, 'label': item.get('label') or run_id,
+                'is_current': False, 'is_key_version': bool(item.get('is_key_version')),
+                'status': 'unverified', 'created_at': item.get('archived_at', ''),
+                'history_warning': '该历史记录损坏，已保留原目录。'})
+    return sorted(versions, key=lambda v: (v['is_current'], v.get('created_at', '')), reverse=True)
 
 
 @_archive_transaction
@@ -830,8 +894,13 @@ def set_homework_version_key(username: str, analysis_id: str, run_id: str, is_ke
     if clean_run_id == CURRENT_RUN_ID:
         raise ValueError('当前版本不是历史版本，不能设为关键历史版本')
 
-    root = _analysis_root(username, analysis_id)
-    archive_root = os.path.join(_archives_root(username, analysis_id), clean_run_id)
+    try:
+        current = safe_json_load(os.path.join(_analysis_root(username, analysis_id), 'manifest.json'))
+    except (ValueError, OSError):
+        current = {}
+    if current.get('run_id') == clean_run_id:
+        raise ValueError('当前版本不能设为关键历史版本')
+    archive_root = resolve_homework_run_root(username, analysis_id, clean_run_id)
     if not os.path.isdir(archive_root):
         raise ValueError('历史版本不存在')
 
@@ -842,6 +911,9 @@ def set_homework_version_key(username: str, analysis_id: str, run_id: str, is_ke
         if isinstance(item, dict) and str(item.get('run_id') or '').strip() == clean_run_id:
             target = item
             break
+    if target is None and clean_run_id.startswith('p03_'):
+        target = {'run_id': clean_run_id, 'storage': 'run', 'physical_run_id': clean_run_id}
+        versions.append(target)
     if target is None:
         raise ValueError('历史版本索引不存在')
 

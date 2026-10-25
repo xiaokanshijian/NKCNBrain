@@ -1,6 +1,9 @@
 <template>
   <!-- 子组件内容 -->
   <div class="chat-window">
+    <div v-if="gradingContextNotices.length" class="grading-context-notice" role="status">
+      <div v-for="item in gradingContextNotices" :key="item.filename">{{ item.filename }}：{{ item.message }}</div>
+    </div>
     <!-- 中断按钮 - 仅在流式输出且未显示eval/second-eval时显示 -->
     <div
       v-if="shouldShowInterruptButton()"
@@ -295,7 +298,7 @@
 
 <script>
 import { h } from 'vue';
-import { ElNotification, ElMessage, ElProgress } from 'element-plus'; // 注意：在 Vue 3 中是 ElNotification 和 ElMessage
+import { ElNotification, ElMessage, ElProgress, ElMessageBox } from 'element-plus'; // 注意：在 Vue 3 中是 ElNotification 和 ElMessage
 
 import { animation, deepCopy } from "@/utils/util";
 import { getChatMsg } from "@/api/getData";
@@ -908,6 +911,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    isSocraticProbeUsed: {
+      type: Boolean,
+      default: false,
+    },
     keyTopics: Array,
     rounds: Number,
     portraitStates: Object,
@@ -923,6 +930,10 @@ export default {
     crossNotebookContext: {
       type: Boolean,
       default: false,
+    },
+    cardShallowRateModelId: {
+      type: String,
+      default: '1126',
     },
   },
   watch: {
@@ -960,8 +971,14 @@ export default {
       deep: true
     },
   },
+  computed: {
+    gradingContextNotices() {
+      return this.gradingContextStatus.filter(item => item.status !== 'ready' && item.status !== 'not_graded');
+    },
+  },
   data() {
     return {
+      gradingContextStatus: [],
       // 🔥 新增：System选择（0=System2慢思考，1=System1快思考）
       systemChoice: 0,
 
@@ -1041,6 +1058,9 @@ export default {
     this.chatList.splice(1, this.chatList.length - 1);
   },
   methods: {
+    updateGradingContextStatus(response) {
+      this.gradingContextStatus = (response && response.grading_context_status) || [];
+    },
     // appendCrossNotebookParams(paramFormData) {
     //   paramFormData.append('crossNotebookContext', this.crossNotebookContext ? 'true' : 'false');
     //   const pinned = getPinnedCrossNotebooksForApi(localStorage.getItem('userId'));
@@ -1499,6 +1519,7 @@ export default {
         formData.append('isSummaryUsed', this.isSummaryUsed);
         // formData.append('isMemorySystemUsed', this.isMemorySystemUsed !== false);
         formData.append('isMemorySystemUsed', !!this.isMemorySystemUsed);
+        formData.append('isSocraticProbeUsed', !!this.isSocraticProbeUsed);
         formData.append('rounds', this.rounds);
         formData.append('realName', localStorage.getItem('realName'));
         formData.append('userbookName', localStorage.getItem('userId'));
@@ -1530,6 +1551,7 @@ export default {
         paramFormData.append('isHistoryUsed', this.isHistoryUsed);
         // paramFormData.append('isMemorySystemUsed', this.isMemorySystemUsed !== false);
         paramFormData.append('isMemorySystemUsed', !!this.isMemorySystemUsed);
+        paramFormData.append('isSocraticProbeUsed', !!this.isSocraticProbeUsed);
         paramFormData.append('rounds', this.rounds);
         let originRealName = localStorage.getItem('originRealName') + localStorage.getItem('userId').replace(localStorage.getItem('realName'), '');
         paramFormData.append('originRealName', originRealName);
@@ -1542,7 +1564,7 @@ export default {
         paramFormData.append('mode', retryType === 'second_iteration_only' ? 'iteration' : 'normal');
         
         // 复用正常回答的API
-        await chat_sendParams(paramFormData);
+        this.updateGradingContextStatus(await chat_sendParams(paramFormData));
         const response = await chat_send(this.chatModelInfo.name, formData, this.$attrs.windowId);
         
         // 处理流式响应
@@ -2173,6 +2195,7 @@ xxx`;
       paramFormData.append('filenamelist', []);
       paramFormData.append('rightSelectList', []);
       paramFormData.append('isHistoryUsed', false);
+      paramFormData.append('isSocraticProbeUsed', !!this.isSocraticProbeUsed);
       paramFormData.append('rounds', this.rounds);
 
       paramFormData.append('originRealName', originRealName)
@@ -2192,6 +2215,7 @@ xxx`;
       chat_sendParams(paramFormData)
       .then(response => {
         // 当 chat_sendParams 成功执行后，才执行 chat_send
+        this.updateGradingContextStatus(response);
         console.log("chat_sendParams response:", response);
         return chat_send(this.chatModelInfo.name, formData, this.$attrs.windowId); // 返回 chat_send 的 Promise，以便在下一个 .then 中处理
       })
@@ -2972,7 +2996,7 @@ xxx`;
       formDataScore.append('originRealName', originRealName);
       formDataScore.append('content', qaTotalStr);
       formDataScore.append('cid', cardId);
-      formDataScore.append('model_id', "1126");  // 对应claude-4-sonnet
+      formDataScore.append('model_id', this.cardShallowRateModelId || "1126");  // Admin「建卡·红蓝浅评」，后端会再覆盖
       // formDataScore.append('model_id', this.chatModelInfo.id);
 
       // card_score(formDataScore).then(response => {
@@ -4089,6 +4113,7 @@ xxx`;
       paramFormData.append('filenamelist', []);
       paramFormData.append('rightSelectList', []);
       paramFormData.append('isHistoryUsed', false);
+      paramFormData.append('isSocraticProbeUsed', !!this.isSocraticProbeUsed);
       paramFormData.append('rounds', this.rounds);
       paramFormData.append('originRealName', originRealName);
       paramFormData.append('choosedCardIdList', []);
@@ -4105,7 +4130,7 @@ xxx`;
       
       // 执行迭代请求
       try {
-        await chat_sendParams(paramFormData);
+        this.updateGradingContextStatus(await chat_sendParams(paramFormData));
         const response = await chat_send(this.chatModelInfo.name, formData, this.$attrs.windowId);
         const reader = response.body.getReader();
         const decoder = new TextDecoder('utf-8');
@@ -5570,6 +5595,7 @@ ${ragInfo}• 第一次回答：总计 ${timingInfo.firstAnswerTotal}s (${firstA
       formData.append('isSummaryUsed', this.isSummaryUsed);
       // formData.append('isMemorySystemUsed', this.isMemorySystemUsed !== false);
       formData.append('isMemorySystemUsed', !!this.isMemorySystemUsed);
+      formData.append('isSocraticProbeUsed', !!this.isSocraticProbeUsed);
       formData.append('rounds', this.rounds)
 
       formData.append('realName', localStorage.getItem('realName'));
@@ -5611,6 +5637,7 @@ ${ragInfo}• 第一次回答：总计 ${timingInfo.firstAnswerTotal}s (${firstA
       paramFormData.append('isHistoryUsed', this.isHistoryUsed);
       // paramFormData.append('isMemorySystemUsed', this.isMemorySystemUsed !== false);
       paramFormData.append('isMemorySystemUsed', !!this.isMemorySystemUsed);
+      paramFormData.append('isSocraticProbeUsed', !!this.isSocraticProbeUsed);
       paramFormData.append('rounds', this.rounds);
 
       paramFormData.append('originRealName', originRealName)
@@ -5645,6 +5672,7 @@ ${ragInfo}• 第一次回答：总计 ${timingInfo.firstAnswerTotal}s (${firstA
       chat_sendParams(paramFormData)
       .then(response => {
         // 当 chat_sendParams 成功执行后，才执行 chat_send
+        this.updateGradingContextStatus(response);
         console.log("chat_sendParams response:", response);
         if (response && response.socratic_should_counter_ask) {
           console.log(
@@ -6040,6 +6068,8 @@ ${ragInfo}• 第一次回答：总计 ${timingInfo.firstAnswerTotal}s (${firstA
     getUploadSupportedTypes() {
       return {
         "application/pdf": 4,
+        "application/zip": 5,
+        "application/x-zip-compressed": 5,
         "text/plain": 6,
         "image/png": 7,
         "image/jpeg": 8,
@@ -6060,6 +6090,10 @@ ${ragInfo}• 第一次回答：总计 ${timingInfo.firstAnswerTotal}s (${firstA
     getUploadFileCategory(file) {
       const supportedTypes = this.getUploadSupportedTypes();
       const type = file?.type || "";
+      const name = (file?.name || "").toLowerCase();
+      if (name.endsWith(".zip") || type === "application/zip" || type === "application/x-zip-compressed") {
+        return "skill_zip";
+      }
       if (!supportedTypes.hasOwnProperty(type)) {
         return null;
       }
@@ -6079,6 +6113,7 @@ ${ragInfo}• 第一次回答：总计 ${timingInfo.firstAnswerTotal}s (${firstA
       if (category === "text") return "TXT";
       if (category === "image") return "图片";
       if (category === "excel") return "Excel";
+      if (category === "skill_zip") return "Skill包ZIP";
       return "未知类型";
     },
     async sendFile(e) {
@@ -6121,6 +6156,68 @@ ${ragInfo}• 第一次回答：总计 ${timingInfo.firstAnswerTotal}s (${firstA
         });
       }
     },
+    /**
+     * Skill 包同名冲突三选：覆盖 / 重命名 / 取消
+     * @returns {{ policy: 'overwrite'|'rename'|'cancel', rename_map?: Record<string,string> }}
+     */
+    async resolveSkillZipConflict(conflicts) {
+      const list = (conflicts || []).join(', ');
+      try {
+        await ElMessageBox.confirm(
+          `本子已存在同名 Skill：\n${list}\n\n` +
+            `「覆盖」：旧目录备份为 .bak 后导入\n` +
+            `「重命名」：为每个冲突项指定新名称再导入\n` +
+            `关闭窗口 (X)：取消导入`,
+          'Skill 同名冲突',
+          {
+            confirmButtonText: '覆盖',
+            cancelButtonText: '重命名',
+            distinguishCancelAndClose: true,
+            type: 'warning',
+            closeOnClickModal: false,
+            closeOnPressEscape: true,
+          }
+        );
+        return { policy: 'overwrite' };
+      } catch (action) {
+        if (action !== 'cancel') {
+          return { policy: 'cancel' };
+        }
+        // 重命名：逐个询问新名
+        const rename_map = {};
+        for (const name of conflicts || []) {
+          let suggested = `${name}-imported`;
+          let n = 2;
+          while (Object.values(rename_map).includes(suggested)) {
+            suggested = `${name}-imported-${n}`;
+            n += 1;
+          }
+          try {
+            const { value } = await ElMessageBox.prompt(
+              `为冲突项「${name}」输入新的 Skill 名称\n（仅小写字母、数字、连字符）`,
+              '重命名 Skill',
+              {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消导入',
+                inputValue: suggested,
+                inputPattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+                inputErrorMessage: '格式须为 a-z / 0-9 / 连字符，如 real-goal-2',
+                closeOnClickModal: false,
+              }
+            );
+            const newName = String(value || '').trim();
+            if (!newName) {
+              return { policy: 'cancel' };
+            }
+            rename_map[name] = newName;
+          } catch {
+            return { policy: 'cancel' };
+          }
+        }
+        return { policy: 'rename', rename_map };
+      }
+    },
+
     async sendSingleFile(file) {
 
       if (!file) {
@@ -6134,8 +6231,11 @@ ${ragInfo}• 第一次回答：总计 ${timingInfo.firstAnswerTotal}s (${firstA
         const isAudioFile = audioExtensions.some(ext => fileName.endsWith(ext));
         if (isAudioFile) {
           supportedTypes[file.type] = 11;
+        } else if (fileName.endsWith('.zip')) {
+          supportedTypes[file.type || 'application/zip'] = 5;
+          file._nkcnForcedType = 5;
         } else {
-          this.$message.error(`文件 ${file.name} 类型不支持！目前仅支持 PDF、TXT 文本文件、PNG、JPG 图片文件、Excel 文件以及音频文件（MP3、WAV、OGG、M4A等）。`);
+          this.$message.error(`文件 ${file.name} 类型不支持！目前仅支持 PDF、TXT、Skill 包 ZIP、PNG、JPG、Excel 以及音频文件。`);
           return;
         }
       }
@@ -6185,7 +6285,7 @@ ${ragInfo}• 第一次回答：总计 ${timingInfo.firstAnswerTotal}s (${firstA
       this.progressDialogs.set(file.name, progressDialog);
 
       // 保存文件类型信息（与旧版一致）
-      const fileTypeNumber = supportedTypes[file.type];
+      const fileTypeNumber = file._nkcnForcedType || supportedTypes[file.type];
       const audioMimeTypes = ['audio/mpeg', 'audio/wav', 'audio/wave', 'audio/x-wav', 'audio/ogg',
                               'audio/mp4', 'audio/x-m4a', 'audio/webm', 'audio/aac', 'audio/flac'];
       const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.webm'];
@@ -6313,6 +6413,43 @@ ${ragInfo}• 第一次回答：总计 ${timingInfo.firstAnswerTotal}s (${firstA
           // 发送上传请求
           // await chat_upload(formData);
           const uploadResponse = await chat_upload(formData);
+          if (uploadResponse && uploadResponse.reject_zip) {
+            this.$message.error(uploadResponse.msg || '当前仅支持 Skill 包结构的 zip');
+            eventSource.close();
+            this.progressDialogs.get(file.name)?.close();
+            this.progressDialogs.delete(file.name);
+            this.uploadStates.delete(file.name);
+            return;
+          }
+          if (uploadResponse && uploadResponse.need_conflict_resolution) {
+            const decision = await this.resolveSkillZipConflict(uploadResponse.conflicts || []);
+            if (decision.policy === 'cancel') {
+              this.$message.info('已取消 Skill 包导入（zip 仍保留在本子）');
+            } else {
+              const confRes = await fetch(`${API_BASE_URL}/api/import_skill_zip`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  username: localStorage.getItem('userId'),
+                  realName: localStorage.getItem('realName'),
+                  zip_name: uploadResponse.zip_name || file.name,
+                  conflict_policy: decision.policy,
+                  rename_map: decision.rename_map || {},
+                }),
+              }).then(r => r.json());
+              if (confRes.error_num !== 0) {
+                this.$message.error(confRes.msg || '导入失败');
+                return;
+              }
+              if (decision.policy === 'overwrite') {
+                this.$message.success('Skill 包已覆盖导入（旧版已备份 .bak）');
+              } else {
+                this.$message.success('Skill 包已按新名称导入');
+              }
+            }
+          } else if (uploadResponse && uploadResponse.is_skill_pack) {
+            this.$message.success(`Skill 包导入成功：${(uploadResponse.imported || []).length} 个`);
+          }
           this.$emit("update:fileList", file.name);
           this.$message.success(`文件 ${file.name} 上传成功！`);
 
@@ -6481,6 +6618,17 @@ ${ragInfo}• 第一次回答：总计 ${timingInfo.firstAnswerTotal}s (${firstA
 </script>
 
 <style lang="scss" scoped>
+.grading-context-notice {
+  padding: 8px 12px;
+  margin: 6px 0;
+  background: #fff8e8;
+  color: #795920;
+  font-size: 12px;
+  line-height: 1.6;
+  max-height: 100px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
 .chat-window {
   width: 100%;
   height: 100%;

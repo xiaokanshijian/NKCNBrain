@@ -126,7 +126,7 @@
               </div>
             </div>
             <div class="notebook-actions">
-              <button @click="openNotebook(notebook, scene)" v-if="showOpenBookButton" class="open-button">打开</button>
+              <button @click="openNotebook(notebook, scene)" v-if="showOpenBookButton" class="open-button" :disabled="showProgress">打开</button>
               <button @click="deleteNotebook(notebook, scene)" v-if="showOpenBookButton" class="delete-button">删除</button>
               <button @click="shareNotebook(notebook, scene)" v-if="showOpenBookButton && !needDemoBtn(scene.sid)"
                 class="share-button">分享</button>
@@ -188,7 +188,7 @@
               </div>
             </div>
             <div class="notebook-actions">
-              <button @click="openNotebook(notebook, findSceneByNotebook(notebook, sceneList))" v-if="showOpenBookButton" class="open-button">打开</button>
+              <button @click="openNotebook(notebook, findSceneByNotebook(notebook, sceneList))" v-if="showOpenBookButton" class="open-button" :disabled="showProgress">打开</button>
               <button @click="deleteNotebook(notebook, findSceneByNotebook(notebook, sceneList))" v-if="showOpenBookButton" class="delete-button">删除</button>
               <button @click="shareNotebook(notebook, findSceneByNotebook(notebook, sceneList))" v-if="showOpenBookButton && !needDemoBtn(findSceneByNotebook(notebook, sceneList).sid)"
                 class="share-button">分享</button>
@@ -2675,6 +2675,9 @@ export default {
     },
 
     openNotebook: function (notebookData, scene) {
+      if (this.showProgress) {
+        return
+      }
       this.showProgress = true;
       this.loadProgress = 0;
       this.progressMessage = '准备加载用户数据...';
@@ -2765,10 +2768,7 @@ export default {
         // 获取进度ID并开始轮询进度
         makeAndGetProgressId().then(response => {
           this.progressId = response.progress_id;
-          setTimeout(() => {
-            // 延迟一会再开始轮询试试，给后端少一点压力
-            this.startProgressPolling();
-          }, 1400);
+          this.startProgressPolling();
 
           loadUser(originRealName, uname, this.selectedName, this.progressId).then(response => {
             if (response.error_num === 0) {

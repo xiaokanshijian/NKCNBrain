@@ -4,12 +4,12 @@ const REDIRECT_CONFIG = {
   TARGETS: {
     SILICON_VALLEY: {
       name: '硅谷服务器',
-      url: 'https://www.nkcnbrain.com',
+      url: (process.env.VUE_APP_APP_URL || "http://localhost:8000"),
       description: '硅谷应用服务器'
     },
     CHINA: {
-      name: '国内服务器',
-      url: process.env.VUE_APP_CHINA_URL || 'http://localhost:8080',
+      name: '国内服务器', 
+      url: (process.env.VUE_APP_SERVICE_8000_URL || "http://localhost:8000"),
       description: '国内应用服务器'
     },
     LOCAL: {

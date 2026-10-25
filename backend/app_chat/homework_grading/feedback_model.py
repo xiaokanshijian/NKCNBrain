@@ -16,6 +16,8 @@ def model_spec(runtime, role):
 
 
 def runtime_client(client, runtime, role):
+    from .execution_control import controlled_client
+    client = controlled_client(client, role, runtime)
     if runtime is None:
         return client
     spec = model_spec(runtime, role)

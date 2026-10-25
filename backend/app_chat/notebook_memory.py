@@ -4,6 +4,7 @@ NKCN 本子/场景/账户长短记忆：写 → 用 → 压 → 升 → AutoDrea
 路径均在 received_dir/memory_system/ 下；条目化存储便于索引/更新/剪枝。
 """
 from __future__ import annotations
+import nkcn_public_config as _public_config
 
 import json
 import os
@@ -491,8 +492,8 @@ def _call_llm(abbr: str, system: str, user: str, *, max_tokens: int = 4096, temp
     cfg = resolve_openai_cfg_from_abbr(
         model_abbr,
         default_model=model_abbr,
-        default_base="https://chat.cloudapi.vip/v1/",
-        default_key=os.environ.get("NKCN_LLM_API_KEY", ""),
+        default_base=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
+        default_key=_public_config.secret('OPENAI_API_KEY'),
     )
     # deepseek 官方优先
     if "deepseek" in model_abbr.lower():
@@ -512,7 +513,7 @@ def _call_llm(abbr: str, system: str, user: str, *, max_tokens: int = 4096, temp
 
     client = OpenAI(
         api_key=cfg.get("api_key") or "EMPTY",
-        base_url=(cfg.get("base_url") or "https://chat.cloudapi.vip/v1").rstrip("/"),
+        base_url=(cfg.get("base_url") or _public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1')).rstrip("/"),
         timeout=120,
     )
     model = cfg.get("model") or model_abbr
@@ -601,10 +602,12 @@ def build_book_snapshot(username: str, scene_name: str = "", sub_scene: str = ""
     raw_dir = os.path.normpath(f"./received_dir/user_raw_file/{username}")
     if os.path.isdir(raw_dir):
         for f in sorted(os.listdir(raw_dir)):
-            if f.startswith(".") or f in ("cardImage", "pre_summary", "pre_image_summary", "_twin", "cardCondense", "pre_tribal_knowledge"):
+            if f.startswith(".") or f in ("cardImage", "pre_summary", "pre_image_summary", "_twin", "cardCondense", "pre_tribal_knowledge", "skills", "_socratic_meta"):
                 continue
             fp = os.path.join(raw_dir, f)
             if os.path.isfile(fp):
+                if f.lower().endswith(".zip"):
+                    continue
                 docs.append(f)
             elif os.path.isdir(fp) and not f.endswith("_ocr"):
                 # 跳过内部目录

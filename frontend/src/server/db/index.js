@@ -1,10 +1,10 @@
-let mysql = require('mysql')
-
-let db = mysql.createPool({
-    host: '127.0.0.1',          //数据库IP地址
-    user: 'root',               //数据库登录账号
-    password: '',     //数据库登录密码
-    database: 'bishe'           //要操作的数据库
+const mysql = require('mysql')
+if (!process.env.AUX_DB_PASSWORD) {
+  throw new Error('Missing AUX_DB_PASSWORD for the optional Node service')
+}
+module.exports = mysql.createPool({
+  host: process.env.AUX_DB_HOST || 'localhost',
+  user: process.env.AUX_DB_USER || 'nkcn',
+  password: process.env.AUX_DB_PASSWORD,
+  database: process.env.AUX_DB_NAME || 'nkcn'
 })
-
-module.exports = db

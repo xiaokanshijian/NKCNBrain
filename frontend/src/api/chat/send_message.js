@@ -60,6 +60,59 @@ export function group_twin_gxx_content(params) {
     return request.get('/api/group_twin_gxx_content', { params });
 }
 
+/** 交叉梳理成功后：后台生成 1+n Skill */
+export function cross_reorganize_skills_start(data) {
+    return request.post('/api/cross_reorganize_skills_start', data, {
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
+
+export function cross_reorganize_skills_status(data) {
+    return request.post('/api/cross_reorganize_skills_status', data, {
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
+
+export function cross_reorganize_index(data) {
+    return request.post('/api/cross_reorganize_index', data, {
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
+
+export function knowledge_conflict_start(data) {
+    return request.post('/api/knowledge_conflict_start', data, {
+        headers: {
+            "Content-Type": "application/json; charset=utf-8"
+        }
+    })
+}
+export function knowledge_conflict_status(data) {
+    return request.post('/api/knowledge_conflict_status', data, {
+        headers: {
+            "Content-Type": "application/json; charset=utf-8"
+        }
+    })
+}
+export function knowledge_conflict_get(data) {
+    return request.post('/api/knowledge_conflict_get', data, {
+        headers: {
+            "Content-Type": "application/json; charset=utf-8"
+        }
+    })
+}
+export function knowledge_conflict_feedback(data) {
+    return request.post('/api/knowledge_conflict_feedback', data, {
+        headers: {
+            "Content-Type": "application/json; charset=utf-8"
+        }
+    })
+}
+export function cross_reorganize_skill_get(data) {
+    return request.post('/api/cross_reorganize_skill_get', data, {
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
+
 // export function chat_send(formData) {
 //     return request.post(
 //         '/api/chat_send',
@@ -407,7 +460,7 @@ export function chat_send_onlytext(formData) {
 // 在API文件中添加流式调用函数
 export function chat_send_onlytext_stream(formData) {
     // const BASE_URL = 'http://localhost:8000';
-    // const BASE_URL = 'https://www.nkcnbrain.com';
+    // const BASE_URL = (process.env.VUE_APP_APP_URL || "http://localhost:8000");
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {

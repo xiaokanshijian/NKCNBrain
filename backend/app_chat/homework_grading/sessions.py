@@ -7,6 +7,7 @@ nkcn 自有实现，按 yq/连续图片批改 2026-06-01 追加修正改写：
 """
 
 from __future__ import annotations
+from .stage_dependencies import artifact_compatible
 
 from .feedback_runtime import stamp_feedback
 from .feedback_verification import validate_page
@@ -568,12 +569,10 @@ def build_pre_pass1_session_map(
         pages = pages[:total_pages]
 
     page_features = _extract_page_features(pages, subject)
-    try:
-        rule_sessions = _build_sessions_rule(page_features, subject, total_pages, sample_id)
-        sessions, split_summary = _resolve_sessions(sample_id, subject, page_features, rule_sessions, total_pages, use_llm=use_llm, **({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
-    except Exception as exc:
-        logger.warning('[session-map] 切分失败，回退整篇作业：%s', exc)
-        title = _fallback_start_title(page_features, sample_id, subject)
+    material_type = str((feedback_runtime.context or {}).get('material_type') or '') if feedback_runtime is not None else ''
+    if material_type in ('composition', 'notes'):
+        title = '作文全文' if material_type == 'composition' else '笔记材料（按内容观察）'
+        source = 'composition_document' if material_type == 'composition' else 'notes_document'
         sessions = _finalize_sessions([{
             'session_index': 1,
             'page_start': 1,
@@ -582,10 +581,10 @@ def build_pre_pass1_session_map(
             'unit_title': title,
             'module_title': title,
             'submodules': _submodules_for_range(page_features, 1, total_pages),
-            'boundary_signal': 'fallback',
-            'boundary_reason': str(exc)[:160],
-            'split_source': 'fallback',
-            'confidence': 0.5,
+            'boundary_signal': source,
+            'boundary_reason': '作文全部页面按同一篇文章处理' if material_type == 'composition' else '笔记作为一份观察材料，不将主题或页序解释为多次练习',
+            'split_source': source,
+            'confidence': 1.0,
         }], sample_id, total_pages)
         split_summary = {
             'granularity': SESSION_GRANULARITY,
@@ -593,10 +592,40 @@ def build_pre_pass1_session_map(
             'ocr_md_used': bool(ocr_md_path),
             'llm_triggered': False,
             'llm_used': False,
-            'fallback_used': True,
-            'fallback_reason': str(exc)[:160],
-            'rule_candidate_count': 0,
+            'fallback_used': False,
+            'fallback_reason': None,
+            'rule_candidate_count': 1,
         }
+    else:
+        try:
+            rule_sessions = _build_sessions_rule(page_features, subject, total_pages, sample_id)
+            sessions, split_summary = _resolve_sessions(sample_id, subject, page_features, rule_sessions, total_pages, use_llm=use_llm, **({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
+        except Exception as exc:
+            logger.warning('[session-map] 切分失败，回退整篇作业：%s', exc)
+            title = _fallback_start_title(page_features, sample_id, subject)
+            sessions = _finalize_sessions([{
+                'session_index': 1,
+                'page_start': 1,
+                'page_end': total_pages,
+                'session_title': title,
+                'unit_title': title,
+                'module_title': title,
+                'submodules': _submodules_for_range(page_features, 1, total_pages),
+                'boundary_signal': 'fallback',
+                'boundary_reason': str(exc)[:160],
+                'split_source': 'fallback',
+                'confidence': 0.5,
+            }], sample_id, total_pages)
+            split_summary = {
+                'granularity': SESSION_GRANULARITY,
+                'channels': ['rule'],
+                'ocr_md_used': bool(ocr_md_path),
+                'llm_triggered': False,
+                'llm_used': False,
+                'fallback_used': True,
+                'fallback_reason': str(exc)[:160],
+                'rule_candidate_count': 0,
+            }
     split_summary['ocr_md_used'] = bool(ocr_md_path)
 
     doc = {
@@ -605,7 +634,7 @@ def build_pre_pass1_session_map(
         'total_pages': total_pages,
         'session_count': len(sessions),
         'extracted_at': datetime.datetime.now().isoformat(timespec='seconds'),
-        'temporal_assumption': TEMPORAL_ASSUMPTION,
+        'temporal_assumption': 'document_order_only; no practice chronology' if material_type == 'notes' else TEMPORAL_ASSUMPTION,
         'page_field_convention': PAGE_FIELD_CONVENTION,
         'session_granularity': SESSION_GRANULARITY,
         'split_summary': split_summary,
@@ -624,7 +653,7 @@ def build_pre_pass1_session_map(
 def _normalize_session_entry(session: Dict[str, Any], idx: int, sample_id: str = 'session') -> Dict[str, Any]:
     start, end = session_page_bounds(session)
     title = session.get('session_title') or session.get('module_title') or session.get('unit_title') or f'Session {idx}'
-    return {
+    out = {
         'session_id': session.get('session_id') or f'{sample_id}_s{idx:02d}',
         'session_index': int(session.get('session_index') or idx),
         'order_index': int(session.get('order_index') or session.get('session_index') or idx),
@@ -637,6 +666,22 @@ def _normalize_session_entry(session: Dict[str, Any], idx: int, sample_id: str =
         'split_source': session.get('split_source', ''),
         'confidence': session.get('confidence'),
     }
+    # 配置卡等可带显式非连续 pages；读取预建 session map 时必须保留，否则会退回起止闭区间
+    raw_pages = session.get('pages')
+    if isinstance(raw_pages, list) and raw_pages:
+        pages: List[int] = []
+        seen = set()
+        for p in raw_pages:
+            try:
+                v = int(p)
+            except (TypeError, ValueError):
+                continue
+            if v > 0 and v not in seen:
+                seen.add(v)
+                pages.append(v)
+        if pages:
+            out['pages'] = pages
+    return out
 
 
 def _match_module(text: str, subject: str) -> Optional[str]:
@@ -676,7 +721,7 @@ def split_sessions(pass1_dir: str, subject: str = 'unknown', sessions_json_path:
         subject = feedback_runtime.context['subject_code']
     if feedback_runtime is not None and sessions_json_path and os.path.exists(sessions_json_path):
         existing = safe_json_load(sessions_json_path)
-        if existing.get('feedback_execution', {}).get('config_fingerprint') != feedback_runtime.fingerprint:
+        if not artifact_compatible(existing, feedback_runtime):
             raise ValueError('篇目数据与当前运行配置不一致')
     if sessions_json_path and os.path.exists(sessions_json_path):
         try:
@@ -786,7 +831,22 @@ def build_session_memory(
     if feedback_runtime is not None:
         subject = feedback_runtime.context['subject_code']
     start, end = session_page_bounds(session)
-    page_files = [p for p in all_page_files if start <= parse_page_num(os.path.basename(p)) <= end]
+    # 配置卡等可带显式非连续 pages；有则只聚合名单内页，避免按起止区间把缝页算进去
+    explicit_pages = session.get('pages')
+    allow: Optional[set] = None
+    if isinstance(explicit_pages, list) and explicit_pages:
+        allow = set()
+        for p in explicit_pages:
+            try:
+                allow.add(int(p))
+            except (TypeError, ValueError):
+                continue
+        page_files = [
+            p for p in all_page_files
+            if parse_page_num(os.path.basename(p)) in allow
+        ]
+    else:
+        page_files = [p for p in all_page_files if start <= parse_page_num(os.path.basename(p)) <= end]
     body = aggregate_pages(page_files, **({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
     session_title = session.get('session_title') or session.get('module_title') or session.get('unit_title') or ''
     body.update({
@@ -794,13 +854,14 @@ def build_session_memory(
         'session_index': session['session_index'],
         'page_start': start,
         'page_end': end,
+        'pages': sorted(allow) if allow is not None else list(range(start, end + 1)),
         'session_title': session_title,
         'unit_title': session.get('unit_title', session_title),
         'module_title': session.get('module_title', session_title),
         'submodules': session.get('submodules', []),
     })
-    body['kp_trend'] = _compute_kp_trend(body, prior_memory)
-    body['erase_candidates'] = _compute_erase_candidates(
+    body['kp_trend'] = {} if body.get('evidence_mode') == 'notes' else _compute_kp_trend(body, prior_memory)
+    body['erase_candidates'] = [] if body.get('evidence_mode') == 'notes' else _compute_erase_candidates(
         body, prior_memory, prior_memory.get('session_index') if prior_memory else None,
     )
     return stamp_feedback({'subject': subject, 'sample_id': sample_id, **body}, feedback_runtime, 'sessions')

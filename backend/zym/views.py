@@ -39,9 +39,107 @@ import pandas as pd
 import openpyxl
 from app_chat import gpt4_api, kimi_api
 from app1.views import online_users
+import tempfile
+import threading
 
 scene_lock = {}
-progress_data = {}
+
+_PROGRESS_DIR = os.path.join(tempfile.gettempdir(), 'nkcn_load_progress')
+_progress_file_lock = threading.Lock()
+
+
+class _ProgressRow(dict):
+    """原地改进度时同时写到临时文件，避免 Django 热重载双进程各记一份内存。"""
+
+    def __init__(self, owner, pid, data):
+        super().__init__(data)
+        self._owner = owner
+        self._pid = pid
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        self._owner.flush(self._pid, dict(self))
+
+    def update(self, *args, **kwargs):
+        super().update(*args, **kwargs)
+        self._owner.flush(self._pid, dict(self))
+
+
+class ProgressStore:
+    def __init__(self):
+        self._mem = {}
+        try:
+            os.makedirs(_PROGRESS_DIR, exist_ok=True)
+        except OSError:
+            pass
+
+    def _path(self, pid):
+        text = str(pid or '')
+        if not re.match(r'^[a-zA-Z0-9-]{8,80}$', text):
+            raise KeyError(pid)
+        return os.path.join(_PROGRESS_DIR, text + '.json')
+
+    def flush(self, pid, data):
+        try:
+            path = self._path(pid)
+            tmp = path + '.tmp'
+            with _progress_file_lock:
+                with open(tmp, 'w', encoding='utf-8') as handle:
+                    json.dump(data, handle, ensure_ascii=False)
+                os.replace(tmp, path)
+        except (OSError, KeyError):
+            pass
+
+    def _read_file(self, pid):
+        try:
+            with open(self._path(pid), 'r', encoding='utf-8') as handle:
+                data = json.load(handle)
+            return data if isinstance(data, dict) else None
+        except (OSError, KeyError, json.JSONDecodeError, UnicodeDecodeError):
+            return None
+
+    def __contains__(self, pid):
+        if pid in self._mem:
+            return True
+        try:
+            return os.path.isfile(self._path(pid))
+        except KeyError:
+            return False
+
+    def __getitem__(self, pid):
+        row = self._mem.get(pid)
+        if row is not None:
+            disk = self._read_file(pid)
+            if disk and (disk.get('progress', 0) > row.get('progress', 0) or disk.get('status') != row.get('status')):
+                row.clear()
+                row.update(disk)
+            return row
+        data = self._read_file(pid)
+        if data is None:
+            raise KeyError(pid)
+        row = _ProgressRow(self, pid, data)
+        self._mem[pid] = row
+        return row
+
+    def __setitem__(self, pid, value):
+        data = dict(value or {})
+        row = _ProgressRow(self, pid, data)
+        self._mem[pid] = row
+        self.flush(pid, data)
+
+    def ensure(self, pid, **fields):
+        if pid not in self:
+            payload = {'status': 'started', 'progress': 0, 'message': '准备加载用户数据...'}
+            payload.update(fields)
+            self[pid] = payload
+            return self[pid]
+        row = self[pid]
+        for key, value in fields.items():
+            row[key] = value
+        return row
+
+
+progress_data = ProgressStore()
 
 # RANDOM_USER_NAME = 'gkjbkjbubuobklnbuibuyfyudsaihefowiilcnsiancioxzdozwqeflzddsfgvb'
 RANDOM_USER_NAME = 'gkjbkjbubuobklnb'
@@ -460,6 +558,10 @@ def loadUser(request):
         username = request.GET.get('username')
         sceneName = request.GET.get('sceneName')
         progress_id = request.GET.get('progressId')
+        if progress_id and progress_id in progress_data:
+            progress_data[progress_id]['progress'] = 4
+            progress_data[progress_id]['message'] = '正在读取场景配置…'
+            print(f"[zym loadUser] 已接到请求 progress_id={progress_id} user={username}")
 
         secenExcelPath = './received_dir/' + 'scene_excel/' + sceneName + '/prompt.xlsx'
         # binary_data = read_xlsx_to_binary(secenExcelPath)
@@ -489,20 +591,18 @@ def loadUser(request):
         secenExcelPath = finalExcelPath
 
         print("[zym loadUser] kaishi")
-        parse_input.load_user(username, progress_id=progress_id)
 
         # 进入本子时，重置小模型ID为3003
         from app_chat.global_state import GLOBAL_STATE
         GLOBAL_STATE.user_little_model_id[username] = "3003"
 
+        # 先后台灌向量（进度条靠它往前走），scene prompt 另写短锁，避免热重载后读 Excel 把进度卡在 0%
+        parse_input.load_user(username, progress_id=progress_id)
+
         if os.path.exists(secenExcelPath):
             res = read_prompt_from_file(secenExcelPath)
             res2 = prompt_to_ghp(res)
-            # parse_input.set_user_prompt(user_name=username, prompt=res2[0])
-            # parse_input.set_user_params(user_name=username, params=res2[1])
             prompt_mem_key = resolve_prompt_storage_key(username, originRealName)
-            if prompt_mem_key not in parse_input.lock:
-                parse_input.lock[prompt_mem_key] = RLock()
             parse_input.set_user_prompt(user_name=prompt_mem_key, prompt=res2[0])
             parse_input.set_user_params(user_name=prompt_mem_key, params=res2[1])
         if originRealName == username:

@@ -68,6 +68,9 @@ def read_feedback_snapshot(root, manifest=None):
                         (kind == 'curriculum' and content is not None and not isinstance(content, dict)) or
                         (kind == 'references' and not isinstance(content, dict))):
                     return _state('invalid', '材料依据快照内容类型无效')
+                if kind == 'skills' and any(s.get('content', {}).get('resource_schema') not in
+                        (None, 'feedback-capabilities-v1') for s in content):
+                    return _state('unsupported', '冻结能力资源版本暂不支持，已保留原结果')
                 data[kind] = content
         execution = manifest.get('feedback_execution')
         if not isinstance(execution, dict) or set(execution) != {'model_config', 'preprocessing', 'retrieval'}:
@@ -83,6 +86,13 @@ def read_feedback_snapshot(root, manifest=None):
 
 def feedback_version_summary(root, manifest=None):
     result = read_feedback_snapshot(root, manifest)
+    from .completion import summarize_completion
+    try:
+        saved = manifest if manifest is not None else json.loads((Path(root) / 'manifest.json').read_text(encoding='utf-8'))
+        result['completion'] = summarize_completion(saved)
+    except (OSError, ValueError, TypeError, AttributeError):
+        result['completion'] = {'status': 'unverified', 'report_usable': False,
+                                'message': '历史版本未记录完整性核验。', 'issues': []}
     context = result['feedback_context']
     if context is not None:
         # 仅返回列表展示所需上下文；不携带声明原件、参考正文或完整规则。

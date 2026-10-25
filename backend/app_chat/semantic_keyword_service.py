@@ -1,6 +1,7 @@
 # encoding=utf-8
 """本子级语义关键词重新/迭代梳理服务。"""
 from __future__ import annotations
+import nkcn_public_config as _public_config
 
 import json
 import logging
@@ -65,7 +66,7 @@ def _job_key(username: str) -> str:
 
 
 def _deepseek_client() -> OpenAI:
-    api_key = os.environ.get('DEEPSEEK_API_KEY') or os.environ.get("DEEPSEEK_API_KEY", "")
+    api_key = os.environ.get('DEEPSEEK_API_KEY') or _public_config.secret('DEEPSEEK_API_KEY')
     return OpenAI(api_key=api_key, base_url='https://api.deepseek.com', timeout=120.0)
 
 

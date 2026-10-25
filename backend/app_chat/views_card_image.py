@@ -3,6 +3,7 @@
 四色卡片生图：为本子内有 four_color_type 的卡片调用 Gemini 文生图，保存到 cardImage 目录。
 6 并发，避免同一张卡重复生图（已有图则跳过），失败重试一次。
 """
+import nkcn_public_config as _public_config
 import os
 import re
 import random
@@ -30,14 +31,14 @@ from PIL import Image, ImageDraw, ImageFont
 from app_chat.models import Card
 
 # 四色卡片生图（批量）使用
-GEMINI_IMAGE_API_KEY = os.environ.get("GEMINI_IMAGE_API_KEY", "")
+GEMINI_IMAGE_API_KEY = _public_config.secret('NKCN_R_LAYER_GEMINI_REPRO_API_KEY')
 # 高清（4K）native generateContent 使用的独立 key（避免 normal key 在 4K 返回中不稳定/不可用）
-GEMINI_IMAGE_API_KEY_HIGH = os.environ.get("GEMINI_IMAGE_API_KEY_HIGH", "")
+GEMINI_IMAGE_API_KEY_HIGH = _public_config.secret('NKCN_VIEWS_CARD_IMAGE_API_KEY')
 # 卡片生图（单张）使用
-# GEMINI_IMAGE_API_KEY_SINGLE = os.environ.get("GEMINI_IMAGE_API_KEY_HIGH", "")
-GEMINI_IMAGE_API_KEY_SINGLE = os.environ.get("GEMINI_IMAGE_API_KEY", "")
-GEMINI_IMAGE_BASE_URL = "https://chat.cloudapi.vip/v1/"
-GEMINI_IMAGE_NATIVE_BASE_URL = "https://chat.cloudapi.vip"
+# GEMINI_IMAGE_API_KEY_SINGLE = "[redacted]"
+GEMINI_IMAGE_API_KEY_SINGLE = _public_config.secret('NKCN_R_LAYER_GEMINI_REPRO_API_KEY')
+GEMINI_IMAGE_BASE_URL = _public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/')
+GEMINI_IMAGE_NATIVE_BASE_URL = _public_config.endpoint('NKCN_MODEL_GATEWAY_URL', 'http://localhost:9999')
 GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image-preview-X"
 GEMINI_IMAGE_MODEL_FALLBACK = "gemini-3.1-flash-image-preview"
 GPT_IMAGE_MODEL = "gpt-image-2"
@@ -66,6 +67,22 @@ GEMINI_IMAGE_TIMEOUT = 8 * 60  # 8 分钟超时
 
 _card_image_generating = {}
 _card_image_lock = threading.Lock()
+
+
+def mark_card_image_generating(username, cid):
+    cid = int(cid)
+    with _card_image_lock:
+        if username not in _card_image_generating:
+            _card_image_generating[username] = set()
+        _card_image_generating[username].add(cid)
+
+
+def unmark_card_image_generating(username, cid):
+    cid = int(cid)
+    with _card_image_lock:
+        s = _card_image_generating.get(username)
+        if s is not None:
+            s.discard(cid)
 _overlay_test_jobs = {}
 # DMT 质检前：用户上传「底图+覆盖层」对齐合成图后 set，生成线程 wait
 _overlay_qa_align_events = {}
@@ -93,8 +110,8 @@ ENABLE_CLAUDE_IMAGE_SPEC = True
 # Claude 模型：用于生成生图描述（与飞书智能纪要图对标，先理解再出图）
 # CLAUDE_IMAGE_SPEC_MODEL = "claude-sonnet-4-5-20250929"
 CLAUDE_IMAGE_SPEC_MODEL = "claude-sonnet-4-6"
-CLAUDE_IMAGE_SPEC_API_KEY = os.environ.get("NKCN_LLM_API_KEY", "")
-CLAUDE_IMAGE_SPEC_BASE_URL = "https://chat.cloudapi.vip/v1/"
+CLAUDE_IMAGE_SPEC_API_KEY = _public_config.secret('OPENAI_API_KEY')
+CLAUDE_IMAGE_SPEC_BASE_URL = _public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/')
 
 # NK2026 本子：contentTitle 含 S5 → 视同无四色/无后置索引，保留 Claude DMT；Gxx.md 仅喂 Claude，批改版式给生图模型
 _S5_IN_TITLE_RE = re.compile(r"(?:^|[^\d])S\s*5(?:\s*[:：]|(?!\d))", re.I)
@@ -702,7 +719,7 @@ def _classify_meeting_doc_via_deepseek(doc_text: str) -> bool:
     )
     user = "【待判别文档原文】\n" + body
     try:
-        ds_key = os.environ.get('DEEPSEEK_API_KEY') or os.environ.get("DEEPSEEK_API_KEY", "")
+        ds_key = os.environ.get('DEEPSEEK_API_KEY') or _public_config.secret('DEEPSEEK_API_KEY')
         model = os.environ.get('NKCN_DEEPSEEK_MODEL') or _sm('homework_deepseek', 'deepseek-v4-flash')
         client = OpenAI(api_key=ds_key, base_url='https://api.deepseek.com', timeout=90.0)
         messages = [
@@ -800,18 +817,116 @@ def _resolve_doc_summary_image_plan(username: str, content: str, title: str = ""
     return style, source_for_claude
 
 
-def _build_v25_card_image_prompt(content, four_color_line, *, nk2026_s5=False, s5_adjust_percent: int = 0, text_style='A', multi_incremental_summary=False):
+_GRADING_HUB_IMAGE_ADDON = """
+【批改结果·枢纽图纪律】（本卡为批改诊断卡时强制）
+- 先交叉摘要，再构图：图是「一句枢纽 + 分栏 + 边界」，禁止把报告栏目 1:1 复刻进图。
+- 中心：一句枢纽判断（短、可扫读）。
+- 三区各 1 个短标题 + 1 个下一步；不要铺满逐条三问墙。
+- 底部一条边界（材料未纳入 / 不能推断的事）。
+- 字要少到一屏读完；方法痕迹用判断取舍体现，禁止方法英文名与包名清单。
+"""
+
+
+def _is_grading_result_card_content(content: str, title: str = '') -> bool:
+    text = content or ''
+    t = title or ''
+    return (
+        '<!--nkcn_grading_card' in text
+        or '批改·诊断' in text
+        or '批改·诊断' in t
+        or ('批改·' in t and '诊断' in t)
+        or '批改·解释精要' in text
+        or ('批改·' in t and '解释精要' in t)
+    )
+
+
+def _is_grading_excerpt_card_content(content: str, title: str = '') -> bool:
+    text = content or ''
+    t = title or ''
+    return (
+        '批改·解释精要' in text
+        or '批改·解释精要' in t
+        or ('解释精要' in t and '批改' in t)
+        or '<!--nkcn_grading_card:批改·解释精要' in text
+    )
+
+
+def _grading_excerpt_image_brief(username: str, content: str, title: str = '') -> str:
+    """解释精要生图：只喂总览+枢纽+各页整体，不喂逐题细节。"""
+    try:
+        from app_chat.homework_grading.excerpt_card_render import (
+            build_excerpt_image_brief,
+            build_excerpt_payload,
+            strip_grading_card_marker,
+        )
+        analysis_id = ''
+        run_id = None
+        m = re.search(
+            r'<!--nkcn_grading_card:批改·解释精要\|([^|>]+)\|([^>]+)-->',
+            content or '',
+        )
+        if m:
+            analysis_id, run_id = m.group(1).strip(), m.group(2).strip()
+        if not analysis_id or not username:
+            return strip_grading_card_marker(content or '')[:4000]
+        from app_chat.homework_grading.service import prepare_homework_workspace
+        from app_chat.homework_grading.result_cards import _load_json, _named_json, _sample_id
+        paths = prepare_homework_workspace(
+            username, analysis_id,
+            None if run_id in (None, '', 'current') else run_id,
+            create=False,
+        )
+        manifest = _load_json(paths.get('manifest') or '')
+        fctx = manifest.get('feedback_context') or {}
+        subject = str(manifest.get('subject') or fctx.get('subject_code') or 'chinese')
+        sample_id = _sample_id(analysis_id)
+        report = _named_json(paths.get('pass2_report') or '', subject, sample_id, '_report.json')
+        ontology = _load_json(os.path.join(paths.get('base') or '', 'student_ontology.json'))
+        assigned = None
+        gc = manifest.get('grading_config') if isinstance(manifest.get('grading_config'), dict) else {}
+        if gc.get('assigned_pages'):
+            try:
+                assigned = [int(p) for p in gc['assigned_pages']]
+            except (TypeError, ValueError):
+                assigned = None
+        filename = (manifest.get('selected_files') or [''])[0]
+        if not fctx and isinstance(ontology, dict):
+            fctx = ontology.get('feedback_context') or {}
+        payload = build_excerpt_payload(
+            report, ontology,
+            pass1_dir=paths.get('pass1_json') or '',
+            subject=subject,
+            assigned_pages=assigned,
+            filename=filename,
+            material_type=str(fctx.get('material_type') or 'homework'),
+            feedback_context=fctx if isinstance(fctx, dict) else None,
+        )
+        brief = build_excerpt_image_brief(payload)
+        return brief or strip_grading_card_marker(content or '')[:4000]
+    except Exception as exc:
+        print(f'[card_image] 解释精要生图摘要失败: {exc}')
+        try:
+            from app_chat.homework_grading.excerpt_card_render import strip_grading_card_marker
+            return strip_grading_card_marker(content or '')[:4000]
+        except Exception:
+            return (content or '')[:4000]
+
+
+def _build_v25_card_image_prompt(content, four_color_line, *, nk2026_s5=False, s5_adjust_percent: int = 0, text_style='A', multi_incremental_summary=False, grading_hub=False):
     """V2.5 通用生图 prompt；NK2026 S5 卡片叠加固定批改报告版式。"""
     if (text_style or 'A').upper() == 'B':
         # 风格 B：content 已是按 Presummary 规则截断的文档原文，不再二次砍到 6000
         body_part = content or ""
     else:
-        body_part = (content or "")[:6000]
+        # 批改卡用筛后 Markdown，不必喂满 6000 墙
+        body_part = (content or "")[:4000 if grading_hub else 6000]
     extra_block = ""
     if (text_style or 'A').upper() == 'B':
         extra_block = "\n\n" + DOC_SUMMARY_IMAGE_TEXT_STYLE_B_ADDON + "\n"
     elif multi_incremental_summary:
         extra_block = "\n\n" + DOC_SUMMARY_IMAGE_MULTI_INCREMENTAL_STYLE_A_ADDON + "\n"
+    if grading_hub:
+        extra_block = (extra_block or "") + "\n" + _GRADING_HUB_IMAGE_ADDON + "\n"
     if nk2026_s5:
         layout_spec = _build_nk2026_s5_image_layout_spec(s5_adjust_percent).strip()
         return """你是一位专业的知识可视化设计师，擅长将复杂文字内容转化为清晰、专业、有层次感的结构化图表。请根据以下内容，生成一张高质量的内容可视化图。
@@ -899,10 +1014,10 @@ CLAUDE_IMAGE_SPEC_TIMEOUT = 120
 DMT_OVERLAY_PROMPT_MODEL = "claude-sonnet-4-20250514"
 DMT_OVERLAY_PROMPT_TIMEOUT = 180
 # DMT 微版面化 / 检验优化 / 覆盖层并行质检：Gemini 3.1 Pro（OpenAI 兼容，dmxapi）
-DMT_GEMINI_BASE_URL = os.environ.get("NKCN_DMT_GEMINI_BASE_URL", "https://www.dmxapi.cn/v1")
+DMT_GEMINI_BASE_URL = os.environ.get("NKCN_DMT_GEMINI_BASE_URL", _public_config.endpoint('NKCN_REVIEW_GATEWAY_V1_URL', 'http://localhost:9999/v1'))
 DMT_GEMINI_API_KEY = os.environ.get(
     "NKCN_DMT_GEMINI_API_KEY",
-    os.environ.get("DMX_API_KEY", ""),
+    _public_config.secret('NKCN_LLM_DMXAPI_API_KEY'),
 )
 DMT_GEMINI_MODEL = os.environ.get("NKCN_DMT_GEMINI_MODEL", "gemini-3.1-pro-preview")
 DMT_GEMINI_TIMEOUT = 300
@@ -1866,7 +1981,10 @@ def _generate_one_card_image(username, cid, title, content, out_path, use_single
         is_multi_summary = _is_multi_incremental_summary_card_content(content)
         prompt_content = content
         gen_text_style = text_style
-        if (text_style or 'A').upper() == 'B':
+        if _is_grading_excerpt_card_content(content, title):
+            prompt_content = _grading_excerpt_image_brief(username, content, title)
+            print(f"[card_image] 解释精要生图用摘要 chars={len(prompt_content or '')}")
+        elif (text_style or 'A').upper() == 'B':
             if style_b_source.strip():
                 prompt_content = style_b_source
                 print(
@@ -1903,7 +2021,10 @@ def _generate_one_card_image(username, cid, title, content, out_path, use_single
                 s5_adjust_percent=s5_adjust_pct,
                 text_style=gen_text_style,
                 multi_incremental_summary=is_multi_summary,
+                grading_hub=_is_grading_result_card_content(content, title),
             )
+        elif _is_grading_result_card_content(content, title):
+            prompt = prompt.rstrip() + "\n\n" + _GRADING_HUB_IMAGE_ADDON
 
     try:
         if str(image_quality).strip().lower() == 'high':
@@ -1949,11 +2070,27 @@ def _run_batch(username, cid_list, single_card=False, image_quality: str = 'norm
                                       image_quality=image_quality, use_claude_spec=use_claude_spec,
                                       image_provider=image_provider, image_aspect_ratio=image_aspect_ratio)
         if not ok:
+            # 同 provider 再试一次
             ok = _generate_one_card_image(username, cid, card.contentTitle, card.content, out_path,
                                           use_single_key=single_card, four_color_type=four_color,
                                           post_index_cids=post_index_cids,
                                           image_quality=image_quality, use_claude_spec=use_claude_spec,
                                           image_provider=image_provider, image_aspect_ratio=image_aspect_ratio)
+        # GPT 链路失败后兜底 Gemini（再失败再试一次 Gemini），生图全失败也不阻断后续 HTML
+        if not ok and _normalize_image_provider(image_provider) == 'gpt':
+            print(f"[card_image] GPT 生图失败，兜底 Gemini cid={cid}")
+            ok = _generate_one_card_image(username, cid, card.contentTitle, card.content, out_path,
+                                          use_single_key=single_card, four_color_type=four_color,
+                                          post_index_cids=post_index_cids,
+                                          image_quality=image_quality, use_claude_spec=use_claude_spec,
+                                          image_provider='gemini', image_aspect_ratio=image_aspect_ratio)
+            if not ok:
+                print(f"[card_image] Gemini 兜底仍失败，最终再试 Gemini cid={cid}")
+                ok = _generate_one_card_image(username, cid, card.contentTitle, card.content, out_path,
+                                              use_single_key=single_card, four_color_type=four_color,
+                                              post_index_cids=post_index_cids,
+                                              image_quality=image_quality, use_claude_spec=use_claude_spec,
+                                              image_provider='gemini', image_aspect_ratio=image_aspect_ratio)
         with _card_image_lock:
             s = _card_image_generating.get(username)
             if s is not None and cid in s:

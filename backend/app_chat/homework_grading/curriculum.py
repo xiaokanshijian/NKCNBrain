@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from functools import lru_cache
 from typing import Any, Dict, Iterator, List, Optional, Set, Tuple
 
@@ -143,6 +144,93 @@ def label_to_cn(subject: str, label: str) -> str:
     if not label:
         return ''
     return label_to_cn_map(subject).get(label, label)
+
+
+@lru_cache(maxsize=8)
+def id_to_entry_map(subject: str) -> Dict[str, Dict[str, Any]]:
+    """课标 id（如 MA_S2_038）→ 条目。"""
+    return {entry['id']: entry for entry in load_curriculum_entries(subject) if entry.get('id')}
+
+
+def id_to_cn(subject: str, curriculum_id: str) -> str:
+    """课标 id → 给人看的中文知识点名；未命中返回空串。"""
+    entry = id_to_entry_map(subject).get(str(curriculum_id or '').strip())
+    if not entry:
+        return ''
+    mapped = label_to_cn(subject, entry.get('label') or '')
+    if mapped and mapped != entry.get('label'):
+        return mapped
+    return _short_cn_name(entry.get('description') or '', entry.get('label') or '')
+
+
+_CURRICULUM_ID_RE = re.compile(r'^[A-Z]{2}_S\d+_\d+$')
+# 模型有时把课标白名单整行写进 knowledge_point，如：
+# EN_S2_040 [expressing_feelings, 掌握, 写作]
+# EN_S2_021 [tense_usage, 理解, 语音] 理解一般现在时…
+# 用户可见：去掉课标码即可；[label, 认知, 领域] 与后面中文说明都可保留。
+_CURRICULUM_LINE_RE = re.compile(
+    r'^(?P<id>[A-Z]{2}_S\d+_\d+)'
+    r'(?:\s*(?P<meta>\[[^\]]*\]))?'
+    r'(?:\s+(?P<desc>.+))?$'
+)
+_CURRICULUM_ID_ANYWHERE_RE = re.compile(r'\b([A-Z]{2}_S\d+_\d+)\b')
+
+
+def strip_curriculum_codes(text: str) -> str:
+    """只去掉课标码（如 EN_S2_040）；保留 [label, 认知, 领域] 与中文说明。"""
+    raw = str(text or '').strip()
+    if not raw:
+        return ''
+    m = _CURRICULUM_LINE_RE.match(raw)
+    if m:
+        meta = (m.group('meta') or '').strip()
+        desc = (m.group('desc') or '').strip()
+        parts = [p for p in (meta, desc) if p]
+        if parts:
+            return ' '.join(parts)
+        # 仅有课标码：用中文短名兜底（调用方需传入 subject 时走 humanize）
+        return ''
+    cleaned = _CURRICULUM_ID_ANYWHERE_RE.sub('', raw)
+    cleaned = re.sub(r'\s{2,}', ' ', cleaned).strip(' ·|-')
+    return cleaned
+
+
+# 兼容旧名
+def strip_curriculum_jargon(text: str) -> str:
+    return strip_curriculum_codes(text)
+
+
+def humanize_knowledge_point(subject: str, value: str) -> str:
+    """展示用知识点名：去掉课标码；保留可读的 [label, 认知, 领域] 与中文说明。
+
+    全学科通用（math / chinese / english）。
+    """
+    text = str(value or '').strip()
+    if not text or text in ('no_observed',):
+        return ''
+    # 整行：EN_S2_021 [tense_usage, 理解, 语音] 理解一般现在时…
+    line = _CURRICULUM_LINE_RE.match(text)
+    if line:
+        meta = (line.group('meta') or '').strip()
+        desc = (line.group('desc') or '').strip()
+        parts = [p for p in (meta, desc) if p]
+        if parts:
+            return ' '.join(parts)
+        # 只有课标码时，换成中文短名，避免界面露码
+        return id_to_cn(subject, line.group('id')) or ''
+    if _CURRICULUM_ID_RE.match(text):
+        return id_to_cn(subject, text) or ''
+    # 句中夹带课标码：只剥码，其余原样
+    if _CURRICULUM_ID_ANYWHERE_RE.search(text):
+        stripped = strip_curriculum_codes(text)
+        return stripped or text
+    # 纯英文 label：有中文映射则用映射，便于单独出现时也好读
+    cn = label_to_cn(subject, text)
+    if cn and cn != text:
+        return cn
+    if re.fullmatch(r'[A-Za-z0-9_]+', text):
+        return id_to_cn(subject, text) or text
+    return text
 
 
 def domains_of(subject: str, stage: Optional[int] = None) -> List[str]:

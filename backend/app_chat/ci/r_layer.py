@@ -9,6 +9,7 @@ Phase 6.1 迁移：
     - Phase 6.1 仅迁移辅助函数，不替换 continuous_image_service.py 中现有调用。
     - 后续阶段已将对旧服务文件的惰性依赖逐步切回新模块，避免 Phase 7.3 薄转发层形成循环导入。
 """
+import nkcn_public_config as _public_config
 
 import base64
 import copy
@@ -48,8 +49,8 @@ from app_chat.ci_prompts import (
 from llm_langchain import global_var
 
 
-_GEMINI_REPRO_API_KEY = os.environ.get("GEMINI_IMAGE_API_KEY", "")
-_GEMINI_REPRO_BASE_URL = 'https://chat.cloudapi.vip/v1/'
+_GEMINI_REPRO_API_KEY = _public_config.secret('NKCN_R_LAYER_GEMINI_REPRO_API_KEY')
+_GEMINI_REPRO_BASE_URL = _public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/')
 _GEMINI_REPRO_MODEL_DEFAULT = 'gemini-3.1-flash-image-preview-X'
 
 
@@ -58,7 +59,7 @@ def _r_layer_gemini_model() -> str:
     return get_scene_value('ci_r_layer_gemini', _GEMINI_REPRO_MODEL_DEFAULT)
 
 _GEMINI_REPRO_TIMEOUT = 8 * 60
-_GEMINI_REPRO_NATIVE_BASE_URL = 'https://chat.cloudapi.vip'
+_GEMINI_REPRO_NATIVE_BASE_URL = _public_config.endpoint('NKCN_MODEL_GATEWAY_URL', 'http://localhost:9999')
 
 _R_LAYER_ITER_CONTEXT_VERSION = 1
 _R_LAYER_ROLLBACK_HISTORY_LIMIT = 10

@@ -684,7 +684,7 @@ async function modelHL(text) {
 
     // 此方式本地调试可行
     // try {
-    //   const response = await fetch('http://192.0.2.1:8000/invoke_rate', {
+    //   const response = await fetch((process.env.VUE_APP_SERVICE_8000_INVOKE_RATE_URL || "http://localhost:8000/invoke_rate"), {
     //     method: 'POST',
     //     headers: {
     //       'Content-Type': 'application/json; charset=utf-8',
@@ -718,7 +718,7 @@ async function modelHL(text) {
 
 
   // 废弃
-  // fetch('http://192.0.2.1:8000/invoke_rate', {
+  // fetch((process.env.VUE_APP_SERVICE_8000_INVOKE_RATE_URL || "http://localhost:8000/invoke_rate"), {
   //   method: 'POST',
   //   headers: {
   //     'Content-Type': 'application/json; charset=utf-8'
@@ -832,7 +832,7 @@ export function get_model_eval(formData) {
 //     const signal = abortSignal || controller?.signal;
     
 //     // 发起fetch请求
-//     const response = await fetch('http://192.0.2.1:8000/invoke_rate_stream', {
+//     const response = await fetch((process.env.VUE_APP_SERVICE_8000_INVOKE_RATE_STREAM_URL || "http://localhost:8000/invoke_rate_stream"), {
 //       method: 'POST',
 //       headers: {
 //         'Content-Type': 'application/json; charset=utf-8',
@@ -1410,9 +1410,9 @@ async function modelHLStream(text, callback, addMode = '', includeDPart = true, 
 // 根据小模型ID获取服务器URL
 function getSmallModelServerUrl(model_id) {
   if (model_id && String(model_id) === "3007") {
-    return "http://192.0.2.1:8000";
+    return (process.env.VUE_APP_SERVICE_8000_URL || "http://localhost:8000");
   } else {
-    return "http://192.0.2.1:8000";
+    return (process.env.VUE_APP_SERVICE_8000_URL || "http://localhost:8000");
   }
 }
 
@@ -1454,7 +1454,7 @@ async function getDepthSuggestion(input_text, user_name, task_type = "qa") {
       }
     } else {
       // 本地调试方式：直接fetch访问中转服务器
-      // const response = await fetch('http://192.0.2.1:8000/get_depth_suggestion', {
+      // const response = await fetch((process.env.VUE_APP_SERVICE_8000_GET_DEPTH_SUGGESTION_URL || "http://localhost:8000/get_depth_suggestion"), {
       const serverUrl = getSmallModelServerUrl(model_id);
       const response = await fetch(`${serverUrl}/get_depth_suggestion`, {
         method: 'POST',

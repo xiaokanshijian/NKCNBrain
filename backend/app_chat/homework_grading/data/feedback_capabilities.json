@@ -1,0 +1,645 @@
+{
+  "schema_version": "feedback-capabilities-v1",
+  "capabilities": [
+    {
+      "manifest": {
+        "schema_version": "feedback-skill-v1",
+        "id": "general-feedback",
+        "version": "1.0.0",
+        "kind": "general",
+        "compatible_schema": "feedback-context-v2",
+        "subject_scope": [
+          "*"
+        ],
+        "education_scope": [
+          "*"
+        ],
+        "material_scope": [
+          "*"
+        ],
+        "unit_scope": [
+          "*"
+        ],
+        "grades": [],
+        "priority": 0,
+        "coverage_status": "offline_only",
+        "rules": [
+          {
+            "id": "general-evidence",
+            "stages": [
+              "detect",
+              "grade",
+              "cross_page",
+              "review",
+              "sessions",
+              "memory",
+              "profile",
+              "ontology",
+              "pass2",
+              "filter",
+              "quality"
+            ],
+            "condition": "always",
+            "text_key": "general-evidence",
+            "evaluation_item": "evidence",
+            "refines": [],
+            "conflicts": []
+          }
+        ]
+      },
+      "resources": {
+        "verifiers": []
+      }
+    },
+    {
+      "manifest": {
+        "schema_version": "feedback-skill-v1",
+        "id": "math-primary4-question",
+        "version": "1.0.0",
+        "kind": "specialized",
+        "compatible_schema": "feedback-context-v2",
+        "subject_scope": [
+          "math"
+        ],
+        "education_scope": [
+          "primary"
+        ],
+        "material_scope": [
+          "homework",
+          "exam"
+        ],
+        "unit_scope": [
+          "question"
+        ],
+        "grades": [
+          4
+        ],
+        "priority": 10,
+        "coverage_status": "offline_only",
+        "rules": [
+          {
+            "id": "math-detect-rules",
+            "stages": [
+              "detect"
+            ],
+            "condition": "always",
+            "text_key": "math-detect-rules",
+            "evaluation_item": "math-detect-rules",
+            "refines": [],
+            "conflicts": [],
+            "source": "subject_prompt_rules.py:MATH_DETECT_RULES"
+          },
+          {
+            "id": "math-grade-rules",
+            "stages": [
+              "grade",
+              "review",
+              "cross_page"
+            ],
+            "condition": "always",
+            "text_key": "math-grade-rules",
+            "evaluation_item": "math-grade-rules",
+            "refines": [],
+            "conflicts": [],
+            "source": "subject_prompt_rules.py:MATH_GRADE_RULES"
+          },
+          {
+            "id": "math-pass1-grade-transcription-lock",
+            "stages": [
+              "grade"
+            ],
+            "condition": "always",
+            "text_key": "math-pass1-grade-transcription-lock",
+            "evaluation_item": "math-pass1-grade-transcription-lock",
+            "refines": [],
+            "conflicts": [],
+            "source": "prompts.py:MATH_PASS1_GRADE_TRANSCRIPTION_LOCK"
+          },
+          {
+            "id": "math-pass1-grade-user-audit",
+            "stages": [
+              "grade"
+            ],
+            "condition": "always",
+            "text_key": "math-pass1-grade-user-audit",
+            "evaluation_item": "math-pass1-grade-user-audit",
+            "refines": [],
+            "conflicts": [],
+            "source": "prompts.py:MATH_PASS1_GRADE_USER_AUDIT"
+          },
+          {
+            "id": "math-operation-law-full-name-grade-rules",
+            "stages": [
+              "grade",
+              "review"
+            ],
+            "condition": "math_operation_law",
+            "text_key": "math-operation-law-full-name-grade-rules",
+            "evaluation_item": "math-operation-law-full-name-grade-rules",
+            "refines": [],
+            "conflicts": [],
+            "source": "subject_prompt_rules.py:MATH_OPERATION_LAW_FULL_NAME_GRADE_RULES"
+          },
+          {
+            "id": "math-verification-suffix",
+            "stages": [
+              "grade"
+            ],
+            "condition": "always",
+            "text_key": "math-verification-suffix",
+            "evaluation_item": "math-verification-suffix",
+            "refines": [],
+            "conflicts": [],
+            "source": "prompts.py:MATH_VERIFICATION_SUFFIX"
+          },
+          {
+            "id": "-uncertain-rules[math]",
+            "stages": [
+              "grade"
+            ],
+            "condition": "always",
+            "text_key": "-uncertain-rules[math]",
+            "evaluation_item": "-uncertain-rules[math]",
+            "refines": [],
+            "conflicts": [],
+            "source": "prompts.py:_UNCERTAIN_RULES[math]"
+          },
+          {
+            "id": "-subject-hints[math]",
+            "stages": [
+              "grade",
+              "review"
+            ],
+            "condition": "always",
+            "text_key": "-subject-hints[math]",
+            "evaluation_item": "-subject-hints[math]",
+            "refines": [],
+            "conflicts": [],
+            "source": "prompts.py:_SUBJECT_HINTS[math]"
+          }
+        ]
+      },
+      "resources": {
+        "verifiers": [
+          "math",
+          "fixed_document",
+          "answer_statement"
+        ],
+        "fixed_documents": {
+          "version": "fixed-document-special-cases-20260726-v3",
+          "description": "固定测试文档的特例身份清单。新任务只按原始 PDF SHA-256 匹配；legacy_sample_ids 仅供缺少源文件指纹的历史产物回放。",
+          "cases": [
+            {
+              "case_id": "primary_math_sample_1",
+              "subject": "math",
+              "source_document_sha256": "83a954cb09d9b8ac6dd7c416941445f51c52b87d1db0899b52ddda6e55ddf62b",
+              "legacy_sample_ids": [
+                "db2d0b12"
+              ],
+              "actions": {
+                "skip_self_review": [
+                  28
+                ],
+                "math_fixed_sample_guard": [
+                  10,
+                  15,
+                  28
+                ],
+                "math_slot_presence_guard": [
+                  12,
+                  15
+                ]
+              }
+            }
+          ]
+        },
+        "slot_presence_regression": {
+          "experiment_mode": "math_slot_presence_apply_v2",
+          "description": "数学槽位级作答存在性固定回归。evaluation 仅供离线评测和正式应用门禁，绝不进入模型请求。",
+          "sample": {
+            "source_file": "数学1.pdf",
+            "sample_id": "db2d0b12",
+            "source_document_sha256": "83a954cb09d9b8ac6dd7c416941445f51c52b87d1db0899b52ddda6e55ddf62b",
+            "legacy_sample_ids": [
+              "db2d0b12"
+            ]
+          },
+          "apply_approved_page_stems": [
+            "math_db2d0b12_page12",
+            "math_db2d0b12_page15"
+          ],
+          "cases": [
+            {
+              "case_id": "math1_p12_q1_red_connection_absent",
+              "page": 12,
+              "question_id": "1",
+              "evaluation": {
+                "answer_presence": "absent",
+                "slots": [
+                  {
+                    "slot_id": "1:s1",
+                    "slot_type": "connection_area",
+                    "presence": "absent",
+                    "note": "全部连线均为教师红笔，学生没有黑笔连线。"
+                  }
+                ]
+              }
+            },
+            {
+              "case_id": "math1_p15_q2_1_mixed_empty_and_written",
+              "page": 15,
+              "question_id": "2-1",
+              "evaluation": {
+                "answer_presence": "partial",
+                "slots": [
+                  {
+                    "slot_id": "2-1:s1",
+                    "slot_type": "fill_blank",
+                    "presence": "absent",
+                    "note": "第一个数值框没有学生黑笔，原图中只有教师红笔订正。"
+                  },
+                  {
+                    "slot_id": "2-1:s2",
+                    "slot_type": "fill_blank",
+                    "presence": "present",
+                    "note": "第二个运算律名称槽位存在学生黑笔作答。"
+                  },
+                  {
+                    "slot_id": "2-1:s3",
+                    "slot_type": "fill_blank",
+                    "presence": "present",
+                    "note": "题目跨左右栏续排；右上方字母公式槽位存在学生黑笔作答，虽超出单一 detect 题框，仍属于题2-1。"
+                  }
+                ]
+              }
+            },
+            {
+              "case_id": "math1_p15_q2_2_two_empty_two_written",
+              "page": 15,
+              "question_id": "2-2",
+              "evaluation": {
+                "answer_presence": "partial",
+                "slots": [
+                  {
+                    "slot_id": "2-2:s1",
+                    "slot_type": "fill_blank",
+                    "presence": "absent",
+                    "note": "第一个数值框没有学生黑笔。"
+                  },
+                  {
+                    "slot_id": "2-2:s2",
+                    "slot_type": "fill_blank",
+                    "presence": "absent",
+                    "note": "第二个数值框没有学生黑笔。"
+                  },
+                  {
+                    "slot_id": "2-2:s3",
+                    "slot_type": "fill_blank",
+                    "presence": "present",
+                    "note": "运算律名称槽位存在学生黑笔。"
+                  },
+                  {
+                    "slot_id": "2-2:s4",
+                    "slot_type": "fill_blank",
+                    "presence": "present",
+                    "note": "字母公式槽位存在学生黑笔。"
+                  }
+                ]
+              }
+            },
+            {
+              "case_id": "math1_p15_q2_3_black_work_present",
+              "page": 15,
+              "question_id": "2-3",
+              "evaluation": {
+                "answer_presence": "present",
+                "slots": [
+                  {
+                    "slot_id": "2-3:s1",
+                    "slot_type": "work_area",
+                    "presence": "present",
+                    "note": "第一道算式区域存在学生黑笔。"
+                  },
+                  {
+                    "slot_id": "2-3:s2",
+                    "slot_type": "work_area",
+                    "presence": "present",
+                    "note": "第二道算式区域存在学生黑笔。"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "manifest": {
+        "schema_version": "feedback-skill-v1",
+        "id": "chinese-primary4-question",
+        "version": "1.0.0",
+        "kind": "specialized",
+        "compatible_schema": "feedback-context-v2",
+        "subject_scope": [
+          "chinese"
+        ],
+        "education_scope": [
+          "primary"
+        ],
+        "material_scope": [
+          "homework",
+          "exam"
+        ],
+        "unit_scope": [
+          "question"
+        ],
+        "grades": [
+          4
+        ],
+        "priority": 10,
+        "coverage_status": "offline_only",
+        "rules": [
+          {
+            "id": "chinese-grade-rules",
+            "stages": [
+              "grade",
+              "cross_page"
+            ],
+            "condition": "always",
+            "text_key": "chinese-grade-rules",
+            "evaluation_item": "chinese-grade-rules",
+            "refines": [],
+            "conflicts": [],
+            "source": "subject_prompt_rules.py:CHINESE_GRADE_RULES"
+          },
+          {
+            "id": "chinese-slash-tianzige-rules",
+            "stages": [
+              "grade",
+              "review"
+            ],
+            "condition": "always",
+            "text_key": "chinese-slash-tianzige-rules",
+            "evaluation_item": "chinese-slash-tianzige-rules",
+            "refines": [],
+            "conflicts": [],
+            "source": "subject_prompt_rules.py:CHINESE_SLASH_TIANZIGE_RULES"
+          },
+          {
+            "id": "chinese-pronunciation-selection-detect-rules",
+            "stages": [
+              "detect"
+            ],
+            "condition": "always",
+            "text_key": "chinese-pronunciation-selection-detect-rules",
+            "evaluation_item": "chinese-pronunciation-selection-detect-rules",
+            "refines": [],
+            "conflicts": [],
+            "source": "subject_prompt_rules.py:CHINESE_PRONUNCIATION_SELECTION_DETECT_RULES"
+          },
+          {
+            "id": "chinese-pronunciation-selection-grade-rules",
+            "stages": [
+              "grade"
+            ],
+            "condition": "chinese_pronunciation_slots",
+            "text_key": "chinese-pronunciation-selection-grade-rules",
+            "evaluation_item": "chinese-pronunciation-selection-grade-rules",
+            "refines": [],
+            "conflicts": [],
+            "source": "subject_prompt_rules.py:CHINESE_PRONUNCIATION_SELECTION_GRADE_RULES"
+          },
+          {
+            "id": "chinese-sentence-contraction-page-rules",
+            "stages": [
+              "grade"
+            ],
+            "condition": "chinese_sentence_contraction",
+            "text_key": "chinese-sentence-contraction-page-rules",
+            "evaluation_item": "chinese-sentence-contraction-page-rules",
+            "refines": [],
+            "conflicts": [],
+            "source": "subject_prompt_rules.py:CHINESE_SENTENCE_CONTRACTION_PAGE_RULES"
+          },
+          {
+            "id": "chinese-review-rules",
+            "stages": [
+              "review"
+            ],
+            "condition": "always",
+            "text_key": "chinese-review-rules",
+            "evaluation_item": "chinese-review-rules",
+            "refines": [],
+            "conflicts": [],
+            "source": "subject_prompt_rules.py:CHINESE_REVIEW_RULES"
+          },
+          {
+            "id": "chinese-cross-page-suffix",
+            "stages": [
+              "detect"
+            ],
+            "condition": "always",
+            "text_key": "chinese-cross-page-suffix",
+            "evaluation_item": "chinese-cross-page-suffix",
+            "refines": [],
+            "conflicts": [],
+            "source": "prompts.py:CHINESE_CROSS_PAGE_SUFFIX"
+          },
+          {
+            "id": "-uncertain-rules[chinese]",
+            "stages": [
+              "grade"
+            ],
+            "condition": "always",
+            "text_key": "-uncertain-rules[chinese]",
+            "evaluation_item": "-uncertain-rules[chinese]",
+            "refines": [],
+            "conflicts": [],
+            "source": "prompts.py:_UNCERTAIN_RULES[chinese]"
+          },
+          {
+            "id": "-subject-hints[chinese]",
+            "stages": [
+              "grade",
+              "review"
+            ],
+            "condition": "always",
+            "text_key": "-subject-hints[chinese]",
+            "evaluation_item": "-subject-hints[chinese]",
+            "refines": [],
+            "conflicts": [],
+            "source": "prompts.py:_SUBJECT_HINTS[chinese]"
+          }
+        ]
+      },
+      "resources": {
+        "verifiers": [
+          "chinese",
+          "fixed_document"
+        ],
+        "fixed_documents": {
+          "version": "fixed-document-special-cases-20260726-v3",
+          "description": "固定测试文档的特例身份清单。新任务只按原始 PDF SHA-256 匹配；legacy_sample_ids 仅供缺少源文件指纹的历史产物回放。",
+          "cases": [
+            {
+              "case_id": "primary_chinese_sample_1",
+              "subject": "chinese",
+              "source_document_sha256": "9c44fc825cff56855eb4710f3370022ad30ea9db74c9bd45c5d59bb1ae2cb9ab",
+              "legacy_sample_ids": [
+                "2918ec3f"
+              ],
+              "actions": {
+                "chinese_fixed_answer": [
+                  12
+                ],
+                "chinese_personification_verifier": [
+                  41
+                ],
+                "skip_self_review": [
+                  12,
+                  15,
+                  19,
+                  21
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "manifest": {
+        "schema_version": "feedback-skill-v1",
+        "id": "english-primary4-question",
+        "version": "1.0.0",
+        "kind": "specialized",
+        "compatible_schema": "feedback-context-v2",
+        "subject_scope": [
+          "english"
+        ],
+        "education_scope": [
+          "primary"
+        ],
+        "material_scope": [
+          "homework",
+          "exam"
+        ],
+        "unit_scope": [
+          "question"
+        ],
+        "grades": [
+          4
+        ],
+        "priority": 10,
+        "coverage_status": "offline_only",
+        "rules": [
+          {
+            "id": "english-grade-rules",
+            "stages": [
+              "grade",
+              "cross_page"
+            ],
+            "condition": "always",
+            "text_key": "english-grade-rules",
+            "evaluation_item": "english-grade-rules",
+            "refines": [],
+            "conflicts": [],
+            "source": "subject_prompt_rules.py:ENGLISH_GRADE_RULES"
+          },
+          {
+            "id": "english-review-rules",
+            "stages": [
+              "review"
+            ],
+            "condition": "always",
+            "text_key": "english-review-rules",
+            "evaluation_item": "english-review-rules",
+            "refines": [],
+            "conflicts": [],
+            "source": "subject_prompt_rules.py:ENGLISH_REVIEW_RULES"
+          },
+          {
+            "id": "english-page15-visual-transcription-lock",
+            "stages": [
+              "grade"
+            ],
+            "condition": "fixed_english_transcription",
+            "text_key": "english-page15-visual-transcription-lock",
+            "evaluation_item": "english-page15-visual-transcription-lock",
+            "refines": [],
+            "conflicts": [],
+            "source": "subject_prompt_rules.py:ENGLISH_PAGE15_VISUAL_TRANSCRIPTION_LOCK"
+          },
+          {
+            "id": "english-parenthesized-choice-slot-grade-rules",
+            "stages": [
+              "grade"
+            ],
+            "condition": "fixed_english_choice_slots",
+            "text_key": "english-parenthesized-choice-slot-grade-rules",
+            "evaluation_item": "english-parenthesized-choice-slot-grade-rules",
+            "refines": [],
+            "conflicts": [],
+            "source": "subject_prompt_rules.py:ENGLISH_PARENTHESIZED_CHOICE_SLOT_GRADE_RULES"
+          },
+          {
+            "id": "-uncertain-rules[english]",
+            "stages": [
+              "grade"
+            ],
+            "condition": "always",
+            "text_key": "-uncertain-rules[english]",
+            "evaluation_item": "-uncertain-rules[english]",
+            "refines": [],
+            "conflicts": [],
+            "source": "prompts.py:_UNCERTAIN_RULES[english]"
+          },
+          {
+            "id": "-subject-hints[english]",
+            "stages": [
+              "grade",
+              "review"
+            ],
+            "condition": "always",
+            "text_key": "-subject-hints[english]",
+            "evaluation_item": "-subject-hints[english]",
+            "refines": [],
+            "conflicts": [],
+            "source": "prompts.py:_SUBJECT_HINTS[english]"
+          }
+        ]
+      },
+      "resources": {
+        "verifiers": [
+          "english",
+          "fixed_document"
+        ],
+        "fixed_documents": {
+          "version": "fixed-document-special-cases-20260726-v3",
+          "description": "固定测试文档的特例身份清单。新任务只按原始 PDF SHA-256 匹配；legacy_sample_ids 仅供缺少源文件指纹的历史产物回放。",
+          "cases": [
+            {
+              "case_id": "primary_english_sample_1",
+              "subject": "english",
+              "source_document_sha256": "a6891387d779229ad18a9e367c1b5525514bbb4aa7a29f88873893b2784ed39c",
+              "legacy_sample_ids": [
+                "51a8f187"
+              ],
+              "actions": {
+                "skip_self_review": [
+                  8
+                ],
+                "english_visual_transcription_lock": [
+                  15
+                ],
+                "fixed_english_choice_slots": [
+                  20
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import os
+import nkcn_public_config as _public_config
 from openai import OpenAI
 import time
 import string
@@ -9,7 +9,7 @@ from llm_langchain import global_var
 async def make_requests_async(user_prompt, system_prompt=""):
     client = OpenAI(
         base_url="https://integrate.api.nvidia.com/v1",
-        api_key=os.environ.get("NVIDIA_API_KEY", "")
+        api_key=_public_config.secret('NVIDIA_API_KEY')
     )
 
     response = client.chat.completions.create(

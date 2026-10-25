@@ -1,3 +1,4 @@
+import nkcn_public_config as _public_config
 # app_chat/ci/_llm.py
 # Phase 1.3 产物：从 continuous_image_service.py 抽取的 LLM 调用封装函数
 # 来源映射：continuous_image_service.py L2808-2813, L2815-3078, L3392-3457
@@ -14,10 +15,10 @@ from openai import OpenAI
 # ─── API 配置常量 ─────────────────────────────────────────────────────────────
 # from continuous_image_service.py L2809-2812
 
-_DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
+_DASHSCOPE_API_KEY = _public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY')
 _DASHSCOPE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-_DMXAPI_API_KEY = os.environ.get("DMX_API_KEY", "")
-_DMXAPI_BASE_URL = 'https://www.dmxapi.cn/v1/'
+_DMXAPI_API_KEY = _public_config.secret('NKCN_LLM_DMXAPI_API_KEY')
+_DMXAPI_BASE_URL = _public_config.endpoint('NKCN_REVIEW_GATEWAY_V1_URL', 'http://localhost:9999/v1/')
 
 # DashScope 等对单条 data-uri 有体积上限；原图直接 base64 易超限。超过此阈值走 llm_langchain.util.encode_image 压到目标以内。
 _CI_LLM_DEFAULTS = {

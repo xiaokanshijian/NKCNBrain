@@ -996,7 +996,7 @@ def resolve_prompt_storage_key(writer_username, origin_real_name=None):
 
 
 if __name__ == '__main__':
-    # file_path = r'C:\Users\hp\Desktop\prompt2.xlsx'
+    # file_path = r'./runtime'
     # binary_data = read_xlsx_to_binary(file_path)
     # res = read_prompt_from_bytes(binary_data)
     # print(res)

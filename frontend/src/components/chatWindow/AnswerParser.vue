@@ -50,9 +50,18 @@ export default {
       renderDelay: 0 // 🔥 渲染延迟（毫秒），用于控制渲染速度
     };
   },
+  computed: {
+    displayAnswer() {
+      // 隐藏后台钉卡 marker / HTML 注释，避免进入用户可见 UI
+      let text = String(this.answer || '');
+      text = text.replace(/<!--\s*nkcn_grading_card:[^>]*-->\s*/gi, '');
+      text = text.replace(/<!--[\s\S]*?-->/g, '');
+      return text;
+    },
+  },
   mounted() {
     const perfStart = performance.now();
-    console.log('[AnswerParser] 🚀 开始处理内容，长度:', this.answer.length);
+    console.log('[AnswerParser] 🚀 开始处理内容，长度:', this.displayAnswer.length);
     
     this.processAnswer();
     const processTime = performance.now() - perfStart;
@@ -1249,7 +1258,7 @@ export default {
       this.mixedContent = [];
       this.visibleMixedContent = []; // 🔥 重置可见内容
       const codeRegex = /```(.*?)```/gs;
-      const textParts = this.answer.split(codeRegex);
+      const textParts = this.displayAnswer.split(codeRegex);
       
       textParts.forEach((part, index) => {
         if (index % 2 === 0) {
@@ -1839,7 +1848,7 @@ export default {
       this.mixedContent = [];
       this.visibleMixedContent = []; // 🔥 重置可见内容
       const codeRegex = /```(.*?)```/gs;
-      const textParts = this.answer.split(codeRegex);
+      const textParts = this.displayAnswer.split(codeRegex);
       
       textParts.forEach((part, index) => {
         if (index % 2 === 0) {

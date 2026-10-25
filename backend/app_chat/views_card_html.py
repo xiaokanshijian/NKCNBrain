@@ -9,8 +9,28 @@ import base64
 import json
 import os
 import re
+import threading
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+_card_html_generating = {}
+_card_html_lock = threading.Lock()
+
+
+def mark_card_html_generating(username, cid):
+    cid = int(cid)
+    with _card_html_lock:
+        if username not in _card_html_generating:
+            _card_html_generating[username] = set()
+        _card_html_generating[username].add(cid)
+
+
+def unmark_card_html_generating(username, cid):
+    cid = int(cid)
+    with _card_html_lock:
+        s = _card_html_generating.get(username)
+        if s is not None:
+            s.discard(cid)
 
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.clickjacking import xframe_options_exempt
@@ -25,6 +45,12 @@ from app_chat.automation_nk2026 import (
     is_nk2026_ladder_scene,
     read_nk2026_chuchengjia_twin_markdown,
     text_references_course_week_at_least,
+)
+
+NK2026_HTML_SCENE_WHITELIST = (
+    "飞书TA答疑",
+    "NK2026精进种子",
+    "NK2026梯子图·群组公能教学指向批改",
 )
 from app_chat.card_html_feedback import (
     DEFAULT_TIZITU_NOTEBOOK,
@@ -482,6 +508,92 @@ _NK2026_LADDER_HTML_TELEMETRY_SPEC = (
 )
 
 
+def card_html_route(scene_name: str, notebook_description: str = "", card_title: str = "", extra: Optional[Dict[str, Any]] = None) -> str:
+    extra = extra or {}
+    sn = (scene_name or "").strip()
+    title = card_title or ""
+    book = notebook_description or ""
+    if sn in NK2026_HTML_SCENE_WHITELIST or is_nk2026_ladder_scene(sn):
+        route = "R0"
+    elif (
+        extra.get("grading_result")
+        or "批改·" in title
+        or "<!--nkcn_grading_card" in str(extra.get("card_content") or "")
+        or "批改" in sn
+        or "批改" in book
+    ):
+        route = "R1"
+    else:
+        route = "R2"
+    if extra.get("grading_result") or "批改·" in title or "<!--nkcn_grading_card" in str(extra.get("card_content") or ""):
+        try:
+            from app_chat.homework_grading.yangqian_debug import debug_log
+            debug_log(f'[card_html] 路由={route} scene={sn} title={title[:80]}')
+        except Exception:
+            pass
+    return route
+
+
+def _synthesis_prompts(
+    notebook_description: str,
+    scene_name: str,
+    card_title: str,
+    card_content: str,
+    doc_bundle: str,
+    choosed_cards_bundle: str,
+    has_card_image: bool,
+    route: str,
+    extra: Optional[Dict[str, Any]] = None,
+) -> Tuple[str, str]:
+    extra = dict(extra or {})
+    grading = route == "R1"
+    workspace = ""
+    if grading:
+        try:
+            from app_chat.homework_grading.result_cards import build_html_workspace_bundle
+            workspace = build_html_workspace_bundle(
+                str(extra.get("username") or ""), extra, extra.get("card_content") or card_content,
+            )
+        except Exception as exc:
+            workspace = f"【批改工作区】本次未纳入（{exc}）。禁止编造课标或方法包全文。"
+    duty = (
+        "这是一份作业/试卷/作文/笔记的批改结果综述页，不是出题。"
+        "页面一打开先见一句枢纽判断；再分栏：白话三问支撑该枢纽、认知三区（少而硬短卡片）、"
+        "本子方法如何改变了判断（禁止报名清单）；开放材料若出现只写事实链（线），勿与诊断（面）复述。"
+        "对错个数、错因频次、材料画像数字等循证信息一律放在页面后部「依据」区。"
+        "禁止助记选择题、禁止编造课标句、禁止把方法包全文糊进去、禁止复刻报告栏目墙。"
+        "主素材优先用筛后卡片 Markdown；工作区只作补证。"
+        if grading else
+        "根据本卡正文、配图理解（若有）、勾选文档摘录（若有）做整理、综合、梳理，输出层次清晰的单文件 HTML。"
+        "禁止做成助记选择题翻面卡。"
+    )
+    system = (
+        "你是资深学习内容编辑与前端设计方向的专家，只输出一份完整、可独立打开的 HTML5。\n"
+        f"{duty}\n"
+        "硬性要求：\n"
+        "1) 单个 HTML：<!DOCTYPE html>、<html lang=\"zh-CN\">、内联 style/script，不要外链 CDN。\n"
+        "2) 栏目用白话。若正文已有【看到了什么】【这说明什么】【下一步做什么】，HTML 里保留并展开，不要改成暗号标题。\n"
+        "3) 结构要有枢纽 + 分栏 + 边界（什么能判断、什么材料未纳入）。\n"
+        "4) 核心判断与方法贯穿放在视觉中心；统计数字克制地放后部。禁止 AI 腔、禁止鸡汤、禁止一面墙。\n"
+        "5) 若提供了卡片配图，结合版面重点，但不要把大图嵌入 HTML。\n"
+        "6) 美学克制，系统中文字体，CSS 变量色板。\n"
+    )
+    # 批改卡已有筛后 Markdown，正文截断收紧，避免再喂 24k 墙
+    body_limit = 10000 if grading else 24000
+    user = (
+        f"【本子中文名/描述】\n{notebook_description or '（未提供）'}\n\n"
+        f"【场景名】\n{scene_name or '（未提供）'}\n\n"
+        f"【卡片标题】\n{card_title or '（无标题）'}\n\n"
+        f"【卡片正文】\n{(card_content or '')[:body_limit]}\n\n"
+        f"【其它勾选卡片】\n{choosed_cards_bundle or '（无）'}\n\n"
+        f"【勾选文档补充】\n{doc_bundle or '（无）'}\n\n"
+        f"【是否已提供卡片配图】\n{'是' if has_card_image else '否'}\n\n"
+        + (f"【批改工作区（缺项已标明未纳入，禁止补造）】\n{workspace}\n\n" if grading else "")
+        + "请直接输出完整 HTML，必须以 <!DOCTYPE html> 开头，不要 Markdown 包裹。"
+    )
+    return system, user
+
+
 def _system_and_user_prompts(
     notebook_description: str,
     scene_name: str,
@@ -490,7 +602,16 @@ def _system_and_user_prompts(
     doc_bundle: str,
     choosed_cards_bundle: str,
     has_card_image: bool,
+    extra: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, str]:
+    extra = dict(extra or {})
+    extra.setdefault("card_content", card_content)
+    route = card_html_route(scene_name, notebook_description, card_title, extra)
+    if route != "R0":
+        return _synthesis_prompts(
+            notebook_description, scene_name, card_title, card_content,
+            doc_bundle, choosed_cards_bundle, has_card_image, route, extra,
+        )
     system = (
         "你是资深学习体验与前端设计方向的专家，只输出「一份完整、可独立打开的 HTML5 内容」。\n"
         "若涉及NK2026 梯子图批改等，则批改对象为**本科二年级课设小组**；若素材未提具体人物，则针对内容隐含的作者/叙述者视角：语言与认知负荷须匹配该阶段和对象主体，**禁止**出「一眼排除错误项」的低幼题目。\n"
@@ -565,8 +686,11 @@ def _system_and_user_prompts_iterate(
     choosed_cards_bundle: str,
     has_card_image: bool,
     existing_body_inner: str,
+    extra: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, str]:
-    nk2026 = is_nk2026_ladder_scene(scene_name)
+    extra = dict(extra or {})
+    extra.setdefault("card_content", card_content)
+    route = card_html_route(scene_name, notebook_description, card_title, extra)
     sys_p, user_base = _system_and_user_prompts(
         notebook_description,
         scene_name,
@@ -575,7 +699,22 @@ def _system_and_user_prompts_iterate(
         doc_bundle,
         choosed_cards_bundle,
         has_card_image,
+        extra,
     )
+    if route != "R0":
+        sys_p = (
+            "你在精修一份综述型卡片 HTML 的 <body> 内部。"
+            "只输出 body 内部片段，不要 <!DOCTYPE>/<html>/<body> 外壳，不要 Markdown。"
+            "保持枢纽+分栏+边界的综述结构，禁止改成助记选择题翻面卡。"
+            "前部必须是批改判断、三问、三区建议与方法贯穿；对错统计放到后部依据区。"
+            "可把层次写得更清楚；材料里没有的课标、年级、主体不要编。"
+        )
+        user_p = (
+            f"【卡片标题】{card_title}\n【卡片正文】\n{(card_content or '')[:12000]}\n\n"
+            "【现有 body 主体】\n" + (existing_body_inner or "")[:80000]
+        )
+        return sys_p, user_p
+    nk2026 = is_nk2026_ladder_scene(scene_name)
     if nk2026:
         iterate_rules = (
             "【迭代任务 · NK2026 梯子图批改场景】\n"
@@ -1213,6 +1352,114 @@ def card_html_group_feedback(request):
 
 
 @csrf_exempt
+def card_get_html_generating_status(request):
+    username = request.GET.get('username')
+    if not username:
+        return JsonResponse({'error_num': 1, 'msg': 'missing username'})
+    with _card_html_lock:
+        generating_cids = list(_card_html_generating.get(username, set()))
+    return JsonResponse({'error_num': 0, 'generating_cids': generating_cids})
+
+
+def generate_card_html_for_card(username: str, cid: int, extra: Optional[Dict[str, Any]] = None) -> str:
+    data = dict(extra or {})
+    ctx = _collect_card_html_context(username, int(cid), data, inject_chuchengjia_zhengben=True)
+    card = ctx["card"]
+    extra = dict(data)
+    extra["card_content"] = card.content or ""
+    extra["username"] = username
+
+    # 解释精要卡：结构化信息量大，用模板填入，不调模型
+    try:
+        from app_chat.homework_grading.excerpt_card_render import (
+            build_excerpt_html,
+            build_excerpt_payload,
+            is_excerpt_grading_card,
+            strip_grading_card_marker,
+        )
+        title = card.contentTitle or ""
+        content = card.content or ""
+        if extra.get("grading_excerpt") or is_excerpt_grading_card(content, title):
+            analysis_id = str(extra.get("analysis_id") or "").strip()
+            run_id = extra.get("run_id")
+            if not analysis_id:
+                m = re.search(
+                    r"<!--nkcn_grading_card:批改·解释精要\|([^|>]+)\|([^>]+)-->",
+                    content,
+                )
+                if m:
+                    analysis_id, run_id = m.group(1).strip(), m.group(2).strip()
+            payload = None
+            if analysis_id:
+                from app_chat.homework_grading.service import prepare_homework_workspace
+                from app_chat.homework_grading.result_cards import _load_json, _named_json, _sample_id
+                paths = prepare_homework_workspace(
+                    username, analysis_id,
+                    None if run_id in (None, "", "current") else run_id,
+                    create=False,
+                )
+                manifest = _load_json(paths.get("manifest") or "")
+                fctx = manifest.get("feedback_context") or {}
+                subject = str(manifest.get("subject") or fctx.get("subject_code") or "chinese")
+                sample_id = _sample_id(analysis_id)
+                report = _named_json(paths.get("pass2_report") or "", subject, sample_id, "_report.json")
+                ontology = _load_json(os.path.join(paths.get("base") or "", "student_ontology.json"))
+                assigned = None
+                gc = manifest.get("grading_config") if isinstance(manifest.get("grading_config"), dict) else {}
+                if gc.get("assigned_pages"):
+                    try:
+                        assigned = [int(p) for p in gc["assigned_pages"]]
+                    except (TypeError, ValueError):
+                        assigned = None
+                filename = (manifest.get("selected_files") or [""])[0]
+                if not isinstance(fctx, dict):
+                    fctx = {}
+                if not fctx and isinstance(ontology, dict):
+                    fctx = ontology.get("feedback_context") or {}
+                payload = build_excerpt_payload(
+                    report, ontology,
+                    pass1_dir=paths.get("pass1_json") or "",
+                    subject=subject,
+                    assigned_pages=assigned,
+                    filename=filename,
+                    material_type=str(fctx.get("material_type") or "homework"),
+                    feedback_context=fctx,
+                    analysis_id=analysis_id,
+                    run_id=str(run_id or ""),
+                )
+                try:
+                    from app_chat.homework_grading.verify_suggestions import suggestions_for_html
+                    payload["verify_suggestions"] = suggestions_for_html(paths)
+                except Exception:
+                    payload["verify_suggestions"] = {}
+            if payload is not None:
+                html = build_excerpt_html(payload)
+                backup = os.path.isfile(_card_html_path(username, int(cid)))
+                return _save_card_html(username, int(cid), html, backup_before=backup)
+    except Exception as exc:
+        try:
+            from app_chat.homework_grading.yangqian_debug import debug_log
+            debug_log(f"[card_html] 解释精要模板失败，回退模型: {exc}")
+        except Exception:
+            pass
+
+    sys_p, user_p = _system_and_user_prompts(
+        ctx["notebook_description"],
+        ctx["scene_name"],
+        (card.contentTitle or "")[:500],
+        card.content or "",
+        ctx["doc_bundle"],
+        ctx["cards_bundle"],
+        bool(ctx["mime_b64"]),
+        extra,
+    )
+    messages = _build_card_html_messages(sys_p, user_p, ctx["mime_b64"])
+    html = _opus_stream_html_completion(messages, max_attempts=2)
+    backup = os.path.isfile(_card_html_path(username, int(cid)))
+    return _save_card_html(username, int(cid), html, backup_before=backup)
+
+
+@csrf_exempt
 def card_html_generate(request):
     if request.method != "POST":
         return JsonResponse({"error_num": 1, "msg": "只支持 POST"})
@@ -1230,46 +1477,17 @@ def card_html_generate(request):
         return JsonResponse({"error_num": 1, "msg": "cid 非法"})
 
     try:
-        ctx = _collect_card_html_context(username, cid, data, inject_chuchengjia_zhengben=True)
+        out_path = generate_card_html_for_card(username, cid, extra=data)
     except Card.DoesNotExist:
         return JsonResponse({"error_num": 1, "msg": "卡片不存在"})
     except Exception as e:
         return JsonResponse({"error_num": 1, "msg": str(e)})
 
-    card = ctx["card"]
-    if ctx["cards_bundle"]:
-        extra = len([x for x in ctx["choosed_ids"] if int(x) != int(cid)])
-        print(f"[card_html] choosed extra cards: {extra} bundle_chars={len(ctx['cards_bundle'])}")
-    if ctx["file_list"]:
-        print(f"[card_html] doc files: {len(ctx['file_list'])}")
-
-    sys_p, user_p = _system_and_user_prompts(
-        ctx["notebook_description"],
-        ctx["scene_name"],
-        (card.contentTitle or "")[:500],
-        card.content or "",
-        ctx["doc_bundle"],
-        ctx["cards_bundle"],
-        bool(ctx["mime_b64"]),
-    )
-    messages = _build_card_html_messages(sys_p, user_p, ctx["mime_b64"])
-
-    try:
-        html = _opus_stream_html_completion(messages, max_attempts=2)
-    except Exception as e:
-        return JsonResponse({"error_num": 1, "msg": f"模型调用失败: {e}"})
-
-    backup = os.path.isfile(_card_html_path(username, cid))
-    try:
-        out_path = _save_card_html(username, cid, html, backup_before=backup)
-    except Exception as e:
-        return JsonResponse({"error_num": 1, "msg": f"写入失败: {e}"})
-
     return JsonResponse({
         "error_num": 0,
         "msg": "success",
-        "path": out_path.replace("\\", "/"),
-        "backed_up": backup,
+        "path": str(out_path).replace("\\", "/"),
+        "backed_up": True,
     })
 
 
@@ -1316,6 +1534,7 @@ def card_html_iterate(request):
         ctx["cards_bundle"],
         bool(ctx["mime_b64"]),
         body_inner,
+        extra=data,
     )
     messages = _build_card_html_messages(sys_p, user_p, ctx["mime_b64"])
 

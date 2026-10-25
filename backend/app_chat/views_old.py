@@ -1,3 +1,4 @@
+import nkcn_public_config as _public_config
 import contextvars
 import csv
 import functools
@@ -132,8 +133,8 @@ QS_QQ_base = "请务必注意：当前的语境口吻为建议引导性回答，
              "如果用户的提问本身是需要提出一些相关问题链，则此时你应该" \
              "给出更有引导价值、更有张力、更有深度思考价值的问题。请重视这个要求！"
 
-# OPEN_AI_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPEN_AI_KEY = os.environ.get("NKCN_LLM_API_KEY", "")
+# OPEN_AI_KEY = "[redacted]"
+OPEN_AI_KEY = _public_config.secret('OPENAI_API_KEY')
 
 system_prompt_claude = """<人性化思考协议>
 <多模态感知体验>
@@ -1127,9 +1128,9 @@ async def gpt_stream_generator(data):
     if not constructed_data["file_list"]:
         try:
             client = OpenAI(
-                # api_key=os.environ.get("OPENAI_API_KEY", ""),
-                api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-                base_url='https://chat.cloudapi.vip/v1/',
+                # api_key='[redacted]',
+                api_key=_public_config.secret('OPENAI_API_KEY'),
+                base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
                 default_headers={"x-foo": "true"},
             )
             print("GPT4o不勾选文件，发送消息: ", constructed_data["questionGPT"])
@@ -1314,8 +1315,8 @@ async def gemini_stream_generator(data):
     if not constructed_data["file_list"]:
         try:
             client = OpenAI(
-                api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-                base_url='https://chat.cloudapi.vip/v1/',
+                api_key=_public_config.secret('OPENAI_API_KEY'),
+                base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
                 default_headers={"x-foo": "true"},
             )
             print("Gemini不勾选文件，发送消息: ", constructed_data["questionGemini"])
@@ -1498,8 +1499,8 @@ async def claude_stream_generator(data):
     if not constructed_data["file_list"]:
         try:
             client = OpenAI(
-                api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-                base_url='https://chat.cloudapi.vip/v1/',
+                api_key=_public_config.secret('OPENAI_API_KEY'),
+                base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
                 default_headers={"x-foo": "true"}
             )
             print("Claude3.5不勾选文件，发送消息: ", constructed_data["questionClaude"])
@@ -1784,7 +1785,7 @@ async def deepseek_stream_generator(data):
     chat_content[username]["deepseek"] = ""
     if not constructed_data["file_list"]:
         try:
-            API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+            API_KEY = _public_config.secret('DEEPSEEK_API_KEY')
             if constructed_data["system_prompt_claudeUse"] != "":
                 role = system_prompt_deepseek  # thinking的简化版
                 role = role + "\n当前的场景阶段提示：\n" + global_var.store_memory[constructed_data['writer']]["prompt"]["LUI2"][
@@ -1983,7 +1984,7 @@ async def llama_stream_generator(data):
     if not constructed_data["file_list"]:
         client = OpenAI(
             base_url="https://integrate.api.nvidia.com/v1",
-            api_key=os.environ.get("NVIDIA_API_KEY", "")
+            api_key=_public_config.secret('NVIDIA_API_KEY')
         )
         try:
             print("Llama3不勾选文件，发送消息: ", constructed_data["questionLlama"])
@@ -2145,7 +2146,7 @@ async def kimi_stream_generator(data):
     if not constructed_data["file_list"]:
         try:
             client = OpenAI(
-                api_key=os.environ.get("KIMI_API_KEY", ""),
+                api_key=_public_config.secret('KIMI_API_KEY'),
                 base_url="https://api.moonshot.cn/v1",
                 default_headers={"x-foo": "true"},
             )
@@ -2307,8 +2308,8 @@ async def dsreasoner_stream_generator(data):
     chat_content[username]["dsreasoner"] = ""
     if not constructed_data["file_list"]:
         try:
-            # API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
-            API_KEY_ALI = os.environ.get("DASHSCOPE_API_KEY", "")
+            # API_KEY = '[redacted]'
+            API_KEY_ALI = _public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY')
 
             if constructed_data["system_prompt"] != "":
                 role = "当前的场景阶段提示：\n" + global_var.store_memory[constructed_data['writer']]["prompt"]["LUI2"]["qa"]
@@ -2532,8 +2533,8 @@ async def qwq_stream_generator(data):
     chat_content[username]["qwq"] = ""
     if not constructed_data["file_list"]:
         try:
-            # API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
-            API_KEY_ALI = os.environ.get("DASHSCOPE_API_KEY", "")
+            # API_KEY = '[redacted]'
+            API_KEY_ALI = _public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY')
 
             if constructed_data["system_prompt"] != "":
                 role = "当前的场景阶段提示：\n" + global_var.store_memory[constructed_data['writer']]["prompt"]["LUI2"]["qa"]
@@ -4445,7 +4446,7 @@ def getLastContent(request):
 
 def little_model_switch(username, model_id):
     try:
-        command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","model_id":"{model_id}"}}\' http://192.0.2.1:8000/model_switch/'
+        command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","model_id":"{model_id}"}}\' http://127.0.0.1:8000/model_switch/'
         result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 text=True)
 
@@ -5136,7 +5137,7 @@ def reget_topics(request):
             "请给出你微调修正topics后的结果吧，记得不能改变格式，除此结果外，不要输出任何其他内容！\n"
         )
     ]
-    OPEN_AI_KEY = os.environ.get("KIMI_API_KEY", "")  # kimi
+    OPEN_AI_KEY = _public_config.secret('KIMI_API_KEY')  # kimi
     base_url = "https://api.moonshot.cn/v1"
 
     try:
@@ -5862,7 +5863,7 @@ def execute_commands(request):
 
     try:
         # 构建curl命令，使用提取的text值
-        command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","text":"{text}"}}\' http://192.0.2.1:8000/invoke_rate'
+        command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","text":"{text}"}}\' http://127.0.0.1:8000/invoke_rate'
         result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 text=True)
 
@@ -5951,7 +5952,7 @@ def execute_commands_stream(request):
 
             # 发送异步请求
             future = session.post(
-                'http://192.0.2.1:8000/invoke_rate_stream',
+                _public_config.endpoint('NKCN_SERVICE_8000_INVOKE_RATE_STREAM_URL', 'http://localhost:8000/invoke_rate_stream'),
                 json={"username": username, "text": text},
                 stream=True
             )
@@ -6155,7 +6156,7 @@ def AIWork(request):
 
         gpt_vision = ChatOpenAI(temperature=0,
                                 openai_api_key=OPEN_AI_KEY,
-                                openai_api_base='https://chat.cloudapi.vip/v1/',
+                                openai_api_base=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
                                 default_headers={"x-foo": "true"},
                                 model_name="gpt-4o",
                                 max_tokens=1000)
@@ -6358,7 +6359,7 @@ def shootCardAnalysis(request):
         # 调用OpenAI
         # gpt_vision = ChatOpenAI(temperature=0,
         #                         openai_api_key=OPEN_AI_KEY,
-        #                         openai_api_base='https://chat.cloudapi.vip/v1/',
+        #                         openai_api_base='http://localhost:9999/v1/',
         #                         default_headers={"x-foo": "true"},
         #                         model_name="gpt-4o",
         #                         max_tokens=2048)

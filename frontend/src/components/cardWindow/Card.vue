@@ -27,7 +27,7 @@
         @click.stop="onMenuCopyCardImage"
       >复制图片</div>
       <div class="card-html-ctx-item" @click.stop="onMenuGenerateHtml">
-        {{ cardHtmlBusy ? '生成中…' : (cardHasHtmlFile ? '重新生成html版' : '生成html版') }}
+        {{ isCardHtmlBusy ? '生成中…' : (cardHasHtmlFile ? '重新生成html版' : '生成html版') }}
       </div>
       <div v-if="cardHasHtmlFile" class="card-html-ctx-item" @click.stop="onMenuIterateHtml">迭代现有html版</div>
       <div v-if="cardHasHtmlLastVersion" class="card-html-ctx-item" @click.stop="onMenuRevertHtml">回退上一版</div>
@@ -56,7 +56,7 @@
                   d="M21 12a9 9 0 01-9 9 9 9 0 01-9-9 9 9 0 019-9c2.5 0 4.9.8 6.8 2.2L15 8.5h4V4"/>
               </svg>
             </span>
-            <span v-else-if="cardHtmlBusy" class="card-html-spinner-wrap">
+            <span v-else-if="isCardHtmlBusy" class="card-html-spinner-wrap">
               <svg class="card-html-spinner-svg" viewBox="0 0 24 24" width="20.8" height="20.8" aria-hidden="true">
                 <polygon points="8,5 8,19 19,12" fill="currentColor" fill-opacity="0.92" />
               </svg>
@@ -326,7 +326,13 @@
     <div class="advice-content" v-html="formattedComprehensiveAdvice"></div>
   </div>
 
-  <div class="card-dialog" v-if="isCardDialogVisible" ref="cardDialog" :style="{ zIndex: cardDialogZIndex }">
+  <div
+    class="card-dialog"
+    :class="{ 'card-dialog--grading-excerpt': isGradingExcerptHtmlPreview }"
+    v-if="isCardDialogVisible"
+    ref="cardDialog"
+    :style="{ zIndex: cardDialogZIndex }"
+  >
     <!-- 关键词神经元永久卡片样式 -->
     <div v-if="isKeywordPermanentCard()" class="permanent-card-layout">
       <!-- 卡片标题和关闭按钮 -->
@@ -464,6 +470,7 @@
                 v-else-if="cardMediaViewMode === 'html'"
                 :key="'htmlp' + cardHtmlIframeKey"
                 class="card-html-iframe"
+                :class="{ 'card-html-iframe--grading-excerpt': isGradingExcerptCard }"
                 :src="cardHtmlViewUrl"
                 title="card html"
                 sandbox="allow-scripts allow-same-origin allow-forms"
@@ -484,7 +491,17 @@
                 }"
                 @mouseenter="$event.target.style.backgroundColor = getKeywordPermanentCardContentBackgroundHover()"
                 @mouseleave="$event.target.style.backgroundColor = getKeywordPermanentCardContentBackground()">
-              <AnswerParser :key="showLastContent ? 'last' : 'current'" :answer="showLastContent ? cardInfo.lastContent : cardInfo.content" @startReading="startFromIndex" @doubleClickOver="doubleClickOver"/>
+              <AnswerParser
+                :key="(showLastContent ? 'last' : 'current') + '-perm-p' + contentPageIndex"
+                :answer="pagedDisplayContent"
+                @startReading="startFromIndex"
+                @doubleClickOver="doubleClickOver"
+              />
+              <div v-if="hasContentPages" class="nkcn-card-page-nav" @click.stop>
+                <button type="button" :disabled="contentPageIndex <= 0" @click="contentPageIndex = Math.max(0, contentPageIndex - 1)">上一页</button>
+                <span>{{ contentPageIndex + 1 }} / {{ contentPages.length }}</span>
+                <button type="button" :disabled="contentPageIndex >= contentPages.length - 1" @click="contentPageIndex = Math.min(contentPages.length - 1, contentPageIndex + 1)">下一页</button>
+              </div>
             </div>
             <el-input
               v-else
@@ -750,6 +767,7 @@
                   v-else-if="cardMediaViewMode === 'html'"
                   :key="'htmld1' + cardHtmlIframeKey"
                   class="card-html-iframe"
+                  :class="{ 'card-html-iframe--grading-excerpt': isGradingExcerptCard }"
                   :src="cardHtmlViewUrl"
                   title="card html"
                   sandbox="allow-scripts allow-same-origin allow-forms"
@@ -763,7 +781,17 @@
                   @mouseup="handleMouseUp"
                   class="content-hover-area-tidy"
                   style="cursor: pointer; padding: 5px; border-radius: 4px;">
-                <AnswerParser :key="showLastContent ? 'last' : 'current'" :answer="showLastContent ? cardInfo.lastContent : cardInfo.content" @startReading="startFromIndex" @doubleClickOver="doubleClickOver"/>
+                <AnswerParser
+                  :key="(showLastContent ? 'last' : 'current') + '-p' + contentPageIndex"
+                  :answer="pagedDisplayContent"
+                  @startReading="startFromIndex"
+                  @doubleClickOver="doubleClickOver"
+                />
+                <div v-if="hasContentPages" class="nkcn-card-page-nav" @click.stop>
+                  <button type="button" :disabled="contentPageIndex <= 0" @click="contentPageIndex = Math.max(0, contentPageIndex - 1)">上一页</button>
+                  <span>{{ contentPageIndex + 1 }} / {{ contentPages.length }}</span>
+                  <button type="button" :disabled="contentPageIndex >= contentPages.length - 1" @click="contentPageIndex = Math.min(contentPages.length - 1, contentPageIndex + 1)">下一页</button>
+                </div>
               </div>
               <!-- 编辑状态显示文本框 -->
               <el-input
@@ -991,25 +1019,163 @@
                 v-else-if="cardMediaViewMode === 'html'"
                 :key="'htmld2' + cardHtmlIframeKey"
                 class="card-html-iframe"
+                :class="{ 'card-html-iframe--grading-excerpt': isGradingExcerptCard }"
                 :src="cardHtmlViewUrl"
                 title="card html"
                 sandbox="allow-scripts allow-same-origin allow-forms"
               ></iframe>
               <pre v-else-if="cardMediaViewMode === 'html_source'" class="card-html-source-pre">{{ cardHtmlSourceText }}</pre>
             </div>
+            <!-- 交叉梳理卡：摘要 / 知识冲突 / Skill 簇 -->
+            <div v-if="isCrossDocumentSuggestionCard" class="cross-reorg-tabs">
+              <button type="button" class="cross-reorg-tab" :class="{ active: crossReorgTab==='suggest' }" @click="crossReorgTab='suggest'">交叉建议摘要</button>
+              <button type="button" class="cross-reorg-tab" :class="{ active: crossReorgTab==='conflicts' }" @click="switchKnowledgeConflictTab">可能的知识冲突</button>
+              <button type="button" class="cross-reorg-tab" :class="{ active: crossReorgTab==='skills' }" @click="switchCrossReorgSkillsTab">本子交叉 Skill 簇</button>
+            </div>
+            <div v-if="isCrossDocumentSuggestionCard && crossReorgTab==='conflicts'" class="kc-panel">
+              <div v-if="kcLoading" class="cross-reorg-empty">知识冲突挖掘加载中…</div>
+              <div v-else-if="!kcData" class="cross-reorg-empty">挖掘中或尚未生成…（生成交叉梳理后会后台产出）</div>
+              <template v-else>
+                <div class="kc-head">
+                  <div class="kc-head-main">
+                    <span class="kc-badge">冲突挖掘</span>
+                    <span class="kc-meta">文档 Skill {{ (kcData.stats && kcData.stats.doc_skills) || 0 }} · 包成员 {{ (kcData.stats && kcData.stats.pack_skills) || 0 }} · 条目 {{ (kcData.items || []).length }}</span>
+                  </div>
+                  <span class="cross-reorg-status" :class="'st-' + (kcData.status || '')">{{ kcData.status || '—' }}</span>
+                </div>
+                <p v-if="kcData.note" class="kc-note">{{ kcData.note }}</p>
+                <div v-if="kcData.status==='failed'" class="cross-reorg-empty">
+                  挖掘失败{{ kcData.error ? ('：' + kcData.error) : '' }}；可稍后重新生成交叉梳理以重试。
+                </div>
+                <div v-else-if="kcData.status==='running'" class="cross-reorg-empty">挖掘进行中…</div>
+                <div v-else-if="!(kcData.items || []).length" class="cross-reorg-empty">本轮未挖到足够站得住的知识冲突（宁可少报）。</div>
+                <div
+                  v-for="item in (kcData.items || [])"
+                  :key="item.id"
+                  class="kc-card"
+                  :class="['kc-st-' + (item.user_status || 'pending'), { 'is-open': isKcItemOpen(item.id) }]"
+                >
+                  <div class="kc-card-top">
+                    <span class="kc-cat">{{ item.category || '张力' }}</span>
+                    <span class="kc-id">{{ item.id }}</span>
+                  </div>
+                  <h4 class="kc-title">{{ item.title }}</h4>
+                  <p class="kc-summary" :class="{ 'is-clamped': !isKcItemOpen(item.id) }">{{ item.summary || item.insight }}</p>
+                  <div v-if="(item.parties || []).length" class="kc-parties">
+                    <span v-for="(p, pi) in item.parties" :key="pi" class="kc-party" :class="'kind-' + (p.kind || '')">{{ p.title || p.name }}</span>
+                  </div>
+                  <button
+                    v-if="kcItemHasDetail(item)"
+                    type="button"
+                    class="kc-toggle"
+                    @click="toggleKcItem(item.id)"
+                  >{{ isKcItemOpen(item.id) ? '收起细节' : '展开张力 / 洞察' }}</button>
+                  <div v-show="isKcItemOpen(item.id)" class="kc-detail">
+                    <p v-if="item.tension" class="kc-tension"><b>张力</b>{{ item.tension }}</p>
+                    <p v-if="item.insight && item.insight !== item.summary" class="kc-insight"><b>洞察</b>{{ item.insight }}</p>
+                    <p v-if="item.why_not_forced" class="kc-why"><b>为何不牵强</b>{{ item.why_not_forced }}</p>
+                    <div class="kc-note-box">
+                      <label>补充说明</label>
+                      <textarea
+                        :value="item.user_note || ''"
+                        rows="2"
+                        placeholder="可改写或补充你的判断…"
+                        @change="onKcNoteChange(item, $event)"
+                      ></textarea>
+                    </div>
+                  </div>
+                  <div class="kc-actions">
+                    <button type="button" class="kc-act confirm" :class="{ on: item.user_status==='confirm' }" @click="setKcFeedback(item, 'confirm')">确认</button>
+                    <button type="button" class="kc-act unsure" :class="{ on: item.user_status==='unsure' }" @click="setKcFeedback(item, 'unsure')">模糊不确认</button>
+                    <button type="button" class="kc-act deny" :class="{ on: item.user_status==='deny' }" @click="setKcFeedback(item, 'deny')">否认</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div v-if="isCrossDocumentSuggestionCard && crossReorgTab==='skills'" class="cross-reorg-skills-panel">
+              <div v-if="crossReorgLoading" class="cross-reorg-empty">交叉 Skill 加载中…</div>
+              <div v-else-if="!crossReorgIndex" class="cross-reorg-empty">交叉 Skill 生成中或尚未生成…（双击导入区生成交叉梳理后会后台产出）</div>
+              <template v-else>
+                <div class="cross-reorg-aim">
+                  <div class="cross-reorg-aim-main">
+                    <span class="cross-reorg-aim-label">本子目标</span>
+                    <span class="cross-reorg-aim-text">{{ crossReorgIndex.notebook_aim_one_liner || '—' }}</span>
+                  </div>
+                  <span class="cross-reorg-status" :class="'st-' + (crossReorgIndex.status || '')">{{ crossReorgIndex.status || '—' }}</span>
+                </div>
+
+                <div class="cross-reorg-hub-card">
+                  <div class="cross-reorg-hub-badge">入口 · 1</div>
+                  <div class="cross-reorg-card-title">notebook-hub</div>
+                  <div class="cross-reorg-card-desc">{{ (crossReorgIndex.hub && crossReorgIndex.hub.description) || '本子 Skill 总入口' }}</div>
+                  <button type="button" class="cross-reorg-btn" @click="openCrossSkillViewer('notebook-hub', '本子 Skill 总入口')">查看入口全文</button>
+                </div>
+
+                <div
+                  v-for="t in (crossReorgIndex.themes || [])"
+                  :key="t.name"
+                  class="cross-reorg-theme-card"
+                  :class="{ 'is-failed': t.status==='failed', 'is-running': t.status==='running' }"
+                >
+                  <div class="cross-reorg-theme-head">
+                    <div class="cross-reorg-card-title">{{ t.title || t.name }}</div>
+                    <span class="cross-reorg-status" :class="'st-' + (t.status || '')">{{ t.status || '—' }}</span>
+                  </div>
+                  <div class="cross-reorg-card-desc">{{ (t.description || '').slice(0, 200) }}{{ (t.description||'').length>200?'…':'' }}</div>
+                  <div v-if="t.how_to_use" class="cross-reorg-meta-row">
+                    <span class="cross-reorg-meta-k">用好</span>
+                    <span class="cross-reorg-meta-v">{{ t.how_to_use }}</span>
+                  </div>
+                  <div v-if="t.reuse_goal" class="cross-reorg-meta-row">
+                    <span class="cross-reorg-meta-k">复用目标</span>
+                    <span class="cross-reorg-meta-v">{{ t.reuse_goal }}</span>
+                  </div>
+                  <div v-if="(t.semantic_keywords || []).length" class="cross-reorg-kw-wrap">
+                    <span
+                      v-for="(kw, ki) in (t.semantic_keywords || []).slice(0, 10)"
+                      :key="ki"
+                      class="cross-reorg-kw"
+                      :title="(kw && kw.gloss) || ''"
+                    >{{ (kw && kw.term) || kw }}</span>
+                    <span v-if="(t.semantic_keywords || []).length > 10" class="cross-reorg-kw more">+{{ (t.semantic_keywords || []).length - 10 }}</span>
+                  </div>
+                  <div class="cross-reorg-rel">
+                    <div><b>关联文档</b> {{ (t.related_docs || []).join('、') || '—' }}</div>
+                    <div><b>关联 Skill</b> {{ (t.related_existing_skills || []).join('、') || '—' }}</div>
+                  </div>
+                  <button
+                    v-if="t.status==='ok'"
+                    type="button"
+                    class="cross-reorg-btn"
+                    @click="openCrossSkillViewer(t.name, t.title || t.name)"
+                  >查看主题全文</button>
+                  <div v-else-if="t.error" class="cross-reorg-err">{{ t.error }}</div>
+                </div>
+              </template>
+            </div>
             <!-- 非编辑状态显示解析后的内容，点击进入编辑状态 -->
-            <div v-if="!isEditingContent" 
+            <div v-if="(!isCrossDocumentSuggestionCard || crossReorgTab==='suggest') && !isEditingContent" 
                 @click="editContentInline" 
                 @mousedown="handleMouseDown"
                 @mouseup="handleMouseUp"
                 class="content-hover-area"
                 style="cursor: pointer; padding: 5px; border-radius: 4px;">
               <!-- <AnswerParser :answer="cardInfo.content" @startReading="startFromIndex" @doubleClickOver="doubleClickOver"/> -->
-              <AnswerParser :answer="showLastContentNormal ? cardInfo.lastContent : cardInfo.content" @startReading="startFromIndex" @doubleClickOver="doubleClickOver"/>
+              <AnswerParser
+                :key="'normal-p' + contentPageIndex"
+                :answer="normalPagedDisplayContent"
+                @startReading="startFromIndex"
+                @doubleClickOver="doubleClickOver"
+              />
+              <div v-if="normalContentPages.length > 1" class="nkcn-card-page-nav" @click.stop>
+                <button type="button" :disabled="contentPageIndex <= 0" @click="contentPageIndex = Math.max(0, contentPageIndex - 1)">上一页</button>
+                <span>{{ contentPageIndex + 1 }} / {{ normalContentPages.length }}</span>
+                <button type="button" :disabled="contentPageIndex >= normalContentPages.length - 1" @click="contentPageIndex = Math.min(normalContentPages.length - 1, contentPageIndex + 1)">下一页</button>
+              </div>
             </div>
             <!-- 编辑状态显示文本框 -->
             <el-input
-              v-else
+              v-else-if="(!isCrossDocumentSuggestionCard || crossReorgTab==='suggest') && isEditingContent"
               id="edit-content-input"
               type="textarea"
               :rows="18"
@@ -1019,6 +1185,60 @@
             ></el-input>
           </div>
         </div>
+
+        <!-- 交叉 Skill 全文查看：挂到 body，避免嵌在卡片弹窗层内 -->
+        <Teleport to="body">
+          <div v-if="crossSkillViewerVisible" class="skill-dlg-overlay" @click.self="closeCrossSkillViewer">
+            <div class="skill-dlg skill-dlg--edit" @click.stop>
+              <div class="skill-dlg-header">
+                <div>
+                  <h3>查看交叉 Skill</h3>
+                  <p class="skill-dlg-sub">{{ crossSkillViewerTitle || crossSkillViewerName || '未选择' }}</p>
+                </div>
+                <button class="skill-dlg-close" type="button" @click="closeCrossSkillViewer">×</button>
+              </div>
+              <div class="skill-dlg-toolbar">
+                <div class="skill-tabs">
+                  <button
+                    type="button"
+                    class="skill-tab"
+                    :class="{ active: crossSkillViewMode === 'preview' }"
+                    @click="crossSkillViewMode = 'preview'"
+                  >Markdown 预览</button>
+                  <button
+                    type="button"
+                    class="skill-tab"
+                    :class="{ active: crossSkillViewMode === 'source' }"
+                    @click="crossSkillViewMode = 'source'"
+                  >查看源码</button>
+                </div>
+              </div>
+              <div class="skill-dlg-body skill-dlg-body--edit">
+                <div v-if="crossSkillViewMode === 'preview'" class="skill-md-preview">
+                  <div v-if="crossSkillFrontmatterRows.length" class="skill-fm-box">
+                    <div class="skill-fm-title">Frontmatter</div>
+                    <div class="skill-fm-row" v-for="(row, i) in crossSkillFrontmatterRows" :key="i">
+                      <span class="skill-fm-key">{{ row.key }}</span>
+                      <span
+                        class="skill-fm-val"
+                        :class="{ 'is-description': row.key === 'description' }"
+                        v-html="formatSkillDescDisplay(row.value)"
+                      ></span>
+                    </div>
+                  </div>
+                  <div class="skill-md-body" v-html="crossSkillPreviewHtml"></div>
+                </div>
+                <pre v-else class="skill-md-source">{{ crossSkillViewerRaw }}</pre>
+              </div>
+              <div class="skill-dlg-footer">
+                <span class="skill-dlg-hint">{{ crossSkillLineCount }} 行 · 交叉 Skill 只读</span>
+                <div class="skill-dlg-footer-actions">
+                  <button class="skill-btn skill-btn--ghost" type="button" @click="closeCrossSkillViewer">关闭</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Teleport>
 
         <!-- 后置索引区域 -->
         <!-- <div v-if="cardInfo.postIndex && cardInfo.postIndex !== ''"  -->
@@ -1931,6 +2151,8 @@ import { chageContent, deleteChoosedCard, changeText, backCardVersion, changeInt
 import { getSceneByName } from "@/views/pages/mainHome/my_js";
 import { getDateTime, modelHL } from "@/api/getData";
 import AnswerParser from '@/components/chatWindow/AnswerParser.vue';
+import { cross_reorganize_index, cross_reorganize_skill_get, cross_reorganize_skills_status, knowledge_conflict_get, knowledge_conflict_status, knowledge_conflict_feedback } from '@/api/chat/send_message';
+import { marked } from 'marked';
 // 🔥 使用npm安装的专业diff库
 import { diffChars } from 'diff';
 
@@ -1946,6 +2168,22 @@ export default {
   },
   data() {
     return {
+      crossReorgTab: 'suggest', // suggest | conflicts | skills
+      crossReorgIndex: null,
+      crossReorgLoading: false,
+      crossReorgPollTimer: null,
+      kcData: null,
+      kcLoading: false,
+      kcPollTimer: null,
+      kcSaving: false,
+      kcOpenIds: {},
+      cardHtmlCacheBust: 0,
+      crossSkillViewerVisible: false,
+      crossSkillViewerTitle: '',
+      crossSkillViewerName: '',
+      crossSkillViewerRaw: '',
+      crossSkillViewerFrontmatter: null,
+      crossSkillViewMode: 'preview', // preview | source
       postIndexTitle: "",   // 后置索引title连结的字符串
       postIndices: [],  // 存储后置索引的cid
 
@@ -2197,6 +2435,7 @@ export default {
       checked: false,
       isContentExpanded: false,
       isContentTruncated: false,
+      contentPageIndex: 0,
       isCardDialogVisible: false,
       showTooltip: false,
       showEditDialog: false,
@@ -2302,6 +2541,69 @@ export default {
       
       // 添加鼠标位置跟踪
       window.addEventListener('mousemove', this.trackMousePosition);
+
+      // 解释精要 HTML iframe：题号跳转 / 核验迭代
+      this._onCardHtmlMessage = (event) => {
+        const data = event && event.data
+        if (!data || !data.type) return
+        if (!this._isMessageFromOwnCardHtml(event)) return
+        const meta = this.parseGradingCardMarker()
+        if (data.type === 'nkcn-homework-jump') {
+          const evidence = String(data.evidence || '').trim()
+          if (!evidence) return
+          window.dispatchEvent(new CustomEvent('nkcn-homework-jump', {
+            detail: {
+              evidence,
+              analysisId: meta.analysisId || data.analysisId || '',
+              runId: meta.runId || data.runId || '',
+              cid: this.cid,
+            },
+          }))
+          return
+        }
+        if (data.type === 'nkcn-homework-verify-assist') {
+          const evidence = String(data.evidence || '').trim()
+          if (!evidence) return
+          window.dispatchEvent(new CustomEvent('nkcn-homework-verify-assist', {
+            detail: {
+              evidence,
+              analysisId: meta.analysisId || data.analysisId || data.analysis_id || '',
+              runId: meta.runId || data.runId || data.run_id || 'current',
+              cid: this.cid,
+            },
+          }))
+          return
+        }
+        if (data.type === 'nkcn-homework-verify-assist-close') {
+          window.dispatchEvent(new CustomEvent('nkcn-homework-verify-assist-close', {
+            detail: { cid: this.cid },
+          }))
+          return
+        }
+        if (data.type === 'nkcn-homework-verify-iterate') {
+          window.dispatchEvent(new CustomEvent('nkcn-homework-verify-iterate', {
+            detail: {
+              username: data.username || localStorage.getItem('userId') || '',
+              analysisId: meta.analysisId || data.analysisId || data.analysis_id || '',
+              runId: meta.runId || data.runId || data.run_id || 'current',
+              cid: this.cid,
+            },
+          }))
+        }
+      }
+      window.addEventListener('message', this._onCardHtmlMessage)
+      this._onVerifyIterateDone = (event) => {
+        const d = (event && event.detail) || {}
+        const cid = d.cid
+        if (cid != null && String(cid) !== String(this.cid)) return
+        this.cardHtmlCacheBust = Date.now()
+        // 触发卡片内容刷新（若有）
+        try {
+          if (typeof this.refreshCardInfo === 'function') this.refreshCardInfo()
+          else if (typeof this.loadCardInfo === 'function') this.loadCardInfo()
+        } catch (e) { /* ignore */ }
+      }
+      window.addEventListener('nkcn-homework-verify-iterate-done', this._onVerifyIterateDone)
     });
 
     // 保证加载页面时就更新卡片内容、打分、颜色，否则不放大卡片颜色不正确显示
@@ -2352,6 +2654,14 @@ export default {
     }
     // 移除点击事件监听
     document.removeEventListener('click', this.handleClickOutside);
+    if (this._onCardHtmlMessage) {
+      window.removeEventListener('message', this._onCardHtmlMessage)
+      if (this._onVerifyIterateDone) {
+        window.removeEventListener('nkcn-homework-verify-iterate-done', this._onVerifyIterateDone)
+        this._onVerifyIterateDone = null
+      }
+      this._onCardHtmlMessage = null
+    }
     // 移除确认框
     this.removeConfirmBar();
     // 清除可能存在的点击计时器
@@ -2366,6 +2676,39 @@ export default {
     this.stopKeywordsGeneratingPoll();
   },
   computed: {
+    isCrossDocumentSuggestionCard() {
+      const c = (this.cardInfo && this.cardInfo.content) || '';
+      return c.includes('【文档全面交叉梳理建议卡片】');
+    },
+    crossSkillLineCount() {
+      const raw = this.crossSkillViewerRaw || '';
+      if (!raw) return 0;
+      return raw.split('\n').length;
+    },
+    crossSkillParsed() {
+      const raw = this.crossSkillViewerRaw || '';
+      if (!raw.startsWith('---')) {
+        return { frontmatterText: '', body: raw };
+      }
+      const end = raw.indexOf('\n---', 3);
+      if (end < 0) {
+        return { frontmatterText: '', body: raw };
+      }
+      return {
+        frontmatterText: raw.slice(3, end).trim(),
+        body: raw.slice(end + 4).replace(/^\r?\n/, ''),
+      };
+    },
+    crossSkillFrontmatterRows() {
+      const apiFm = this.crossSkillViewerFrontmatter;
+      if (apiFm && typeof apiFm === 'object') {
+        return this.formatFrontmatterRows(apiFm);
+      }
+      return this.parseFrontmatterRowsFromText(this.crossSkillParsed.frontmatterText || '');
+    },
+    crossSkillPreviewHtml() {
+      return this.renderSkillMarkdown(this.crossSkillParsed.body || '（正文为空）');
+    },
     overlayManualDetectAutoVert() {
       const h = Math.max(1, Number(this.overlayManualCanvasHeight) || 1);
       return Math.max(4, Math.min(18, Math.max(1, Math.floor(h / 120))));
@@ -2413,18 +2756,32 @@ export default {
     /** 左上角图标 hover：生图优先，其次 HTML 生成 */
     cardTopLeftBusyTitle() {
       if (this.isAnyImageBusy) return this.overlayBusyHoverTitle || '';
-      if (this.cardHtmlBusy) return '正在生成 HTML 版，请稍候';
+      if (this.isCardHtmlBusy) return '正在生成 HTML 版，请稍候';
       return '';
     },
     cardHtmlViewUrl() {
       const u = encodeURIComponent(localStorage.getItem('userId') || '');
-      return `${API_BASE_URL}/api/card_html_view?username=${u}&cid=${this.cid}`;
+      const bust = this.cardHtmlCacheBust ? `&_=${this.cardHtmlCacheBust}` : '';
+      return `${API_BASE_URL}/api/card_html_view?username=${u}&cid=${this.cid}${bust}`;
     },
     cardHtmlChromeTitle() {
       const t = (this.cardInfo && this.cardInfo.contentTitle) ? String(this.cardInfo.contentTitle) : (this.contentTitle || '');
       const s = (t || '').trim();
       const x = s ? (s.length > 26 ? s.slice(0, 24) + '…' : s) : `卡片${this.cid}`;
       return x + ' · HTML';
+    },
+    /** 批改·解释精要卡（标题/正文标记） */
+    isGradingExcerptCard() {
+      const title = String(
+        (this.cardInfo && this.cardInfo.contentTitle) || this.contentTitle || (this.cardInfo && this.cardInfo.title) || ''
+      );
+      if (title.includes('解释精要')) return true;
+      const content = String((this.cardInfo && this.cardInfo.content) || this.content || '');
+      return content.includes('nkcn_grading_card:批改·解释精要') || content.includes('批改·解释精要|');
+    },
+    /** 仅解释精要 + HTML 预览时加宽；切回图片/源码等仍用常规尺寸 */
+    isGradingExcerptHtmlPreview() {
+      return this.isGradingExcerptCard && this.cardMediaViewMode === 'html';
     },
     // 检查用户是否有权限查看质量评估
     canViewQualityAssessment() {
@@ -2467,7 +2824,13 @@ export default {
     },
     isCardImageGenerating() {
       const list = this.cardImageGeneratingCids || [];
-      return list.includes(this.cid);
+      const me = Number(this.cid);
+      return list.some((c) => Number(c) === me);
+    },
+    isCardHtmlBusy() {
+      const me = Number(this.cid);
+      const inQueue = (this.cardHtmlGeneratingCids || []).some((c) => Number(c) === me);
+      return this.cardHtmlBusy || inQueue;
     },
     cardImageGenDialogTitle() {
       return (this.imgClicked && this.imgClicked !== '') ? '新生图' : '卡片生图';
@@ -2607,8 +2970,12 @@ export default {
     // 🔥 格式化预览内容，区分不同类型（关键词、标题、加粗、句子）
     formattedPreviewContent() {
       if (!this.content) return '';
+      const cleaned = String(this.content)
+        .replace(/<!--\s*nkcn_grading_card:[^>]*-->\s*/gi, '')
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .split(/\n*---NKCN_CARD_PAGE---\n*/)[0] || '';
       
-      const lines = this.content.split('\n').filter(line => line.trim() && !line.includes('(加载中)'));
+      const lines = cleaned.split('\n').filter(line => line.trim() && !line.includes('(加载中)'));
       const formattedLines = [];
       
       // 🔥 遍历所有行，检测标题后面是否紧跟加粗，以及多个连续的加粗
@@ -2915,6 +3282,52 @@ export default {
     wordCount() {
       return this.cardInfo.word_count || 0;
     },
+    rawDisplayContent() {
+      const raw = this.showLastContent
+        ? (this.cardInfo.lastContent || '')
+        : (this.cardInfo.content || '');
+      return String(raw)
+        .replace(/<!--\s*nkcn_grading_card:[^>]*-->\s*/gi, '')
+        .replace(/<!--[\s\S]*?-->/g, '');
+    },
+    contentPages() {
+      const text = this.rawDisplayContent;
+      if (!text) return [''];
+      if (!text.includes('---NKCN_CARD_PAGE---')) return [text];
+      return text.split(/\n*---NKCN_CARD_PAGE---\n*/).filter((p) => String(p || '').trim());
+    },
+    hasContentPages() {
+      return this.contentPages.length > 1;
+    },
+    pagedDisplayContent() {
+      const pages = this.contentPages;
+      if (!pages.length) return '';
+      const idx = Math.min(Math.max(0, this.contentPageIndex), pages.length - 1);
+      return pages[idx] || '';
+    },
+    normalRawDisplayContent() {
+      const raw = this.showLastContentNormal
+        ? (this.cardInfo.lastContent || '')
+        : (this.cardInfo.content || '');
+      return String(raw)
+        .replace(/<!--\s*nkcn_grading_card:[^>]*-->\s*/gi, '')
+        .replace(/<!--[\s\S]*?-->/g, '');
+    },
+    normalContentPages() {
+      const text = this.normalRawDisplayContent;
+      if (!text) return [''];
+      if (!text.includes('---NKCN_CARD_PAGE---')) return [text];
+      return text.split(/\n*---NKCN_CARD_PAGE---\n*/).filter((p) => String(p || '').trim());
+    },
+    hasNormalContentPages() {
+      return this.normalContentPages.length > 1;
+    },
+    normalPagedDisplayContent() {
+      const pages = this.normalContentPages;
+      if (!pages.length) return '';
+      const idx = Math.min(Math.max(0, this.contentPageIndex), pages.length - 1);
+      return pages[idx] || '';
+    },
     isKeywordsGenerating() {
       const kw = (this.cardInfo && this.cardInfo.keyWords != null)
         ? String(this.cardInfo.keyWords).trim()
@@ -3105,6 +3518,10 @@ export default {
       type: Array,
       default: () => []
     },
+    cardHtmlGeneratingCids: {
+      type: Array,
+      default: () => []
+    },
     /** 当前卡片是否已有附图（用于左上角图标高亮） */
     hasCardImage: {
       type: Boolean,
@@ -3200,9 +3617,25 @@ export default {
       }
     },
     card(newVal){
+      this.contentPageIndex = 0
       this.cardFromCardListToCardInfo()
       this.showInterGrowthArea()
       // 这里没有deep检测，只能检测到结构变化，单单内容变化检测不到，例如更新了card.postIndex，所以要单独提出来检测 ↓
+    },
+    showLastContent() {
+      this.contentPageIndex = 0
+    },
+    showLastContentNormal() {
+      this.contentPageIndex = 0
+    },
+    contentPages(pages) {
+      if (!pages || !pages.length) {
+        this.contentPageIndex = 0
+        return
+      }
+      if (this.contentPageIndex >= pages.length) {
+        this.contentPageIndex = pages.length - 1
+      }
     },
     reason(newVal) {
       // 只有在没有流式更新内容时才更新content，避免覆盖流式更新的内容
@@ -3234,11 +3667,23 @@ export default {
     },
     cardImageGeneratingCids(newVal) {
       const list = newVal && newVal.slice ? newVal.slice() : [];
-      const wasGenerating = (this._prevCardImageGeneratingCids || []).includes(this.cid);
+      const me = Number(this.cid);
+      const wasGenerating = (this._prevCardImageGeneratingCids || []).some((c) => Number(c) === me);
       this._prevCardImageGeneratingCids = list;
-      const nowGenerating = list.includes(this.cid);
+      const nowGenerating = list.some((c) => Number(c) === me);
       if (wasGenerating && !nowGenerating && this.isCardDialogVisible) {
         this.refetchCardImage();
+      }
+    },
+    cardHtmlGeneratingCids(newVal) {
+      const list = newVal && newVal.slice ? newVal.slice() : [];
+      const me = Number(this.cid);
+      const wasGenerating = (this._prevCardHtmlGeneratingCids || []).some((c) => Number(c) === me);
+      this._prevCardHtmlGeneratingCids = list;
+      const nowGenerating = list.some((c) => Number(c) === me);
+      if (wasGenerating && !nowGenerating) {
+        this.cardHasHtmlFile = true;
+        this.cardHtmlIframeKey += 1;
       }
     },
     content(newVal) {
@@ -6337,7 +6782,7 @@ export default {
     },
     async onMenuGenerateHtml() {
       this.cardHtmlMenuVisible = false;
-      if (this.cardHtmlBusy) return;
+      if (this.isCardHtmlBusy) return;
       const username = localStorage.getItem('userId');
       if (!username) return;
       this.cardHtmlBusy = true;
@@ -6361,7 +6806,7 @@ export default {
     },
     async onMenuIterateHtml() {
       this.cardHtmlMenuVisible = false;
-      if (this.cardHtmlBusy) return;
+      if (this.isCardHtmlBusy) return;
       if (!this.cardHasHtmlFile) {
         this.$message.warning('请先生成 HTML 版');
         return;
@@ -6538,6 +6983,55 @@ export default {
         }
         this.$message.warning('无法打开新窗口，请检查浏览器是否拦截了弹出窗口');
       }
+    },
+    /** 从批改结果卡 marker 解析 analysis_id / run_id */
+    parseGradingCardMarker() {
+      const raw = String(
+        (this.cardInfo && this.cardInfo.content) || this.content || ''
+      )
+      const m = raw.match(/<!--\s*nkcn_grading_card:批改·[^|]*\|([^|>]+)\|([^>]+)-->/i)
+      if (!m) return { analysisId: '', runId: '' }
+      return { analysisId: String(m[1] || '').trim(), runId: String(m[2] || '').trim() }
+    },
+    /** 收集本卡 HTML iframe（含打开弹层；兼容多根节点 $el 只指向首节点） */
+    _collectCardHtmlFrames() {
+      const frames = []
+      const seen = new Set()
+      const pushAll = (root) => {
+        if (!root || !root.querySelectorAll) return
+        root.querySelectorAll('iframe.card-html-iframe').forEach((frame) => {
+          if (seen.has(frame)) return
+          seen.add(frame)
+          frames.push(frame)
+        })
+      }
+      pushAll(this.$refs.cardDialog)
+      pushAll(this.$el)
+      try {
+        const cid = String(this.cid || '')
+        if (cid) {
+          document.querySelectorAll('iframe.card-html-iframe').forEach((frame) => {
+            const src = String(frame.getAttribute('src') || '')
+            if (src.includes(`cid=${cid}`) || src.includes(`cid=${encodeURIComponent(cid)}`)) {
+              if (!seen.has(frame)) {
+                seen.add(frame)
+                frames.push(frame)
+              }
+            }
+          })
+        }
+      } catch (e) { /* ignore */ }
+      return frames
+    },
+    _isMessageFromOwnCardHtml(event) {
+      const frames = this._collectCardHtmlFrames()
+      if (frames.some((frame) => frame.contentWindow === event.source)) return true
+      // 兜底：解释精要卡按 analysisId 认领（避免多根节点漏检 iframe）
+      const data = event && event.data
+      if (!data || !this.isGradingExcerptCard) return false
+      const meta = this.parseGradingCardMarker()
+      const aid = String(data.analysisId || data.analysis_id || '').trim()
+      return !!(meta.analysisId && aid && aid === meta.analysisId)
     },
     /** 与 iframe 预览同一接口，在系统浏览器新标签页全页打开（含脚本交互） */
     openCardHtmlInNewTab() {
@@ -9329,15 +9823,298 @@ export default {
         this.judgeScrollToBottom()
         this.$emit('cardClickLog', this.cardInfo.content, this.cardInfo.score, this.cardInfo.reason, this.cardInfo.keyWords, this.cardInfo.contentTitle, this.cardInfo.cid)
         this.refreshCardHtmlFlag()
+        this.crossReorgTab = 'suggest';
+        if ((this.cardInfo.content || '').includes('【文档全面交叉梳理建议卡片】')) {
+          this.loadCrossReorgIndex({ pollIfRunning: true });
+          this.loadKnowledgeConflicts({ pollIfRunning: true });
+        } else {
+          this.stopCrossReorgPoll();
+          this.crossReorgIndex = null;
+          this.stopKcPoll();
+          this.kcData = null;
+        }
       }).catch(error => {
         console.error("An error occurred:", error); // 错误处理
       });
+    },
+
+    switchCrossReorgSkillsTab() {
+      this.crossReorgTab = 'skills';
+      this.loadCrossReorgIndex({ pollIfRunning: true });
+    },
+    switchKnowledgeConflictTab() {
+      this.crossReorgTab = 'conflicts';
+      this.loadKnowledgeConflicts({ pollIfRunning: true });
+    },
+    stopCrossReorgPoll() {
+      if (this.crossReorgPollTimer) {
+        clearInterval(this.crossReorgPollTimer);
+        this.crossReorgPollTimer = null;
+      }
+    },
+    stopKcPoll() {
+      if (this.kcPollTimer) {
+        clearInterval(this.kcPollTimer);
+        this.kcPollTimer = null;
+      }
+    },
+    isKcItemOpen(id) {
+      return !!(this.kcOpenIds && this.kcOpenIds[id]);
+    },
+    toggleKcItem(id) {
+      if (!id) return;
+      this.kcOpenIds = { ...this.kcOpenIds, [id]: !this.kcOpenIds[id] };
+    },
+    kcItemHasDetail(item) {
+      if (!item) return false;
+      const summary = (item.summary || '').trim();
+      const insight = (item.insight || '').trim();
+      return !!(item.tension || item.why_not_forced || (insight && insight !== summary));
+    },
+    loadKnowledgeConflicts({ pollIfRunning = false } = {}) {
+      const username = localStorage.getItem('userId');
+      if (!username) return;
+      this.kcLoading = true;
+      knowledge_conflict_get({ username }).then((res) => {
+        this.kcLoading = false;
+        if (res && res.error_num === 0) {
+          this.kcData = res.conflicts || null;
+          const st = (this.kcData && this.kcData.status) || '';
+          const emptyRunning = !this.kcData && pollIfRunning;
+          if (pollIfRunning && (emptyRunning || st === 'running')) {
+            this.stopKcPoll();
+            this.kcPollTimer = setInterval(() => {
+              knowledge_conflict_status({ username }).then((r2) => {
+                if (r2 && r2.error_num === 0) {
+                  if (r2.conflicts) this.kcData = r2.conflicts;
+                  const jobSt = (r2.job && r2.job.status) || '';
+                  const st2 = (this.kcData && this.kcData.status) || '';
+                  if ((jobSt && jobSt !== 'running') || (st2 && st2 !== 'running' && this.kcData)) {
+                    this.stopKcPoll();
+                  }
+                }
+              }).catch(() => {});
+            }, 4000);
+          }
+        }
+      }).catch(() => {
+        this.kcLoading = false;
+      });
+    },
+    setKcFeedback(item, status) {
+      if (!item || !item.id || this.kcSaving) return;
+      const username = localStorage.getItem('userId');
+      this.kcSaving = true;
+      knowledge_conflict_feedback({
+        username,
+        id: item.id,
+        user_status: status,
+        user_note: item.user_note || '',
+      }).then((res) => {
+        this.kcSaving = false;
+        if (res && res.error_num === 0 && res.item) {
+          Object.assign(item, res.item);
+        } else {
+          this.$message.error((res && res.msg) || '保存失败');
+        }
+      }).catch(() => {
+        this.kcSaving = false;
+        this.$message.error('保存失败');
+      });
+    },
+    onKcNoteChange(item, ev) {
+      if (!item || !item.id) return;
+      const note = (ev && ev.target && ev.target.value) || '';
+      item.user_note = note;
+      const username = localStorage.getItem('userId');
+      knowledge_conflict_feedback({
+        username,
+        id: item.id,
+        user_status: item.user_status || 'pending',
+        user_note: note,
+      }).then((res) => {
+        if (res && res.error_num === 0 && res.item) Object.assign(item, res.item);
+      }).catch(() => {});
+    },
+    loadCrossReorgIndex({ pollIfRunning = false } = {}) {
+      const username = localStorage.getItem('userId');
+      if (!username) return;
+      this.crossReorgLoading = true;
+      cross_reorganize_index({ username }).then((res) => {
+        this.crossReorgLoading = false;
+        if (res && res.error_num === 0) {
+          this.crossReorgIndex = res.index_cross || null;
+          const st = (this.crossReorgIndex && this.crossReorgIndex.status) || '';
+          if (pollIfRunning && (st === 'running' || !this.crossReorgIndex)) {
+            this.stopCrossReorgPoll();
+            this.crossReorgPollTimer = setInterval(() => {
+              cross_reorganize_skills_status({ username }).then((r2) => {
+                if (r2 && r2.error_num === 0 && r2.index_cross) {
+                  this.crossReorgIndex = r2.index_cross;
+                  const st2 = r2.index_cross.status || '';
+                  if (st2 && st2 !== 'running') this.stopCrossReorgPoll();
+                }
+              }).catch(() => {});
+            }, 4000);
+          }
+        }
+      }).catch(() => {
+        this.crossReorgLoading = false;
+      });
+    },
+    openCrossSkillViewer(name, title) {
+      const username = localStorage.getItem('userId');
+      cross_reorganize_skill_get({ username, name }).then((res) => {
+        if (res && res.error_num === 0) {
+          this.crossSkillViewerTitle = title || name;
+          this.crossSkillViewerName = name;
+          this.crossSkillViewerRaw = res.raw || '';
+          this.crossSkillViewerFrontmatter = res.frontmatter || null;
+          this.crossSkillViewMode = 'preview';
+          this.crossSkillViewerVisible = true;
+        } else {
+          this.$message.error((res && res.msg) || '无法打开 Skill');
+        }
+      }).catch((e) => {
+        this.$message.error(e.message || '无法打开 Skill');
+      });
+    },
+    closeCrossSkillViewer() {
+      this.crossSkillViewerVisible = false;
+      this.crossSkillViewerRaw = '';
+      this.crossSkillViewerFrontmatter = null;
+      this.crossSkillViewMode = 'preview';
+    },
+    renderSkillMarkdown(text) {
+      const src = String(text || '').trim();
+      if (!src) return '<p class="skill-md-empty">（无内容）</p>';
+      try {
+        marked.setOptions({ breaks: true, gfm: true });
+        const html = typeof marked.parse === 'function' ? marked.parse(src) : marked(src);
+        return html;
+      } catch (e) {
+        const escaped = src
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        return `<pre>${escaped}</pre>`;
+      }
+    },
+    formatFrontmatterRows(fm) {
+      if (!fm || typeof fm !== 'object') return [];
+      const prefer = ['name', 'description', 'title', 'version', 'license', 'agent_created'];
+      const skip = new Set(['metadata', 'layers', 'compatibility', 'allowed-tools', 'allowed_tools']);
+      const rows = [];
+      const seen = new Set();
+      const pushKey = (key) => {
+        if (seen.has(key) || !(key in fm) || skip.has(key)) return;
+        seen.add(key);
+        const raw = fm[key];
+        if (raw == null) return;
+        if (typeof raw === 'object') return;
+        const value = String(raw).trim();
+        if (!value) return;
+        rows.push({ key, value });
+      };
+      prefer.forEach(pushKey);
+      Object.keys(fm).forEach(pushKey);
+      return rows;
+    },
+    formatSkillDescDisplay(text) {
+      const src = String(text || '');
+      if (!src) return '';
+      const escaped = src
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      return escaped
+        .replace(/\s*(Use\s+when)\b/gi, '<br><span class="skill-desc-mark">$1</span>')
+        .replace(/\s*(NOT\s+for)\b/gi, '<br><span class="skill-desc-mark">$1</span>');
+    },
+    parseFrontmatterRowsFromText(text) {
+      if (!text) return [];
+      const skip = new Set(['metadata', 'layers', 'compatibility', 'allowed-tools', 'allowed_tools']);
+      const lines = text.split(/\r?\n/);
+      const rows = [];
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+        const m = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*)$/);
+        if (!m) {
+          i++;
+          continue;
+        }
+        const key = m[1];
+        let value = (m[2] || '').trim();
+        i++;
+        if (skip.has(key)) {
+          while (i < lines.length) {
+            const next = lines[i];
+            if (/^[A-Za-z0-9_-]+\s*:/.test(next)) break;
+            i++;
+          }
+          continue;
+        }
+        if (value === '|' || value === '>') {
+          const block = [];
+          while (i < lines.length) {
+            const next = lines[i];
+            if (/^[A-Za-z0-9_-]+\s*:/.test(next)) break;
+            if (/^\s*$/.test(next)) {
+              block.push('');
+              i++;
+              continue;
+            }
+            if (!/^\s+/.test(next)) break;
+            block.push(next.replace(/^\s+/, ''));
+            i++;
+          }
+          value = block.join(value === '>' ? ' ' : '\n').replace(/[ \t]+\n/g, '\n').trim();
+        } else if (
+          (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
+          (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
+        ) {
+          value = value.slice(1, -1);
+        } else if (
+          (value.startsWith('"') && !value.endsWith('"')) ||
+          (value.startsWith("'") && !value.endsWith("'"))
+        ) {
+          const quote = value[0];
+          const parts = [value.slice(1)];
+          while (i < lines.length) {
+            const next = lines[i];
+            i++;
+            const qi = next.indexOf(quote);
+            if (qi >= 0) {
+              parts.push(next.slice(0, qi));
+              break;
+            }
+            parts.push(next.trim());
+          }
+          value = parts.join(' ').replace(/\s+/g, ' ').trim();
+        } else if (value !== '') {
+          const cont = [value];
+          while (i < lines.length) {
+            const next = lines[i];
+            if (/^[A-Za-z0-9_-]+\s*:/.test(next)) break;
+            if (/^\s*$/.test(next)) break;
+            if (!/^\s+/.test(next)) break;
+            cont.push(next.replace(/^\s+/, ''));
+            i++;
+          }
+          value = cont.join(' ').replace(/\s+/g, ' ').trim();
+        }
+        if (value) rows.push({ key, value });
+      }
+      return rows;
     },
 
     hideCardDialog() {
       // [TODO] 这里提到有bug，有时关闭卡片关不掉，可能是双击误触？？连续双击？？暂时先注释掉else部分
       // if(this.doubleClick === false) {
         this.stopSpeech()
+        this.stopCrossReorgPoll();
+        this.stopKcPoll();
         this.isCardDialogVisible = false;
         this.cardMediaViewMode = 'image';
         this.cardHtmlMenuVisible = false;
@@ -10094,6 +10871,12 @@ export default {
   max-width: 100%;
 
   overflow: scroll;
+}
+
+/* 解释精要 HTML 含侧栏 + 核验弹窗，打开时加宽加高；其他卡不受影响 */
+.card-dialog.card-dialog--grading-excerpt {
+  width: min(960px, 92vw);
+  height: min(84vh, 920px);
 }
 
 .history-dialog {
@@ -11391,6 +12174,31 @@ export default {
   transition: background-color 0.2s ease;
 }
 
+.nkcn-card-page-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 8px 0 4px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 13px;
+  color: #5b6472;
+}
+.nkcn-card-page-nav button {
+  appearance: none;
+  border: 1px solid #d8d2c6;
+  background: #fff;
+  color: #1f2430;
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.nkcn-card-page-nav button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* 编辑按钮样式 */
 .edit-button {
   margin-left: 10px;
@@ -12206,6 +13014,10 @@ export default {
   border-radius: 8px;
   background: #fff;
 }
+.card-html-iframe.card-html-iframe--grading-excerpt {
+  min-height: 560px;
+  height: min(68vh, 720px);
+}
 .card-html-source-pre {
   margin: 0;
   max-height: 420px;
@@ -12217,5 +13029,623 @@ export default {
   border-radius: 8px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* ========== 交叉梳理 1+n 专区 ========== */
+.cross-reorg-tabs {
+  margin: 8px 0 12px;
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  background: #eef2f6;
+  border-radius: 10px;
+}
+.cross-reorg-tab {
+  border: none;
+  background: transparent;
+  color: #5b6b7c;
+  font-size: 13px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.cross-reorg-tab.active {
+  background: #fff;
+  color: #1f2a37;
+  box-shadow: 0 1px 3px rgba(20, 30, 50, 0.08);
+}
+/* 知识冲突面板 */
+.kc-panel {
+  padding: 14px;
+  background: linear-gradient(165deg, #f7f3ef 0%, #f0f4f8 55%, #eef2f7 100%);
+  border-radius: 12px;
+  margin-bottom: 14px;
+  border: 1px solid #e6ddd3;
+}
+.kc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.kc-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #8a5a2b;
+  background: #f3e4d2;
+  padding: 3px 8px;
+  border-radius: 999px;
+  margin-right: 8px;
+}
+.kc-meta {
+  font-size: 12px;
+  color: #6b7c8f;
+}
+.kc-note {
+  font-size: 12px;
+  color: #7a6a58;
+  background: #fff8f0;
+  border: 1px solid #edd9c3;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0 0 12px;
+}
+.kc-card {
+  background: #fff;
+  border: 1px solid #e8e0d6;
+  border-radius: 12px;
+  padding: 12px 12px 10px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 2px rgba(40, 30, 20, 0.04);
+  border-left: 4px solid #c9a27a;
+}
+.kc-card.kc-st-confirm { border-left-color: #3a9b6a; background: #f7fcf9; }
+.kc-card.kc-st-unsure { border-left-color: #d0a14a; background: #fffbf3; }
+.kc-card.kc-st-deny { border-left-color: #c06a5a; background: #fdf7f6; }
+.kc-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.kc-cat {
+  font-size: 11px;
+  font-weight: 650;
+  color: #8a5a2b;
+  background: #f6ebe0;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.kc-id { font-size: 11px; color: #9aa6b2; }
+.kc-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: #243447;
+  font-weight: 650;
+  line-height: 1.35;
+}
+.kc-summary, .kc-tension, .kc-insight, .kc-why {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #3d4d5f;
+  line-height: 1.5;
+}
+.kc-summary.is-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin-bottom: 6px;
+  color: #52657a;
+}
+.kc-toggle {
+  border: none;
+  background: transparent;
+  color: #6b7c8f;
+  font-size: 12px;
+  padding: 0;
+  margin: 0 0 8px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.kc-toggle:hover { color: #3d4d5f; }
+.kc-detail {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  background: #f7f9fb;
+  border-radius: 8px;
+  border: 1px solid #e8eef4;
+}
+.kc-detail .kc-tension,
+.kc-detail .kc-insight,
+.kc-detail .kc-why { margin-bottom: 6px; }
+.kc-detail .kc-note-box { margin-top: 8px; margin-bottom: 0; }
+.kc-tension b, .kc-insight b, .kc-why b {
+  color: #6b7c8f;
+  font-weight: 650;
+  margin-right: 6px;
+}
+.kc-parties {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+.kc-actions { margin-bottom: 0; }
+.kc-party {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eef2f6;
+  color: #4a5a6a;
+}
+.kc-party.kind-doc { background: #e8f0fa; color: #2f5f8f; }
+.kc-party.kind-pack { background: #eaf6ef; color: #2f6b4a; }
+.kc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.kc-act {
+  border: 1px solid #d8e0e8;
+  background: #fff;
+  color: #5b6b7c;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 550;
+}
+.kc-act.confirm.on { background: #e6f6ee; border-color: #8fc9a8; color: #1f8a55; }
+.kc-act.unsure.on { background: #fff3dc; border-color: #e2c48a; color: #a06a18; }
+.kc-act.deny.on { background: #fdeceb; border-color: #e3a59b; color: #b04a3a; }
+.kc-note-box label {
+  display: block;
+  font-size: 11px;
+  color: #8a96a3;
+  margin-bottom: 4px;
+}
+.kc-note-box textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #e3e9f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #243447;
+  resize: vertical;
+  background: #fafbfc;
+  font-family: inherit;
+  line-height: 1.45;
+}
+.cross-reorg-skills-panel {
+  padding: 12px;
+  background: linear-gradient(180deg, #f4f7fb 0%, #eef2f7 100%);
+  border-radius: 12px;
+  margin-bottom: 14px;
+  border: 1px solid #e3e9f0;
+}
+.cross-reorg-empty {
+  color: #8a96a3;
+  font-size: 13px;
+  padding: 18px 8px;
+  text-align: center;
+}
+.cross-reorg-aim {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #e5ebf1;
+}
+.cross-reorg-aim-label {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 650;
+  color: #6b7c8f;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-right: 8px;
+}
+.cross-reorg-aim-text {
+  font-size: 13px;
+  color: #243447;
+  line-height: 1.55;
+}
+.cross-reorg-status {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 650;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #eef2f6;
+  color: #5b6b7c;
+}
+.cross-reorg-status.st-ok {
+  background: #e8f6ef;
+  color: #1f8a55;
+}
+.cross-reorg-status.st-partial {
+  background: #fff6e6;
+  color: #b76b20;
+}
+.cross-reorg-status.st-failed {
+  background: #fdecec;
+  color: #c45656;
+}
+.cross-reorg-status.st-running {
+  background: #e8f1fc;
+  color: #3a6ea8;
+}
+.cross-reorg-hub-card,
+.cross-reorg-theme-card {
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #e5ebf1;
+  box-shadow: 0 1px 2px rgba(20, 30, 50, 0.04);
+}
+.cross-reorg-hub-card {
+  border-left: 3px solid #3d6ea8;
+}
+.cross-reorg-theme-card.is-failed {
+  border-left: 3px solid #c45656;
+  opacity: 0.92;
+}
+.cross-reorg-hub-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 650;
+  color: #3d6ea8;
+  background: #eaf2fb;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-bottom: 6px;
+}
+.cross-reorg-theme-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.cross-reorg-card-title {
+  font-weight: 650;
+  font-size: 15px;
+  color: #1f2a37;
+}
+.cross-reorg-card-desc {
+  font-size: 13px;
+  color: #4a5a6a;
+  line-height: 1.55;
+  margin: 4px 0 8px;
+}
+.cross-reorg-meta-row {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 6px;
+  align-items: start;
+}
+.cross-reorg-meta-k {
+  color: #8a6a3b;
+  font-weight: 650;
+  padding-top: 1px;
+}
+.cross-reorg-meta-v {
+  color: #3d4a58;
+  line-height: 1.5;
+}
+.cross-reorg-kw-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.cross-reorg-kw {
+  font-size: 11px;
+  color: #3d4a58;
+  background: #f1f4f8;
+  border: 1px solid #e5ebf1;
+  border-radius: 999px;
+  padding: 2px 8px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cross-reorg-kw.more {
+  background: transparent;
+  border-style: dashed;
+  color: #8a96a3;
+}
+.cross-reorg-rel {
+  font-size: 12px;
+  color: #7a8694;
+  line-height: 1.55;
+  margin-bottom: 8px;
+}
+.cross-reorg-rel b {
+  color: #5b6b7c;
+  font-weight: 600;
+  margin-right: 4px;
+}
+.cross-reorg-btn {
+  border: 1px solid #c5d4e6;
+  background: #f5f9fd;
+  color: #2f5f8f;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.cross-reorg-btn:hover {
+  background: #e8f1fc;
+  border-color: #9bb8d9;
+}
+.cross-reorg-err {
+  font-size: 12px;
+  color: #c45656;
+}
+
+/* ========== Skill 查看对话框（对齐 FileCard 文档 Skill 样式） ========== */
+.skill-dlg-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(22, 28, 36, 0.48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30000;
+  padding: 24px;
+}
+.skill-dlg {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(20, 30, 50, 0.22);
+  display: flex;
+  flex-direction: column;
+  width: 920px;
+  max-width: 96vw;
+  max-height: 88vh;
+  overflow: hidden;
+}
+.skill-dlg--edit {
+  width: 980px;
+  max-width: 96vw;
+}
+.skill-dlg-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px 12px;
+  border-bottom: 1px solid #eef1f4;
+  flex-shrink: 0;
+}
+.skill-dlg-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  color: #1f2a37;
+}
+.skill-dlg-sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #7a8694;
+  word-break: break-all;
+}
+.skill-dlg-close {
+  border: none;
+  background: transparent;
+  color: #9aa5b1;
+  font-size: 26px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.skill-dlg-close:hover {
+  background: #f2f4f7;
+  color: #334155;
+}
+.skill-dlg-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px 0;
+  flex-shrink: 0;
+}
+.skill-tabs {
+  display: inline-flex;
+  background: #f1f4f8;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+.skill-tab {
+  border: none;
+  background: transparent;
+  color: #5b6b7c;
+  font-size: 13px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.skill-tab.active {
+  background: #fff;
+  color: #1f2a37;
+  box-shadow: 0 1px 2px rgba(20, 30, 50, 0.08);
+}
+.skill-dlg-body {
+  padding: 12px 22px;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+.skill-dlg-body--edit {
+  display: flex;
+  flex-direction: column;
+}
+.skill-md-preview {
+  flex: 1;
+  min-height: 360px;
+  overflow: auto;
+  border: 1px solid #e5ebf1;
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px 18px;
+}
+.skill-md-source {
+  flex: 1;
+  min-height: 360px;
+  margin: 0;
+  overflow: auto;
+  border: 1px solid #e5ebf1;
+  border-radius: 10px;
+  background: #fbfcfe;
+  padding: 14px 16px;
+  font-family: Consolas, 'SF Mono', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #1f2a37;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.skill-fm-box {
+  border: 1px solid #ebe4d6;
+  background: #faf7f1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+.skill-fm-title {
+  font-size: 11px;
+  font-weight: 650;
+  color: #8a6a3b;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.skill-fm-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 0;
+  align-items: start;
+}
+.skill-fm-key {
+  color: #8a6a3b;
+  font-family: Consolas, 'SF Mono', monospace;
+}
+.skill-fm-val {
+  color: #3d4a58;
+  word-break: break-word;
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+.skill-fm-val.is-description {
+  line-height: 1.65;
+}
+.skill-fm-val :deep(.skill-desc-mark) {
+  display: inline-block;
+  margin-top: 6px;
+  font-weight: 700;
+  color: #8a6a3b;
+}
+.skill-md-body {
+  color: #243447;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.skill-md-body :deep(h1) {
+  font-size: 22px;
+  margin: 0 0 12px;
+  border-bottom: 1px solid #eef1f4;
+  padding-bottom: 8px;
+}
+.skill-md-body :deep(h2) {
+  font-size: 18px;
+  margin: 18px 0 8px;
+}
+.skill-md-body :deep(h3) {
+  font-size: 15px;
+  margin: 14px 0 6px;
+}
+.skill-md-body :deep(p),
+.skill-md-body :deep(ul),
+.skill-md-body :deep(ol) {
+  margin: 0 0 10px;
+}
+.skill-md-body :deep(code) {
+  background: #f1f4f8;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+}
+.skill-md-body :deep(pre) {
+  background: #f6f8fb;
+  border-radius: 8px;
+  padding: 12px;
+  overflow: auto;
+}
+.skill-md-body :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+.skill-md-body :deep(th),
+.skill-md-body :deep(td) {
+  border: 1px solid #e5ebf1;
+  padding: 6px 8px;
+  text-align: left;
+}
+.skill-dlg-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 22px 16px;
+  border-top: 1px solid #eef1f4;
+  flex-shrink: 0;
+  background: #fff;
+}
+.skill-dlg-hint {
+  font-size: 12px;
+  color: #8a96a3;
+}
+.skill-dlg-footer-actions {
+  display: flex;
+  gap: 8px;
+}
+.skill-btn {
+  border: 1px solid #d7dee7;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.skill-btn--ghost:hover {
+  background: #f2f4f7;
 }
 </style>

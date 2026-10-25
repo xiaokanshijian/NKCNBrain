@@ -8,6 +8,7 @@ Tab键触发小模型辅助问题补全模块
 注意：通过中转服务器调用时，复用了get_depth_suggestion接口，task_type设置为'question_enhance'。
 如果8卡服务器不支持此task_type，可以临时使用'qa'类型，或者需要8卡服务器添加对question_enhance任务类型的支持。
 """
+import nkcn_public_config as _public_config
 from openai import OpenAI
 import json
 import os
@@ -18,15 +19,15 @@ from app_chat import scene_context_helper
 def get_small_model_server_url(username):
     """
     根据username从全局变量获取小模型ID，返回对应的服务器URL
-    3007 -> 192.0.2.1
-    3001-3006 -> 192.0.2.1
+    3007 -> 127.0.0.1
+    3001-3006 -> 127.0.0.1
     """
     from app_chat.global_state import GLOBAL_STATE
     model_id = GLOBAL_STATE.user_little_model_id.get(username, "3003")
     if str(model_id) == "3007":
-        return "http://192.0.2.1:8000"
+        return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
     else:
-        return "http://192.0.2.1:8000"
+        return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
 
 
 def enhance_question_with_small_model(user_question, username, scene_name, sub_scene_name, 
@@ -439,8 +440,8 @@ def _enhance_question_via_relay(user_prompt, system_prompt, username):
     """
     通过中转服务器调用8卡服务端小模型
     根据model_id选择服务器地址：
-    - 3007 -> 192.0.2.1:8000
-    - 3001-3006 -> 192.0.2.1:8000
+    - 3007 -> 127.0.0.1:8000
+    - 3001-3006 -> 127.0.0.1:8000
     
     注意：这里复用了get_depth_suggestion接口，task_type设置为'question_enhance'。
     如果8卡服务器暂不支持此task_type，可以临时使用'qa'类型，或需要8卡服务器添加对question_enhance任务类型的支持。
@@ -469,7 +470,7 @@ def _enhance_question_via_relay(user_prompt, system_prompt, username):
         # 从全局变量获取小模型ID
         server_url = get_small_model_server_url(username)
         # 使用curl命令调用中转服务器的深度建议接口（与get_depth_suggestion格式保持一致）
-        # command = f'curl -X POST -H "Content-Type: application/json" -d \'{json_data}\' http://192.0.2.1:8000/get_depth_suggestion'
+        # command = f'curl -X POST -H "Content-Type: application/json" -d \'{json_data}\' http://localhost:8000/get_depth_suggestion'
         command = f'curl -X POST -H "Content-Type: application/json" -d \'{json_data}\' {server_url}/get_depth_suggestion'
         result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 text=True)
@@ -504,7 +505,7 @@ def _enhance_question_via_moonshot(user_prompt, system_prompt):
     直接调用moonshot-v1-8k模型
     """
     try:
-        API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+        API_KEY = _public_config.secret('DEEPSEEK_API_KEY')
         client = OpenAI(
             api_key=API_KEY,
             base_url="https://api.deepseek.com",

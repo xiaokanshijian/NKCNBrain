@@ -1,6 +1,6 @@
 <template>
-  <div class="hg-panel-overlay" :class="{ 'is-page-only': pageViewOnly }">
-    <aside v-if="!pageViewOnly" class="hg-panel">
+  <div class="hg-panel-overlay" :class="{ 'is-page-only': pageViewOnly, 'is-verify-assist': verifyAssist }">
+    <aside v-if="!pageViewOnly && !verifyAssist" class="hg-panel">
       <header class="hg-header">
         <div>
           <div class="hg-title">连续图片批改</div>
@@ -37,27 +37,74 @@
             @click="confirmRerun"
           >迭代</button>
           <button
+            class="hg-rerun-btn"
+            type="button"
+            :disabled="pinLoading || !!(runningTask && !runningTask.completed) || activeRunId !== 'current' || !activeResult"
+            title="把当前批改终态覆盖写入本子结果卡，并仅对诊断卡重新出图/HTML"
+            @click="pinResultCards"
+          >{{ pinLoading ? '沉淀中…' : '重新沉淀' }}</button>
+          <!-- 进度在 mainPage 右下角；关面板也不消失 -->
+          <button
             v-if="canResumeSessionRerun"
             class="hg-rerun-btn hg-resume-rerun-btn"
             type="button"
             :disabled="rerunLoading || !!(runningTask && !runningTask.completed) || !canIncrementalRerun"
-            title="补齐本轮尚未迭代的篇目，并停在原先选择的阶段"
+            title="继续原任务尚未完成的处理，保持原目标和规则"
             @click="resumeSessionRerun"
-          >继续迭代</button>
+          >继续处理</button>
           <button class="hg-cross-btn" type="button" :disabled="pass3Loading" @click="openPass3Dialog">双科交叉诊断</button>
           <button class="hg-close" type="button" @click="$emit('close')">×</button>
         </div>
       </header>
 
-      <div v-if="runningTask && !runningTask.completed" class="hg-progress">
+      <details class="hg-skill-usage">
+        <summary>本次使用 Skill：{{ activeResult?.notebook_skill_usage?.message || '未记录本子 Skill 使用情况' }}</summary>
+        <p v-for="item in activeResult?.notebook_skill_usage?.members || []" :key="item.name">
+          {{ item.title || item.name }}（{{ item.source }}）<span v-if="item.truncated"> · 已按长度节选</span>
+        </p>
+        <p v-for="stage in activeResult?.notebook_skill_usage?.stages || []" :key="stage.phase">
+          {{ stage.label }}：已确认发送 {{ stage.sent }} 次，返回已接受 {{ stage.accepted }} 次，检查点复用 {{ stage.reused }} 次
+        </p>
+        <p v-if="activeResult?.notebook_skill_usage?.status === 'selected'">使用记录包含沿用的阶段记录；方法对内容的影响仍需对照核验。</p>
+        <p v-if="activeResult?.notebook_skill_usage?.unreadable_audits">部分调用记录不可读，使用统计不完整。</p>
+      </details>
+      <div v-if="(runningTask && !runningTask.completed) || rerunLoading" class="hg-progress">
         <div class="hg-progress-title">{{ displayProgressSection }}</div>
         <div class="hg-progress-track">
           <div class="hg-progress-bar" :style="{ width: progressPercent + '%' }"></div>
         </div>
+        <div v-if="rerunLoading" class="hg-progress-hint">正在准备迭代，界面可能停留数十秒到两分钟，并非卡死。</div>
       </div>
 
       <main class="hg-body">
-        <FeedbackBasisCard v-if="false" :result="activeResult" :task="runningTask" />
+        <div v-if="['complete', 'running'].includes(activeResult?.completion?.status)">{{ activeResult.completion.message }}</div>
+        <div v-if="reviewCoverageText">{{ reviewCoverageText }}</div>
+        <div v-if="checkWarning" class="hg-check-warning" role="alert">{{ checkWarning }}</div>
+        <section v-if="userVerification && userVerification.items && userVerification.items.length" class="hg-verify-banner" role="region" aria-label="需加强核实">
+          <div class="hg-verify-banner-head">
+            <strong>{{ userVerification.title || '需加强核实的位置' }}</strong>
+            <span class="hg-verify-counts">
+              <em v-for="group in userVerificationGroups" :key="'c-' + group.level" :class="'is-' + group.level.toLowerCase()">{{ group.level }} {{ group.items.length }}</em>
+            </span>
+          </div>
+          <p class="hg-verify-summary">{{ userVerification.summary }}</p>
+          <div v-for="group in userVerificationGroups" :key="group.level" class="hg-verify-tier">
+            <div class="hg-verify-tier-name">{{ group.title }} <em>{{ group.items.length }}</em></div>
+            <div class="hg-verify-chips">
+              <button
+                v-for="item in group.items"
+                :key="item.qid_global || item.label"
+                type="button"
+                :class="['hg-verify-chip', 'is-' + group.level.toLowerCase()]"
+                @click="jumpToEvidence(item.qid_global)"
+                :title="item.reason || ''"
+              >{{ item.label || item.qid_global }}</button>
+            </div>
+          </div>
+        </section>
+        <section v-if="activeResult" class="hg-basis-strip">
+          <FeedbackBasisStrip :result="activeResult" :task="runningTask" />
+        </section>
         <section v-if="isFinalGradingResult" :class="['hg-red-blue-card', `is-${redBlueReview.color || 'pending'}`]">
           <template v-if="redBlueReady">
             <div class="hg-red-blue-head">
@@ -120,6 +167,48 @@
           </div>
         </section>
 
+        <section v-if="isOpenMaterial && hasOpenMaterialOverview" class="hg-layer hg-layer-open-overview">
+          <div class="hg-layer-header hg-open-overview-header">
+            <span>开放材料反馈</span>
+          </div>
+          <div class="hg-layer-content hg-open-overview-content">
+            <article class="hg-open-overview-card">
+              <h4>主体与版面理解</h4>
+              <div v-if="explanationLayers(openMaterialOverview.subject_and_layout).length" class="hg-three-q">
+                <div v-for="layer in explanationLayers(openMaterialOverview.subject_and_layout)" :key="layer.key" class="hg-three-q-item">
+                  <strong>{{ layer.key }}</strong>
+                  <div v-if="layer.key === '这说明什么' && meanTagParts(layer.text).length" class="hg-mean-tags">
+                    <div v-for="tag in meanTagParts(layer.text)" :key="tag.name"><em>{{ tag.name }}</em>{{ tag.value }}</div>
+                    <p v-if="meanLeftover(layer.text)">{{ meanLeftover(layer.text) }}</p>
+                  </div>
+                  <p v-else>{{ layer.text }}</p>
+                </div>
+              </div>
+              <p v-else>{{ displayText(openMaterialOverview.subject_and_layout) }}</p>
+            </article>
+            <article class="hg-open-overview-card">
+              <h4>内容理解与评述</h4>
+              <div v-if="explanationLayers(openMaterialOverview.content_review).length" class="hg-three-q">
+                <div v-for="layer in explanationLayers(openMaterialOverview.content_review)" :key="layer.key" class="hg-three-q-item">
+                  <strong>{{ layer.key }}</strong>
+                  <div v-if="layer.key === '这说明什么' && meanTagParts(layer.text).length" class="hg-mean-tags">
+                    <div v-for="tag in meanTagParts(layer.text)" :key="tag.name"><em>{{ tag.name }}</em>{{ tag.value }}</div>
+                    <p v-if="meanLeftover(layer.text)">{{ meanLeftover(layer.text) }}</p>
+                  </div>
+                  <p v-else>{{ layer.text }}</p>
+                </div>
+              </div>
+              <p v-else>{{ displayText(openMaterialOverview.content_review) }}</p>
+            </article>
+            <article class="hg-open-overview-card">
+              <h4>下一步建议</h4>
+              <ol>
+                <li v-for="(step, index) in openMaterialNextSteps" :key="index">{{ displayText(step) }}</li>
+              </ol>
+            </article>
+          </div>
+        </section>
+
         <section class="hg-layer hg-layer-diagnosis">
           <button class="hg-layer-header" type="button" @click="expanded.diagnosis = !expanded.diagnosis">
             <span>整篇诊断</span>
@@ -129,10 +218,36 @@
             <div v-if="diagnosisMetaItems.length" class="hg-diagnosis-meta">
               <span v-for="item in diagnosisMetaItems" :key="item.text" :class="['hg-meta-badge', item.warn ? 'is-warn' : '']">{{ item.text }}</span>
             </div>
-            <div v-if="diagnosis.summary" class="hg-summary-card">{{ displayText(diagnosis.summary) }}</div>
-            <div v-if="evolutionNarrative" class="hg-process-card">
+            <div v-if="diagnosis.summary" class="hg-summary-card">
+              <div v-if="diagnosisSummaryLayers.length" class="hg-three-q">
+                <div v-for="layer in diagnosisSummaryLayers" :key="layer.key" class="hg-three-q-item">
+                  <strong>{{ layer.key }}</strong>
+                  <div v-if="layer.key === '这说明什么' && meanTagParts(layer.text).length" class="hg-mean-tags">
+                    <div v-for="tag in meanTagParts(layer.text)" :key="tag.name"><em>{{ tag.name }}</em>{{ tag.value }}</div>
+                    <p v-if="meanLeftover(layer.text)">{{ meanLeftover(layer.text) }}</p>
+                  </div>
+                  <p v-else>{{ layer.text }}</p>
+                </div>
+              </div>
+              <template v-else>{{ displayText(diagnosis.summary) }}</template>
+            </div>
+            <div v-if="unassignedPagesNote" class="hg-process-card" style="border-left: 3px solid #909399;">
+              <div class="hg-process-title">布置范围</div>
+              <div class="hg-process-text">{{ unassignedPagesNote }}</div>
+            </div>
+            <div v-if="showEvolutionNarrative" class="hg-process-card">
               <div class="hg-process-title">学习过程概览</div>
-              <div class="hg-process-text">{{ evolutionNarrative }}</div>
+              <div v-if="evolutionLayers.length" class="hg-three-q">
+                <div v-for="layer in evolutionLayers" :key="layer.key" class="hg-three-q-item">
+                  <strong>{{ layer.key }}</strong>
+                  <div v-if="layer.key === '这说明什么' && meanTagParts(layer.text).length" class="hg-mean-tags">
+                    <div v-for="tag in meanTagParts(layer.text)" :key="tag.name"><em>{{ tag.name }}</em>{{ tag.value }}</div>
+                    <p v-if="meanLeftover(layer.text)">{{ meanLeftover(layer.text) }}</p>
+                  </div>
+                  <p v-else>{{ layer.text }}</p>
+                </div>
+              </div>
+              <div v-else class="hg-process-text">{{ evolutionNarrative }}</div>
             </div>
             <div v-for="block in diagnosisBlocks" :key="block.key" :class="['hg-diag-block', `hg-diag-${block.key}`]">
               <div class="hg-diag-label">{{ block.label }}</div>
@@ -163,7 +278,17 @@
                     <div class="hg-zone-conf-track"><div class="hg-zone-conf-bar" :style="{ width: Math.round((entry.confidence || 0) * 100) + '%' }"></div></div>
                     <span class="hg-zone-conf-val">置信 {{ Math.round((entry.confidence || 0) * 100) }}%</span>
                   </div>
-                  <div v-if="entry.comment" class="hg-zone-comment">{{ entry.comment }}</div>
+                  <div v-if="explanationLayers(entry.comment).length" class="hg-zone-comment">
+                    <div v-for="layer in explanationLayers(entry.comment)" :key="layer.key" class="hg-three-q-item">
+                      <strong>{{ layer.key }}</strong>
+                      <div v-if="layer.key === '这说明什么' && meanTagParts(layer.text).length" class="hg-mean-tags">
+                        <div v-for="tag in meanTagParts(layer.text)" :key="tag.name"><em>{{ tag.name }}</em>{{ tag.value }}</div>
+                        <p v-if="meanLeftover(layer.text)">{{ meanLeftover(layer.text) }}</p>
+                      </div>
+                      <p v-else>{{ layer.text }}</p>
+                    </div>
+                  </div>
+                  <div v-else-if="entry.comment" class="hg-zone-comment">{{ entry.comment }}</div>
                   <div v-if="entry.error_clusters && entry.error_clusters.length" class="hg-zone-clusters">
                     <div v-for="(ec, ecIdx) in entry.error_clusters" :key="ecIdx" class="hg-zone-cluster">
                       <div v-if="ec.cause" class="hg-zone-cluster-cause">· {{ ec.cause }}</div>
@@ -192,7 +317,7 @@
           </div>
         </section>
 
-        <section v-if="sessionTrends.length >= 1" class="hg-layer hg-layer-trend">
+        <section v-if="!isOpenMaterial && sessionTrends.length >= 1" class="hg-layer hg-layer-trend">
           <button class="hg-layer-header" type="button" @click="toggleTrend">
             <span>学习趋势（按篇次）</span>
             <span>{{ expanded.trend ? '收起' : '展开' }}</span>
@@ -202,7 +327,7 @@
           </div>
         </section>
 
-        <section v-if="hasCurriculum" class="hg-layer hg-layer-curriculum">
+        <section v-if="!isOpenMaterial && hasCurriculum" class="hg-layer hg-layer-curriculum">
           <button class="hg-layer-header" type="button" @click="expanded.curriculum = !expanded.curriculum">
             <span>知识点 · 课标掌握度</span>
             <span>{{ expanded.curriculum ? '收起' : '展开' }}</span>
@@ -240,8 +365,221 @@
       </main>
     </aside>
 
-    <div v-if="pageDialogVisible" class="hg-dialog-overlay" @click.self="closePageDialog">
-      <div class="hg-dialog">
+    <div
+      v-if="pageDialogVisible"
+      class="hg-dialog-overlay"
+      :class="{
+        'is-verify-assist': verifyAssist,
+        'is-va-collapsed': verifyAssist && verifyAssistCollapsed,
+      }"
+      @click.self="!verifyAssist && closePageDialog()"
+    >
+      <!-- 核验对照：左原始 / 右批改，中间留给提交弹窗；收起时左右分别收向两侧 -->
+      <template v-if="verifyAssist">
+        <button
+          v-if="verifyAssistCollapsed"
+          type="button"
+          class="hg-va-rail-btn is-left"
+          title="展开对照"
+          @click.stop="verifyAssistCollapsed = false"
+        >
+          <svg class="hg-va-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8.5 6.5 L13.5 12 L8.5 17.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M13.5 6.5 L18.5 12 L13.5 17.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button
+          v-if="verifyAssistCollapsed"
+          type="button"
+          class="hg-va-rail-btn is-right"
+          title="展开对照"
+          @click.stop="verifyAssistCollapsed = false"
+        >
+          <svg class="hg-va-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15.5 6.5 L10.5 12 L15.5 17.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M10.5 6.5 L5.5 12 L10.5 17.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <aside
+          v-show="!verifyAssistCollapsed"
+          class="hg-va-side is-left"
+          :style="{ width: `${verifyAssistLeftWidth}px` }"
+        >
+          <header class="hg-dialog-header hg-va-side-header">
+            <div>
+              <div>第 {{ activePage.page }} 页{{ pageViewModeLabel }}</div>
+              <div class="hg-dialog-meta">{{ activePageIndex + 1 }} / {{ pages.length }}</div>
+            </div>
+            <div class="hg-dialog-actions">
+              <button class="hg-va-toggle" type="button" title="收起（左收 / 右收）" @click="verifyAssistCollapsed = true">
+                <svg class="hg-va-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M15.5 6.5 L10.5 12 L15.5 17.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M10.5 6.5 L5.5 12 L10.5 17.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <button class="hg-close" type="button" title="关闭对照" @click="closePageDialog">×</button>
+            </div>
+          </header>
+          <section
+            v-if="pageViewMode === 'grading' && activePage.feedback_context"
+            class="hg-page-context is-va-compact"
+          >
+            <strong>{{ displayText(activePage.feedback_context.education_level_label) }} · {{ displayText(activePage.feedback_context.grade_label) }} · {{ displayText(activePage.feedback_context.subject_label) }}</strong>
+            <div>{{ displayText(activePage.feedback_context.unit_label) }}</div>
+            <p class="hg-va-context-summary">{{ displayText(activePage.feedback_context.understanding_summary) }}</p>
+          </section>
+          <div class="hg-va-side-body">
+            <div class="hg-image-title">原始页面</div>
+            <div
+              ref="rawImageWrap"
+              class="hg-img-wrap hg-va-raw-stage"
+              :class="{ 'is-loading': pageImageLoading }"
+            >
+              <img
+                v-if="activePage.raw_image_path"
+                ref="rawImageRef"
+                class="hg-page-img"
+                :key="`va-raw-${pageImageLoadToken}-${activePage.raw_image_path}-${assetBustKey()}`"
+                :src="assetUrl(activePage.raw_image_path, { preview: true })"
+                alt="原始页面"
+                decoding="async"
+                @load="onRawImageLoad"
+                @error="onPageImageLoad('raw')"
+              />
+              <div class="hg-box-layer" v-if="verifyFocusQuestion && rawImageMetrics.width">
+                <div
+                  v-show="verifyFocusTagVisible"
+                  class="hg-verify-focus-tag"
+                  :style="verifyFocusTagStyle"
+                >{{ verifyFocusTagText }}</div>
+                <div
+                  class="hg-verify-focus-arrow"
+                  :class="verifyFocusArrowClass"
+                  :style="verifyFocusArrowStyle"
+                  aria-hidden="true"
+                />
+                <div
+                  class="hg-verify-focus-box"
+                  :style="verifyFocusBoxStyle"
+                  :title="questionTitle(verifyFocusQuestion)"
+                  @mouseenter="verifyFocusTagVisible = true"
+                  @mouseleave="verifyFocusTagVisible = false"
+                />
+              </div>
+            </div>
+          </div>
+          <div
+            class="hg-va-resize is-left-panel"
+            title="拖拽调整宽度"
+            @mousedown.prevent="startVerifyAssistResize($event, 'left')"
+          />
+        </aside>
+
+        <aside
+          v-show="!verifyAssistCollapsed"
+          class="hg-va-side is-right"
+          :style="{ width: `${verifyAssistRightWidth}px` }"
+        >
+          <header class="hg-dialog-header hg-va-side-header">
+            <div>
+              <div>{{ rightPaneTitle }}</div>
+              <div class="hg-dialog-meta">第 {{ activePage.page }} 页</div>
+            </div>
+            <div class="hg-dialog-actions">
+              <button class="hg-va-toggle" type="button" title="收起（左收 / 右收）" @click="verifyAssistCollapsed = true">
+                <svg class="hg-va-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M8.5 6.5 L13.5 12 L8.5 17.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M13.5 6.5 L18.5 12 L13.5 17.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <button class="hg-close" type="button" title="关闭对照" @click="closePageDialog">×</button>
+            </div>
+          </header>
+          <div class="hg-va-side-body">
+            <div class="hg-image-title">{{ rightPaneTitle }}</div>
+            <div class="hg-stage" ref="stageRef" :class="{ 'is-loading': pageImageLoading }">
+              <img
+                v-if="activeRightImagePath"
+                ref="annotatedImageRef"
+                class="hg-page-img"
+                :key="`va-right-${pageImageLoadToken}-${activeRightImagePath}-${assetBustKey()}`"
+                :src="assetUrl(activeRightImagePath, { preview: true })"
+                alt="批改页面"
+                decoding="async"
+                @load="onAnnotatedImageLoad"
+                @error="onAnnotatedImageLoad"
+              />
+              <div class="hg-box-layer" v-if="imageMetrics.width">
+                <button
+                  v-for="question in activePage.questions"
+                  :key="`va-${question.id}`"
+                  class="hg-question-box"
+                  type="button"
+                  :class="questionBoxClasses(question)"
+                  :style="questionBoxStyle(question)"
+                  @mouseenter="showQuestionTooltip(question, $event)"
+                  @mousemove="moveQuestionTooltip"
+                  @mouseleave="hideQuestionTooltip"
+                >
+                  <span
+                    v-if="pageViewMode === 'grading' && !useBakedOverlay"
+                    class="hg-confidence-dot"
+                    :style="gradingConfidenceDotStyle(question)"
+                  />
+                  <template v-if="showVerdictMarks">
+                    <span v-if="question.importance === 'HIGH'" class="hg-q-flag hg-q-flag-high">重</span>
+                    <span v-else-if="question.uncertain_reason" class="hg-q-flag hg-q-flag-uncertain">?</span>
+                    <span v-if="question.trend === 'worsening'" class="hg-q-trend hg-q-trend-down">↓</span>
+                    <span v-else-if="question.trend === 'improving'" class="hg-q-trend hg-q-trend-up">↑</span>
+                  </template>
+                </button>
+              </div>
+              <div
+                v-if="hoveredQuestion"
+                class="hg-tooltip"
+                :class="{ 'is-expanded': tooltipExpanded }"
+                :style="tooltipStyle()"
+                @mouseenter="onTooltipEnter"
+                @mouseleave="onTooltipLeave"
+              >
+                <div class="hg-tooltip-title">
+                  <span>{{ questionTitle(hoveredQuestion) }}</span>
+                  <button
+                    v-if="tooltipNeedsExpand(hoveredQuestion)"
+                    type="button"
+                    class="hg-tooltip-expand"
+                    @click.stop="tooltipExpanded = !tooltipExpanded"
+                  >{{ tooltipExpanded ? '收起' : '展开全文' }}</button>
+                </div>
+                <div class="hg-tooltip-body">
+                  <div v-for="row in tooltipRows(hoveredQuestion)" :key="row.label" class="hg-tooltip-row" :class="{ 'is-block': row.layers && row.layers.length }">
+                    <span>{{ row.label }}</span>
+                    <div v-if="row.layers && row.layers.length" class="hg-three-q hg-three-q-compact">
+                      <div v-for="layer in row.layers" :key="layer.key" class="hg-three-q-item">
+                        <strong>{{ layer.key }}</strong>
+                        <div v-if="layer.key === '这说明什么' && meanTagParts(layer.text).length" class="hg-mean-tags">
+                          <div v-for="tag in meanTagParts(layer.text)" :key="tag.name"><em>{{ tag.name }}</em>{{ tag.value }}</div>
+                          <p v-if="meanLeftover(layer.text)">{{ meanLeftover(layer.text) }}</p>
+                        </div>
+                        <p v-else>{{ layer.text }}</p>
+                      </div>
+                    </div>
+                    <strong v-else>{{ row.value }}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div
+            class="hg-va-resize is-right-panel"
+            title="拖拽调整宽度"
+            @mousedown.prevent="startVerifyAssistResize($event, 'right')"
+          />
+        </aside>
+      </template>
+
+      <div v-else class="hg-dialog">
         <header class="hg-dialog-header">
           <div>
             <div>第 {{ activePage.page }} 页{{ pageViewModeLabel }}</div>
@@ -253,6 +591,22 @@
             <button class="hg-close" type="button" @click="closePageDialog">×</button>
           </div>
         </header>
+        <div v-if="pageViewMode === 'grading' && checkWarning" class="hg-check-warning" role="alert">{{ checkWarning }}</div>
+        <section v-if="pageViewMode === 'grading' && activePage.feedback_context" class="hg-page-context">
+          <strong>{{ displayText(activePage.feedback_context.education_level_label) }} · {{ displayText(activePage.feedback_context.grade_label) }} · {{ displayText(activePage.feedback_context.subject_label) }}</strong>
+          <div>{{ displayText(activePage.feedback_context.unit_label) }}</div>
+          <div v-if="explanationLayers(activePage.feedback_context.understanding_summary).length" class="hg-three-q">
+            <div v-for="layer in explanationLayers(activePage.feedback_context.understanding_summary)" :key="layer.key" class="hg-three-q-item">
+              <strong>{{ layer.key }}</strong>
+              <div v-if="layer.key === '这说明什么' && meanTagParts(layer.text).length" class="hg-mean-tags">
+                <div v-for="tag in meanTagParts(layer.text)" :key="tag.name"><em>{{ tag.name }}</em>{{ tag.value }}</div>
+                <p v-if="meanLeftover(layer.text)">{{ meanLeftover(layer.text) }}</p>
+              </div>
+              <p v-else>{{ layer.text }}</p>
+            </div>
+          </div>
+          <p v-else>{{ displayText(activePage.feedback_context.understanding_summary) }}</p>
+        </section>
         <div class="hg-dialog-body">
           <div class="hg-image-pane">
             <div class="hg-image-title">原始页面</div>
@@ -275,6 +629,7 @@
                 v-if="activeRightImagePath"
                 ref="annotatedImageRef"
                 class="hg-page-img"
+                :key="`right-${pageImageLoadToken}-${activeRightImagePath}-${assetBustKey()}`"
                 :src="assetUrl(activeRightImagePath, { preview: true })"
                 alt="批改页面"
                 decoding="async"
@@ -306,11 +661,38 @@
                   </template>
                 </button>
               </div>
-              <div v-if="hoveredQuestion" class="hg-tooltip" :style="tooltipStyle()">
-                <div class="hg-tooltip-title">{{ questionTitle(hoveredQuestion) }}</div>
-                <div v-for="row in tooltipRows(hoveredQuestion)" :key="row.label" class="hg-tooltip-row">
-                  <span>{{ row.label }}</span>
-                  <strong>{{ row.value }}</strong>
+              <div
+                v-if="hoveredQuestion"
+                class="hg-tooltip"
+                :class="{ 'is-expanded': tooltipExpanded }"
+                :style="tooltipStyle()"
+                @mouseenter="onTooltipEnter"
+                @mouseleave="onTooltipLeave"
+              >
+                <div class="hg-tooltip-title">
+                  <span>{{ questionTitle(hoveredQuestion) }}</span>
+                  <button
+                    v-if="tooltipNeedsExpand(hoveredQuestion)"
+                    type="button"
+                    class="hg-tooltip-expand"
+                    @click.stop="tooltipExpanded = !tooltipExpanded"
+                  >{{ tooltipExpanded ? '收起' : '展开全文' }}</button>
+                </div>
+                <div class="hg-tooltip-body">
+                  <div v-for="row in tooltipRows(hoveredQuestion)" :key="row.label" class="hg-tooltip-row" :class="{ 'is-block': row.layers && row.layers.length }">
+                    <span>{{ row.label }}</span>
+                    <div v-if="row.layers && row.layers.length" class="hg-three-q hg-three-q-compact">
+                      <div v-for="layer in row.layers" :key="layer.key" class="hg-three-q-item">
+                        <strong>{{ layer.key }}</strong>
+                        <div v-if="layer.key === '这说明什么' && meanTagParts(layer.text).length" class="hg-mean-tags">
+                          <div v-for="tag in meanTagParts(layer.text)" :key="tag.name"><em>{{ tag.name }}</em>{{ tag.value }}</div>
+                          <p v-if="meanLeftover(layer.text)">{{ meanLeftover(layer.text) }}</p>
+                        </div>
+                        <p v-else>{{ layer.text }}</p>
+                      </div>
+                    </div>
+                    <strong v-else>{{ row.value }}</strong>
+                  </div>
                 </div>
               </div>
             </div>
@@ -363,6 +745,14 @@
           </div>
         </div>
         <div class="hg-rerun-confirm-body">
+          <section class="hg-skill-usage">
+            <label><input v-model="replaceNotebookSkills" type="checkbox" @change="onNotebookSkillsChange"> 重新选择／采用当前 Skill 内容</label>
+            <p v-if="!replaceNotebookSkills">沿用该运行冻结的 Skill 内容。</p>
+            <template v-else>
+              <p>本次将整份重新处理，保留原结果。</p>
+              <NotebookSkillSelector v-model="notebookSkillSelection" :username="skillWorkspace" @valid="notebookSkillValid = $event" />
+            </template>
+          </section>
           <div class="hg-rerun-stage-list">
             <label
               v-for="option in rerunStageOptions"
@@ -371,7 +761,7 @@
                   'hg-rerun-stage-option',
                   {
                     'is-active': selectedRerunStage === option.value,
-                    'is-disabled': (preprocessModeChanged || needsFullRecompute) && option.value !== 'all',
+                    'is-disabled': (preprocessModeChanged || needsFullRecompute || refreshConfiguration || replaceNotebookSkills) && option.value !== 'all',
                   },
                 ]"
               >
@@ -380,7 +770,7 @@
                 type="radio"
                 name="hg-rerun-stage"
                 :value="option.value"
-                :disabled="(preprocessModeChanged || needsFullRecompute) && option.value !== 'all'"
+                :disabled="(preprocessModeChanged || needsFullRecompute || refreshConfiguration || replaceNotebookSkills) && option.value !== 'all'"
               >
               <span>
                 <strong>{{ option.label }}</strong>
@@ -388,6 +778,18 @@
               </span>
             </label>
           </div>
+
+          <section class="hg-rerun-fold is-expanded">
+            <div class="hg-rerun-fold-body hg-current-rules-option">
+              <label class="hg-red-blue-toggle">
+                <input v-model="refreshConfiguration" type="checkbox" @change="onRefreshConfigurationChange">
+                <span>
+                  <strong>采用当前规则，整份重新处理</strong>
+                  <em>读取管理页现行规则；原结果归档保留，不能与分阶段或篇目迭代混用。</em>
+                </span>
+              </label>
+            </div>
+          </section>
 
           <section :class="['hg-rerun-fold', 'is-preprocess', { 'is-expanded': rerunSectionsExpanded.preprocess }]">
             <button
@@ -435,7 +837,7 @@
             </div>
           </section>
 
-          <section :class="['hg-rerun-fold', { 'is-expanded': rerunSectionsExpanded.sessions, 'is-disabled': preprocessModeChanged || needsFullRecompute }]">
+          <section :class="['hg-rerun-fold', { 'is-expanded': rerunSectionsExpanded.sessions, 'is-disabled': preprocessModeChanged || needsFullRecompute || refreshConfiguration || replaceNotebookSkills }]">
             <button
               class="hg-rerun-fold-trigger"
               type="button"
@@ -456,13 +858,13 @@
               <div v-if="rerunSessions.length" class="hg-rerun-session-head">
                 <span>选择本轮要处理的篇目</span>
                 <span>
-                  <button type="button" :disabled="preprocessModeChanged || needsFullRecompute" @click="selectAllRerunSessions">全选</button>
-                  <button type="button" :disabled="preprocessModeChanged || needsFullRecompute" @click="clearRerunSessions">清空</button>
+                  <button type="button" :disabled="preprocessModeChanged || needsFullRecompute || refreshConfiguration || replaceNotebookSkills" @click="selectAllRerunSessions">全选</button>
+                  <button type="button" :disabled="preprocessModeChanged || needsFullRecompute || refreshConfiguration || replaceNotebookSkills" @click="clearRerunSessions">清空</button>
                 </span>
               </div>
               <div v-if="rerunSessions.length" class="hg-rerun-session-list">
                 <label v-for="item in rerunSessions" :key="item.session_id" class="hg-rerun-session-option">
-                  <input v-model="selectedRerunSessionIds" type="checkbox" :value="item.session_id" :disabled="preprocessModeChanged || needsFullRecompute">
+                  <input v-model="selectedRerunSessionIds" type="checkbox" :value="item.session_id" :disabled="preprocessModeChanged || needsFullRecompute || refreshConfiguration || replaceNotebookSkills">
                   <span>{{ rerunSessionLabel(item) }}</span>
                 </label>
               </div>
@@ -524,7 +926,8 @@ import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { resolveHomeworkEvidencePage } from '@/utils/homeworkEvidence'
 import { listCIPass3Pairs, feedbackMaterialSettings } from '@/api/continuous_image'
-import FeedbackBasisCard from './FeedbackBasisCard.vue'
+import FeedbackBasisStrip from './FeedbackBasisCard.vue'
+import NotebookSkillSelector from './NotebookSkillSelector.vue'
 
 const HOMEWORK_INTERNAL_TERM_LABELS = Object.freeze({
   source_lock: '证据来源不足',
@@ -583,7 +986,7 @@ const HOMEWORK_INTERNAL_TERM_LABELS = Object.freeze({
 
 export default {
   name: 'HomeworkGradingPanel',
-  components: { FeedbackBasisCard },
+  components: { FeedbackBasisStrip, NotebookSkillSelector },
   props: {
     activeResult: Object,
     activeAnalysisId: String,
@@ -598,17 +1001,31 @@ export default {
     versionsLoading: Boolean,
     keyVersionLoading: Boolean,
     rerunLoading: Boolean,
+    pinLoading: {
+      type: Boolean,
+      default: false,
+    },
     redBlueRetryLoading: Boolean,
     runningTask: Object,
     pageViewOnly: {
       type: Boolean,
       default: false,
     },
+    /** 提交核验时：左侧停靠逐页对照，不挡卡片 HTML 提交弹窗 */
+    verifyAssist: {
+      type: Boolean,
+      default: false,
+    },
+    /** 核验迭代等回写后刷新标注图，避免浏览器仍显示旧 PNG 上的对错/白灰黑图标 */
+    assetCacheBust: {
+      type: [Number, String],
+      default: 0,
+    },
   },
-  emits: ['close', 'start-pass3', 'rerun', 'retry-red-blue', 'switch-version', 'toggle-key-version'],
+  emits: ['close', 'close-verify-assist', 'start-pass3', 'rerun', 'retry-red-blue', 'switch-version', 'toggle-key-version', 'start-pin-result-cards', 'result-cards-pinned'],
   data() {
     return {
-      expanded: { diagnosis: true, zone: true, trend: true, curriculum: true, pages: true },
+      expanded: { diagnosis: true, zone: true, trend: true, curriculum: true, pages: true, verifyList: false },
       evidenceExpanded: {},
       pageDialogVisible: false,
       pageViewMode: 'grading',
@@ -619,7 +1036,17 @@ export default {
       _prefetchCache: null,
       hoveredQuestion: null,
       tooltipPointer: null,
+      tooltipExpanded: false,
+      tooltipPinned: false,
+      _tooltipHideTimer: null,
       imageMetrics: { left: 0, top: 0, width: 0, height: 0 },
+      rawImageMetrics: { left: 0, top: 0, width: 0, height: 0 },
+      verifyFocusQid: '',
+      verifyFocusTagVisible: true,
+      verifyAssistCollapsed: false,
+      verifyAssistLeftWidth: 460,
+      verifyAssistRightWidth: 520,
+      _vaResize: null,
       // 逐页查看用缩放预览；300DPI 原图太大，直接拉会卡数秒
       pagePreviewWidth: 1600,
       trendChart: null,
@@ -628,6 +1055,10 @@ export default {
       pass3Loading: false,
       pass3Candidates: [],
       rerunConfirmVisible: false,
+      refreshConfiguration: false,
+      replaceNotebookSkills: false,
+      notebookSkillSelection: { enabled: false, names: [] },
+      notebookSkillValid: true,
       selectedRerunStage: 'grading',
       selectedRerunSessionIds: [],
       selectedPreprocessMode: 'scan',
@@ -675,6 +1106,28 @@ export default {
     }
   },
   computed: {
+    skillWorkspace() { return this.activeResult?.manifest?.username || localStorage.getItem('userId') || '' },
+    reviewCoverageText() {
+      const coverage = this.manifest.pass1_review?.coverage
+      if (!coverage) return ''
+      const skipped = (coverage.policy_skipped_pages || []).length
+      const checked = Math.max(0, (coverage.completed_pages || []).length - skipped)
+      return `逐页复核：${checked}页已核对，${skipped}页按当前策略免检，${(coverage.incomplete_pages || []).length}页未完成。`
+    },
+    checkWarning() {
+      const completion = this.runningTask?.completion || this.activeResult?.completion
+      if (completion && ['incomplete', 'unverified'].includes(completion.status)) {
+        return [completion.message, ...(completion.issues || []).map(item => item.message)].join(' ')
+      }
+      if (this.manifest.content_validation?.status === 'needs_review') {
+        return '部分反馈尚未通过核验；已保留有效内容，待复核项不作为确定结论。'
+      }
+      if (this.manifest.hallucination?.status === 'failed') {
+        return '批改复核未完成，结果已保留，请结合原文人工核实。'
+      }
+      return this.manifest.rule_profile?.status === 'failed'
+        ? '部分辅助检查未完成，请结合原文核实建议。' : ''
+    },
     manifest() {
       return this.activeResult?.manifest || {}
     },
@@ -707,8 +1160,9 @@ export default {
       return parts.length ? `当前结果：${parts.join('，')}` : ''
     },
     rerunSubmitDisabled() {
+      if (this.replaceNotebookSkills && !this.notebookSkillValid) return true
       if (this.rerunLoading) return true
-      if (this.needsFullRecompute || this.preprocessModeChanged) return this.selectedRerunStage !== 'all'
+      if (this.needsFullRecompute || this.preprocessModeChanged || this.refreshConfiguration || this.replaceNotebookSkills) return this.selectedRerunStage !== 'all'
       return Boolean(this.rerunSessions.length && !this.selectedRerunSessionIds.length)
     },
     redBlueReview() {
@@ -762,11 +1216,14 @@ export default {
       return this.manifest?.stages?.grading === 'done' || this.manifest?.status === 'completed'
     },
     canRetryRedBlue() {
-      return this.canIncrementalRerun && this.isFinalGradingResult && !this.redBlueReady
+      const action = this.activeResult?.available_actions?.retry_quality
+      return action ? action.enabled : false
     },
     redBlueEmptyText() {
+      const action = this.activeResult?.available_actions?.retry_quality
+      if (action?.reason) return action.reason
       if (this.redBlueReview.status === 'failed') {
-        return '评分待补充。完整批改结果不受影响，可单独重新评分。'
+        return '质量评分待补充。已保留报告，可单独重新评分。'
       }
       return this.canIncrementalRerun
         ? '当前版本尚无卡标，可单独生成；完整批改结果不受影响。'
@@ -781,7 +1238,8 @@ export default {
     },
     /** 可沿用原快照做分阶段/篇目迭代 */
     canIncrementalRerun() {
-      return this.canOpenRerunDialog && this.activeResult?.snapshot_status === 'complete'
+      const action = this.activeResult?.available_actions?.rerun_grading
+      return this.canOpenRerunDialog && (action ? action.enabled : this.activeResult?.snapshot_status === 'complete')
     },
     canRerunCurrentVersion() {
       return this.canOpenRerunDialog
@@ -824,6 +1282,7 @@ export default {
       return value && typeof value === 'object' ? value : {}
     },
     canResumeSessionRerun() {
+      if (this.activeResult?.available_actions?.resume) return this.activeResult.available_actions.resume.enabled
       return this.canIncrementalRerun
         && Boolean(this.sessionRerunState.resume_available)
         && Array.isArray(this.sessionRerunState.remaining_session_ids)
@@ -837,6 +1296,115 @@ export default {
     },
     activePage() {
       return this.pages[this.activePageIndex] || { page: 0, questions: [] }
+    },
+    verifyFocusQuestion() {
+      if (!this.verifyAssist || !this.verifyFocusQid) return null
+      const questions = this.activePage?.questions || []
+      return questions.find(q => String(q.id) === String(this.verifyFocusQid)) || null
+    },
+    verifyFocusTone() {
+      const question = this.verifyFocusQuestion
+      const blue = { solid: '#2d6fae', fill: 'rgba(45, 111, 174, 0.16)' }
+      if (!question) return blue
+      if (this.pageViewMode === 'layout' || this.pageViewMode === 'understanding') {
+        return blue
+      }
+      const verdict = String(question.verdict || '')
+      if (verdict === 'correct') return { solid: '#1f8a3b', fill: 'rgba(31, 138, 59, 0.16)' }
+      if (verdict === 'wrong') return { solid: '#d23b32', fill: 'rgba(210, 59, 50, 0.16)' }
+      if (verdict === 'partial') return { solid: '#d67e23', fill: 'rgba(214, 126, 35, 0.16)' }
+      return blue
+    },
+    verifyFocusBoxStyle() {
+      const geom = this.verifyFocusGeom
+      if (!geom) return { display: 'none' }
+      const tone = this.verifyFocusTone
+      const base = {
+        left: `${geom.left}px`,
+        top: `${geom.top}px`,
+        width: `${geom.width}px`,
+        height: `${geom.height}px`,
+        borderColor: tone.solid,
+        background: tone.fill,
+        borderWidth: '2px',
+      }
+      if (this.pageViewMode === 'layout' || this.pageViewMode === 'understanding') {
+        const question = this.verifyFocusQuestion
+        const confidence = this.pageViewMode === 'layout'
+          ? question.layout_confidence
+          : this.combinedRecognitionUnderstandingConfidence(question)
+        const colors = this.confidenceBoxColors(confidence, this.pageViewMode) || {}
+        return {
+          ...base,
+          ...colors,
+          borderWidth: '2px',
+          borderStyle: 'solid',
+        }
+      }
+      return base
+    },
+    verifyFocusArrowClass() {
+      const geom = this.verifyFocusGeom
+      if (!geom) return ''
+      return geom.placeLeft ? 'is-from-left' : 'is-from-right'
+    },
+    verifyFocusGeom() {
+      const question = this.verifyFocusQuestion
+      const m = this.rawImageMetrics
+      if (!question || !m.width) return null
+      const bbox = question.bbox || this.positionToBbox(question.position)
+      const w = Number(bbox.w || 0)
+      const h = Number(bbox.h || 0)
+      if (!(w > 0) || !(h > 0)) return null
+      const rawW = Math.max(8, w * m.width)
+      const rawH = Math.max(8, h * m.height)
+      const scale = 1.08
+      const width = rawW * scale
+      const height = rawH * scale
+      const left = (m.left + Number(bbox.x || 0) * m.width) - (width - rawW) / 2
+      const top = (m.top + Number(bbox.y || 0) * m.height) - (height - rawH) / 2
+      return {
+        left,
+        top,
+        width,
+        height,
+        placeLeft: left >= 28,
+      }
+    },
+    verifyFocusArrowStyle() {
+      const geom = this.verifyFocusGeom
+      if (!geom) return { display: 'none' }
+      const tone = this.verifyFocusTone
+      const mid = geom.top + geom.height / 2
+      if (geom.placeLeft) {
+        return {
+          left: `${Math.max(2, geom.left - 22)}px`,
+          top: `${mid - 9}px`,
+          borderLeftColor: tone.solid,
+        }
+      }
+      return {
+        left: `${geom.left + geom.width + 6}px`,
+        top: `${mid - 9}px`,
+        borderRightColor: tone.solid,
+      }
+    },
+    verifyFocusTagText() {
+      const question = this.verifyFocusQuestion
+      if (!question) return ''
+      const id = question.id ? String(question.id) : ''
+      return this.isOpenMaterial ? `内容 ${id}` : `题目 ${id}`
+    },
+    verifyFocusTagStyle() {
+      const geom = this.verifyFocusGeom
+      if (!geom) return { display: 'none' }
+      const tagH = 26
+      let top = geom.top - tagH - 4
+      if (top < 2) top = geom.top + geom.height + 4
+      return {
+        left: `${Math.max(2, geom.left)}px`,
+        top: `${top}px`,
+      }
     },
     canPrevPage() {
       return this.activePageIndex > 0
@@ -884,11 +1452,70 @@ export default {
     report() {
       return this.activeResult?.report || {}
     },
+    isOpenMaterial() {
+      const materialType = this.manifest?.feedback_context?.material_type
+        || this.activeResult?.feedback_context?.material_type
+        || ''
+      return materialType === 'notes' || materialType === 'composition'
+    },
+    openMaterialOverview() {
+      const overview = this.report.open_material_overview
+      return overview && typeof overview === 'object' ? overview : {}
+    },
+    openMaterialNextSteps() {
+      return Array.isArray(this.openMaterialOverview.next_steps)
+        ? this.openMaterialOverview.next_steps.filter(item => this.cleanText(item))
+        : []
+    },
+    hasOpenMaterialOverview() {
+      return Boolean(
+        this.cleanText(this.openMaterialOverview.subject_and_layout)
+        && this.cleanText(this.openMaterialOverview.content_review)
+        && this.openMaterialNextSteps.length
+      )
+    },
     diagnosis() {
       return this.report.diagnosis || {}
     },
+    userVerification() {
+      const uv = this.report.user_verification
+      if (uv && typeof uv === 'object' && Array.isArray(uv.items) && uv.items.length) return uv
+      return null
+    },
+    userVerificationGroups() {
+      const items = (this.userVerification && this.userVerification.items) || []
+      const titles = {
+        I: 'I · 最应该优先核验的',
+        II: 'II · 其次应该先核验的',
+        III: 'III · 再次可做核验的',
+      }
+      const groups = ['I', 'II', 'III'].map((level) => ({
+        level,
+        title: titles[level],
+        items: items.filter((it) => String(it.level || '') === level),
+      })).filter((group) => group.items.length)
+      const rest = items.filter((it) => !['I', 'II', 'III'].includes(String(it.level || '')))
+      if (rest.length) groups.push({ level: 'other', title: '需加强核实', items: rest })
+      return groups
+    },
+    unassignedPagesNote() {
+      const note = (this.report && this.report.unassigned_pages_note)
+        || (this.report && this.report.grading_config && this.report.grading_config.note)
+        || ''
+      if (note) return note
+      const pages = (this.report && this.report.unassigned_pages) || []
+      if (Array.isArray(pages) && pages.length) {
+        return '未布置页：' + pages.join(',') + '（本轮未批改）'
+      }
+      return ''
+    },
     hasDiagnosis() {
-      return Boolean(this.diagnosis.summary || this.evolutionNarrative || this.diagnosisBlocks.some(block => block.items.length))
+      return Boolean(
+        this.diagnosis.summary
+        || this.unassignedPagesNote
+        || this.evolutionNarrative
+        || this.diagnosisBlocks.some(block => block.items.length)
+      )
     },
     diagnosisBlocks() {
       return [
@@ -943,6 +1570,17 @@ export default {
       const reportMeta = this.report?._ontology_metadata || {}
       return this.displayPracticeText(this.ontology.evolution_narrative || reportMeta.evolution_narrative || '')
     },
+    showEvolutionNarrative() {
+      const evo = String(this.ontology.evolution_narrative || this.report?._ontology_metadata?.evolution_narrative || '').trim()
+      const summary = String(this.diagnosis.summary || '').trim()
+      return !!(evo && evo !== summary)
+    },
+    diagnosisSummaryLayers() {
+      return this.explanationLayers(this.diagnosis.summary)
+    },
+    evolutionLayers() {
+      return this.explanationLayers(this.ontology.evolution_narrative || this.report?._ontology_metadata?.evolution_narrative || '')
+    },
     ontologyMeta() {
       const o = this.ontology || {}
       const meta = this.activeResult?.sample_meta || {}
@@ -961,6 +1599,9 @@ export default {
       if (this.ontologyMeta.stage) items.push({ text: this.stageDisplayLabel(this.ontologyMeta.stage) })
       if (this.ontologyMeta.sessionCount) items.push({ text: `${this.ontologyMeta.sessionCount}次练习` })
       if (this.ontologyMeta.fallbackUsed) items.push({ text: '含规则兜底建议', warn: true })
+      const effect = this.manifest?.result_cards?.skill_effect || {}
+      if (effect.level) items.push({ text: `方法作用${effect.level}` })
+      else if (effect.source) items.push({ text: '方法作用档未写出', warn: true })
       return items
     },
     masteryTrajectory() {
@@ -983,10 +1624,14 @@ export default {
       return (this.manifest.selected_files || [])[0] || '作业PDF'
     },
     progressPercent() {
+      if (this.rerunLoading && !(this.runningTask && !this.runningTask.completed)) return 12
       if (!this.runningTask || !this.runningTask.total) return 8
       return Math.max(8, Math.min(100, Math.round((this.runningTask.item / this.runningTask.total) * 100)))
     },
     displayProgressSection() {
+      if (this.rerunLoading && !(this.runningTask && !this.runningTask.completed)) {
+        return '正在精选并交叉理解本子 Skill（请稍候）…'
+      }
       return this.formatProgressSection(this.runningTask?.section || '')
     },
     sessionTrends() {
@@ -1004,7 +1649,7 @@ export default {
     window.addEventListener('resize', this.syncImageMetrics)
     window.addEventListener('resize', this.resizeTrendChart)
     window.addEventListener('keydown', this.handlePageKeydown)
-    if (!this.pageViewOnly) {
+    if (!this.pageViewOnly && !this.verifyAssist) {
       this.$nextTick(() => this.renderTrendChart())
     }
   },
@@ -1012,6 +1657,11 @@ export default {
     window.removeEventListener('resize', this.syncImageMetrics)
     window.removeEventListener('resize', this.resizeTrendChart)
     window.removeEventListener('keydown', this.handlePageKeydown)
+    this.stopVerifyAssistResize()
+    if (this._tooltipHideTimer) {
+      clearTimeout(this._tooltipHideTimer)
+      this._tooltipHideTimer = null
+    }
     if (this.trendResizeObserver) {
       this.trendResizeObserver.disconnect()
       this.trendResizeObserver = null
@@ -1023,12 +1673,27 @@ export default {
     this._prefetchCache = null
   },
   watch: {
+    activeAnalysisId() { this.closeRerunConfirm() },
+    activeRunId() { this.closeRerunConfirm() },
+    skillWorkspace() { this.closeRerunConfirm() },
+    verifyAssist(val) {
+      if (val) {
+        this.verifyAssistCollapsed = false
+        // 左右尽量加宽，中间只预留提交弹窗；左边略窄一点更舒服
+        const side = this.defaultVerifyAssistSideWidth()
+        this.verifyAssistRightWidth = side
+        this.verifyAssistLeftWidth = Math.max(320, Math.round(side * 0.88))
+      } else {
+        this.verifyAssistCollapsed = false
+        this.stopVerifyAssistResize()
+      }
+    },
     sessionTrends() {
-      if (this.pageViewOnly || this.pageDialogVisible) return
+      if (this.pageViewOnly || this.verifyAssist || this.pageDialogVisible) return
       this.$nextTick(() => this.renderTrendChart())
     },
     pageViewOnly(val) {
-      if (!val) this.$nextTick(() => this.renderTrendChart())
+      if (!val && !this.verifyAssist) this.$nextTick(() => this.renderTrendChart())
     },
     pages: {
       immediate: true,
@@ -1037,6 +1702,15 @@ export default {
         // 结果就绪后预热首页三种视图预览，缩短点工具栏按钮的首开等待
         this.$nextTick(() => this.prefetchPageAssets(0, ['layout', 'understanding', 'grading']))
       },
+    },
+    assetCacheBust() {
+      // 迭代回写后：清预取、换 img key/src（URL 带 &_=），强制浏览器拉新预览
+      this._prefetchCache = new Set()
+      this.pageImageLoadToken += 1
+      this.$nextTick(() => {
+        this.beginPageImageLoad()
+        this.prefetchPageAssets(this.activePageIndex, ['layout', 'understanding', 'grading'])
+      })
     },
   },
   methods: {
@@ -1056,7 +1730,22 @@ export default {
         ElMessage.warning('该证据无法唯一定位，请从逐页批改中核对原题。')
         return
       }
-      this.openPageAt(idx, this.pageViewMode)
+      this.openPageAt(idx, this.pageViewMode || 'grading')
+      const raw = String(ev || '').trim()
+      const matched = raw.match(/^p(\d+):(.+)$/i)
+      const qid = matched ? matched[2] : raw
+      const page = this.pages[idx]
+      const question = (page?.questions || []).find(q => String(q.id) === String(qid))
+      this.verifyFocusQid = question ? String(question.id) : ''
+      this.verifyFocusTagVisible = true
+      if (question) {
+        this.$nextTick(() => {
+          this.hoveredQuestion = question
+          this.tooltipPinned = true
+          this.tooltipExpanded = true
+          this.syncRawImageMetrics()
+        })
+      }
     },
     trendBadgeText(trend) {
       const map = { improving: '向好', worsening: '需关注', stable: '较稳定' }
@@ -1081,9 +1770,26 @@ export default {
       if (matched) return `第${matched[1]}页 · ${matched[2]}题`
       return raw || '相关题目'
     },
+    /** 预览图缓存戳：迭代戳 / 盘上标注图 mtime / 核验回写时间，避免 Ctrl+F5 后仍吃旧 jpg */
+    assetBustKey(options = {}) {
+      if (options.bust) return String(options.bust)
+      if (this.assetCacheBust) return String(this.assetCacheBust)
+      const assetsVersion = this.activeResult?.assets_version
+        || this.activePage?.asset_mtime
+      if (assetsVersion) return String(assetsVersion)
+      const verifyAt = this.report?.verify_loop?.updated_at
+        || this.activeResult?.report?.verify_loop?.updated_at
+        || this.report?.user_verification?.updated_at
+        || ''
+      if (verifyAt) return String(verifyAt)
+      const mtimeHint = this.activeResult?.manifest?.updated_at
+        || this.manifest?.updated_at
+        || ''
+      return mtimeHint ? String(mtimeHint) : ''
+    },
     assetUrl(path, options = {}) {
       if (!path) return ''
-      const username = localStorage.getItem('userId') || ''
+      const username = this.manifest.username || localStorage.getItem('userId') || ''
       const analysisId = this.activeAnalysisId || this.activeResult?.analysis_id || ''
       const runId = (this.activeRunId || this.activeResult?.run_id || 'current').trim()
       let url = `${API_BASE_URL}/api/ci/layout_visual?path=${encodeURIComponent(path.replace(/\\/g, '/'))}&username=${encodeURIComponent(username)}&analysis_id=${encodeURIComponent(analysisId)}`
@@ -1093,6 +1799,10 @@ export default {
       if (options.preview) {
         const w = Number(options.width || this.pagePreviewWidth) || 1600
         url += `&w=${encodeURIComponent(w)}`
+      }
+      const bust = this.assetBustKey(options)
+      if (bust) {
+        url += `&_=${encodeURIComponent(bust)}`
       }
       return url
     },
@@ -1141,6 +1851,48 @@ export default {
         this.prefetchPageAssets(this.activePageIndex)
       })
     },
+    defaultVerifyAssistSideWidth() {
+      // 中间约留出提交弹窗 + 间距，其余左右平分
+      const centerReserve = 460
+      const gap = 28
+      const avail = Math.max(640, window.innerWidth - centerReserve - gap)
+      const side = Math.floor(avail / 2)
+      return Math.max(360, Math.min(720, side))
+    },
+    verifyAssistSideMaxWidth() {
+      const centerReserve = 420
+      const gap = 24
+      return Math.max(360, Math.min(760, Math.floor((window.innerWidth - centerReserve - gap) / 2)))
+    },
+    startVerifyAssistResize(event, side = 'left') {
+      if (!this.verifyAssist || this.verifyAssistCollapsed) return
+      this.stopVerifyAssistResize()
+      const startX = event.clientX
+      const startW = side === 'right' ? this.verifyAssistRightWidth : this.verifyAssistLeftWidth
+      const max = this.verifyAssistSideMaxWidth()
+      const onMove = (e) => {
+        const delta = e.clientX - startX
+        // 左边栏：向右拖变宽；右边栏：向左拖变宽
+        const next = side === 'right'
+          ? Math.round(startW - delta)
+          : Math.round(startW + delta)
+        const width = Math.max(280, Math.min(max, next))
+        if (side === 'right') this.verifyAssistRightWidth = width
+        else this.verifyAssistLeftWidth = width
+        this.syncImageMetrics()
+        this.syncRawImageMetrics()
+      }
+      const onUp = () => this.stopVerifyAssistResize()
+      this._vaResize = { onMove, onUp }
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    stopVerifyAssistResize() {
+      if (!this._vaResize) return
+      window.removeEventListener('mousemove', this._vaResize.onMove)
+      window.removeEventListener('mouseup', this._vaResize.onUp)
+      this._vaResize = null
+    },
     onPageImageLoad(kind) {
       if (kind !== 'raw' && kind !== 'annotated') return
       // 忽略上一页迟到的 load，避免误清当前页 loading
@@ -1157,16 +1909,36 @@ export default {
       this.onPageImageLoad('annotated')
       this.syncImageMetrics()
     },
+    onRawImageLoad() {
+      this.onPageImageLoad('raw')
+      this.syncRawImageMetrics()
+    },
+    syncRawImageMetrics() {
+      const wrap = this.$refs.rawImageWrap
+      const img = this.$refs.rawImageRef
+      if (!wrap || !img) return
+      const wrapRect = wrap.getBoundingClientRect()
+      const imgRect = img.getBoundingClientRect()
+      if (!imgRect.width || !imgRect.height) return
+      this.rawImageMetrics = {
+        left: imgRect.left - wrapRect.left,
+        top: imgRect.top - wrapRect.top,
+        width: imgRect.width,
+        height: imgRect.height,
+      }
+    },
     versionOptionLabel(ver) {
       const label = ver?.label || ver?.run_id || '版本'
       const context = ver?.feedback_context
       const material = context ? ` · ${context.grade_label || '未知年级'} ${context.subject_name || '未知课程'}` : ' · 未保存材料依据'
       const timeText = this.formatVersionTime(ver?.created_at)
       const keyMark = ver?.is_key_version ? '★ ' : ''
+      const delivery = ver?.completion?.status
+      const deliveryText = delivery === 'incomplete' ? ' · 尚有未完成项' : delivery === 'unverified' ? ' · 未记录完整性核验' : ''
       const scoreText = ver?.red_blue_status === 'ready' && Number.isFinite(Number(ver?.red_blue_score))
         ? ` · 卡标 ${Number(ver.red_blue_score).toFixed(1)}`
         : ''
-      return timeText ? `${keyMark}${label} · ${timeText}${scoreText}${material}` : `${keyMark}${label}${scoreText}${material}`
+      return timeText ? `${keyMark}${label} · ${timeText}${scoreText}${material}${deliveryText}` : `${keyMark}${label}${scoreText}${material}${deliveryText}`
     },
     formatVersionTime(value) {
       const text = String(value || '').trim()
@@ -1194,6 +1966,17 @@ export default {
         isKey: !this.activeVersion.is_key_version,
       })
     },
+    pinResultCards() {
+      if (this.pinLoading || (this.runningTask && !this.runningTask.completed) || this.activeRunId !== 'current') return
+      const analysisId = (this.activeAnalysisId || this.activeResult?.analysis_id || '').trim()
+      const username = this.skillWorkspace
+      if (!analysisId || !username) {
+        this.$message.warning('无法确定当前批改，稍后再试')
+        return
+      }
+      // 进度条由 mainPage 托管，关闭本面板后仍可见
+      this.$emit('start-pin-result-cards', { username, analysisId })
+    },
     confirmRerun() {
       if (this.rerunLoading || (this.runningTask && !this.runningTask.completed) || !this.canOpenRerunDialog) return
       this.selectedRerunStage = this.needsFullRecompute
@@ -1203,6 +1986,10 @@ export default {
         ? []
         : this.rerunSessions.map(item => item.session_id).filter(Boolean)
       this.selectedPreprocessMode = this.currentPreprocessMode
+      this.refreshConfiguration = false
+      this.replaceNotebookSkills = false
+      this.notebookSkillSelection = { enabled: false, names: [] }
+      this.notebookSkillValid = true
       this.useRedBlueFeedback = this.redBlueReady
       this.rerunSectionsExpanded = {
         preprocess: false,
@@ -1220,7 +2007,8 @@ export default {
       const files = Array.isArray(this.activeResult?.manifest?.selected_files)
         ? [...this.activeResult.manifest.selected_files]
         : []
-      const fullRecompute = this.needsFullRecompute
+      if (this.replaceNotebookSkills && !this.notebookSkillValid) return
+      const fullRecompute = this.needsFullRecompute || this.replaceNotebookSkills
       const rerunStage = fullRecompute
         ? 'all'
         : (['all', 'layout', 'understanding', 'grading'].includes(this.selectedRerunStage)
@@ -1228,22 +2016,25 @@ export default {
           : 'grading')
       const sessionIds = this.selectedRerunSessionIds.filter(Boolean)
       const modeChanged = this.preprocessModeChanged
-      if (!fullRecompute && !modeChanged && this.rerunSessions.length && !sessionIds.length) return
+      if (!fullRecompute && !modeChanged && !this.refreshConfiguration && this.rerunSessions.length && !sessionIds.length) return
       if ((fullRecompute || modeChanged) && rerunStage !== 'all') return
 
-      // 完整迭代/完整新跑：带上已保存材料设置，使学段科目类型与材料设置一致；红蓝仍按用户勾选
+      // 只有显式采用当前配置或旧快照不可恢复时才读取当前材料设置；普通完整迭代继续沿用原快照。
       let material = null
-      if (rerunStage === 'all' || fullRecompute) {
+      if (this.refreshConfiguration || this.needsFullRecompute) {
         const filename = String(files[0] || this.activeResult?.manifest?.selected_files?.[0] || '').trim()
-        const username = localStorage.getItem('userId') || ''
+        const username = this.skillWorkspace
         if (filename && username) {
           try {
             const settings = await feedbackMaterialSettings({ username, files: [filename] })
-            if (settings?.error_num === 0 && settings.material_saved && settings.material) {
+            if (settings?.error_num !== 0) throw new Error(settings?.msg || '材料设置读取失败')
+            if (settings.material_saved && settings.material) {
               material = settings.material
             }
           } catch (error) {
             console.warn('[HomeworkGradingPanel] load material settings for rerun failed:', error)
+            this.$message.error(error?.message || '材料设置读取失败，本次未启动')
+            return
           }
         }
       }
@@ -1256,15 +2047,32 @@ export default {
         preprocessMode: this.selectedPreprocessMode,
         useRedBlueFeedback: Boolean(this.useRedBlueFeedback && this.redBlueReady),
         ...(fullRecompute ? { fullRecompute: true } : {}),
+        ...(this.replaceNotebookSkills ? { notebookSkillSelection: {
+          enabled: this.notebookSkillSelection.enabled, names: [...this.notebookSkillSelection.names],
+        } } : {}),
+        ...(this.refreshConfiguration ? { refreshConfiguration: true } : {}),
         ...(material ? { material } : {}),
         // 仅当本次带入材料设置（依据可能变化）时不传篇目；其余情况保持原样传篇目
         ...(!fullRecompute && !modeChanged && !material && sessionIds.length ? { sessionIds } : {}),
       })
     },
+    onNotebookSkillsChange() {
+      if (this.replaceNotebookSkills) {
+        this.selectedRerunStage = 'all'
+        this.selectedRerunSessionIds = []
+      }
+    },
     onPreprocessModeChange() {
       if (this.preprocessModeChanged) {
         this.selectedRerunStage = 'all'
         this.rerunSectionsExpanded.preprocess = true
+      }
+    },
+    onRefreshConfigurationChange() {
+      if (this.refreshConfiguration) {
+        this.selectedRerunStage = 'all'
+        this.selectedRerunSessionIds = []
+        this.rerunSectionsExpanded.sessions = false
       }
     },
     selectAllRerunSessions() {
@@ -1289,7 +2097,7 @@ export default {
       const files = Array.isArray(this.activeResult?.manifest?.selected_files)
         ? [...this.activeResult.manifest.selected_files]
         : []
-      const rerunStage = this.sessionRerunState.rerun_stage
+      const rerunStage = this.activeResult?.available_actions?.resume?.rerun_stage || this.sessionRerunState.rerun_stage
       if (!['all', 'layout', 'understanding', 'grading'].includes(rerunStage)) return
       this.$emit('rerun', { analysisId, files, rerunStage, resume: true })
     },
@@ -1336,6 +2144,53 @@ export default {
           text = text.replace(pattern, (_match, prefix) => `${prefix}${label}`)
         })
       return text.replace(/\b[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+\b/g, '内部信息')
+    },
+    explanationLayers(value) {
+      const raw = this.displayText(value)
+      if (!raw || (!raw.includes('【看到了什么】') && !raw.includes('【这说明什么】') && !raw.includes('【下一步做什么】'))) {
+        return []
+      }
+      const re = /【(看到了什么|这说明什么|下一步做什么)】\s*/g
+      const found = []
+      let match
+      while ((match = re.exec(raw))) {
+        found.push({ key: match[1], start: match.index, end: match.index + match[0].length })
+      }
+      return found.map((item, index) => {
+        const stop = index + 1 < found.length ? found[index + 1].start : raw.length
+        return { key: item.key, text: raw.slice(item.end, stop).trim() }
+      }).filter(item => item.text)
+    },
+    meanLeftover(text) {
+      const raw = String(text || '')
+      const re = /【(?!看到了什么|这说明什么|下一步做什么)([^】]{1,12})】\s*/g
+      const found = []
+      let match
+      while ((match = re.exec(raw))) {
+        found.push({ start: match.index, end: match.index + match[0].length })
+      }
+      if (!found.length) return ''
+      let leftover = ''
+      let last = 0
+      found.slice(0, 5).forEach((item, index) => {
+        leftover += raw.slice(last, item.start)
+        last = index + 1 < found.length ? found[index + 1].start : raw.length
+      })
+      leftover += raw.slice(last)
+      return leftover.replace(/\s+/g, ' ').replace(/^[ ；,，、。.\n]+|[ ；,，、。.\n]+$/g, '').trim()
+    },
+    meanTagParts(text) {
+      const raw = String(text || '')
+      const re = /【(?!看到了什么|这说明什么|下一步做什么)([^】]{1,12})】\s*/g
+      const found = []
+      let match
+      while ((match = re.exec(raw))) {
+        found.push({ name: match[1].trim(), start: match.index, end: match.index + match[0].length })
+      }
+      return found.slice(0, 5).map((item, index) => {
+        const stop = index + 1 < found.length ? found[index + 1].start : raw.length
+        return { name: item.name, value: raw.slice(item.end, stop).trim().slice(0, 24) }
+      }).filter(item => item.name)
     },
     displayText(value) {
       let text = this.localizeInternalTerms(value)
@@ -1421,6 +2276,12 @@ export default {
       this.activePageIndex = Math.max(0, Math.min(index, this.pages.length - 1))
       this.hoveredQuestion = null
       this.tooltipPointer = null
+      this.tooltipExpanded = false
+      this.tooltipPinned = false
+      if (this._tooltipHideTimer) {
+        clearTimeout(this._tooltipHideTimer)
+        this._tooltipHideTimer = null
+      }
       this.imageMetrics = { left: 0, top: 0, width: 0, height: 0 }
       this.pageDialogVisible = true
       this.beginPageImageLoad()
@@ -1432,8 +2293,22 @@ export default {
       this.pageDialogVisible = false
       this.pageViewMode = 'grading'
       this.hoveredQuestion = null
+      this.verifyFocusQid = ''
+      this.rawImageMetrics = { left: 0, top: 0, width: 0, height: 0 }
       this.tooltipPointer = null
+      this.tooltipExpanded = false
+      this.tooltipPinned = false
+      this.verifyAssistCollapsed = false
+      this.stopVerifyAssistResize()
+      if (this._tooltipHideTimer) {
+        clearTimeout(this._tooltipHideTimer)
+        this._tooltipHideTimer = null
+      }
       this.imageMetrics = { left: 0, top: 0, width: 0, height: 0 }
+      if (this.verifyAssist) {
+        this.$emit('close-verify-assist')
+        return
+      }
       if (this.pageViewOnly) {
         this.$emit('close')
       }
@@ -1473,6 +2348,7 @@ export default {
         width: `${Math.max(8, Number(bbox.w || 0) * m.width)}px`,
         height: `${Math.max(8, Number(bbox.h || 0) * m.height)}px`,
       }
+      // 有烘焙标注图时，对错/白灰黑都画在底图上，叠层只负责热区，不再另铺色
       if (this.useBakedOverlay) {
         return base
       }
@@ -1616,10 +2492,19 @@ export default {
       return { ...base, backgroundColor: `rgba(${gray}, ${gray}, ${gray}, 0.92)` }
     },
     showQuestionTooltip(question, event) {
+      if (this._tooltipHideTimer) {
+        clearTimeout(this._tooltipHideTimer)
+        this._tooltipHideTimer = null
+      }
+      if (this.hoveredQuestion !== question) {
+        this.tooltipExpanded = false
+      }
+      this.tooltipPinned = false
       this.hoveredQuestion = question
       this.moveQuestionTooltip(event)
     },
     moveQuestionTooltip(event) {
+      if (this.tooltipPinned || this.tooltipExpanded) return
       const stage = this.$refs.stageRef
       if (!stage || !event) return
       const stageRect = stage.getBoundingClientRect()
@@ -1629,15 +2514,68 @@ export default {
       }
     },
     hideQuestionTooltip() {
-      this.hoveredQuestion = null
-      this.tooltipPointer = null
+      if (this.tooltipExpanded) return
+      if (this._tooltipHideTimer) clearTimeout(this._tooltipHideTimer)
+      this._tooltipHideTimer = setTimeout(() => {
+        this._tooltipHideTimer = null
+        if (this.tooltipPinned || this.tooltipExpanded) return
+        this.hoveredQuestion = null
+        this.tooltipPointer = null
+        this.tooltipExpanded = false
+      }, 120)
+    },
+    onTooltipEnter() {
+      if (this._tooltipHideTimer) {
+        clearTimeout(this._tooltipHideTimer)
+        this._tooltipHideTimer = null
+      }
+      this.tooltipPinned = true
+    },
+    onTooltipLeave() {
+      this.tooltipPinned = false
+      if (this.tooltipExpanded) return
+      if (this._tooltipHideTimer) clearTimeout(this._tooltipHideTimer)
+      this._tooltipHideTimer = setTimeout(() => {
+        this._tooltipHideTimer = null
+        if (this.tooltipPinned || this.tooltipExpanded) return
+        this.hoveredQuestion = null
+        this.tooltipPointer = null
+      }, 80)
+    },
+    tooltipNeedsExpand(question) {
+      const rows = this.tooltipRows(question) || []
+      let chars = 0
+      for (const row of rows) {
+        if (row.layers && row.layers.length) {
+          for (const layer of row.layers) chars += String(layer.text || '').length
+        } else {
+          chars += String(row.value || '').length
+        }
+      }
+      return chars > 180
     },
     tooltipStyle() {
-      const pointer = this.tooltipPointer || { x: this.imageMetrics.left + this.imageMetrics.width / 2, y: this.imageMetrics.top + 24 }
-      const tooltipWidth = 300
-      const left = Math.max(8, pointer.x - tooltipWidth - 12)
-      const top = Math.max(8, pointer.y - 28)
-      return { left: `${left}px`, top: `${top}px` }
+      const stage = this.$refs.stageRef
+      const stageW = stage ? stage.clientWidth : (this.imageMetrics.width || 800)
+      const stageH = stage ? stage.clientHeight : (this.imageMetrics.height || 600)
+      const pointer = this.tooltipPointer || {
+        x: this.imageMetrics.left + this.imageMetrics.width / 2,
+        y: this.imageMetrics.top + 24,
+      }
+      const tooltipWidth = this.tooltipExpanded ? Math.min(420, stageW - 16) : Math.min(360, Math.max(280, stageW * 0.42))
+      const maxH = this.tooltipExpanded ? Math.min(stageH * 0.72, 480) : Math.min(stageH * 0.42, 280)
+      let left = pointer.x - tooltipWidth - 12
+      if (left < 8) left = Math.min(pointer.x + 16, stageW - tooltipWidth - 8)
+      left = Math.max(8, Math.min(left, stageW - tooltipWidth - 8))
+      let top = pointer.y - 28
+      if (top + maxH > stageH - 8) top = Math.max(8, stageH - maxH - 8)
+      if (top < 8) top = 8
+      return {
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${tooltipWidth}px`,
+        maxHeight: `${maxH}px`,
+      }
     },
     positionToBbox(position) {
       if (!Array.isArray(position) || position.length !== 4) return {}
@@ -1646,6 +2584,12 @@ export default {
       return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 }
     },
     questionTitle(question) {
+      if (this.isOpenMaterial) {
+        const contentId = question.id ? `内容 ${question.id}` : '内容'
+        if (this.pageViewMode === 'layout') return `${contentId} · 版面`
+        if (this.pageViewMode === 'understanding') return `${contentId} · 识别与理解`
+        return `${contentId} · 内容反馈`
+      }
       const id = question.id ? `题目 ${question.id}` : '题目'
       if (this.pageViewMode === 'layout') return `${id} · 版面`
       if (this.pageViewMode === 'understanding') return `${id} · 识别与理解`
@@ -1776,6 +2720,13 @@ export default {
       return this.selfReviewComment(question)
     },
     tooltipRows(question) {
+      const markingRows = [
+        { label: '印刷文字与标记', value: this.cleanText(question.printed_text_marked) },
+        { label: '手写内容与笔色', value: this.cleanText(question.handwritten_text_marked) },
+        { label: '标注关系', value: (Array.isArray(question.annotation_links) ? question.annotation_links : [])
+          .map(link => [link.marked_text, link.annotation_text, link.relation].filter(Boolean).join('；')).join('\n') },
+        { label: '标记提示', value: (Array.isArray(question.marking_warnings) ? question.marking_warnings : []).join('；') },
+      ].filter(row => row.value)
       const zoneRow = this.confidenceZoneRow(question)
       if (this.pageViewMode === 'layout') {
         const crossPageText = question.cross_page
@@ -1789,6 +2740,7 @@ export default {
           { label: '大题号', value: this.cleanText(question.parent_group_id) },
           { label: '大题', value: this.cleanText(question.parent_stem_excerpt) },
           { label: '本题', value: this.cleanText(question.stem_excerpt) },
+          ...markingRows,
           { label: '跨页', value: crossPageText },
           zoneRow,
         ].filter(row => row.value)
@@ -1797,12 +2749,15 @@ export default {
         return [
           { label: '题号', value: this.cleanText(question.id) },
           { label: '学生作答', value: this.cleanText(question.student_answer) },
+          ...markingRows,
           { label: '理解', value: this.cleanText(question.understanding) },
           { label: '参考答案', value: this.cleanText(question.correct_answer) },
           zoneRow,
         ].filter(row => row.value)
       }
       const feedback = question.feedback || {}
+      const comment = this.tooltipComment(question)
+      const commentLayers = this.explanationLayers(comment)
       return [
         { label: '错误类型', value: this.errorTypeLabel(question.error_type) },
         { label: '知识点', value: this.kpName(this.cleanText(question.knowledge_point)) },
@@ -1810,9 +2765,25 @@ export default {
         { label: '趋势', value: this.trendLabel(question.trend) },
         { label: '认知区域', value: this.displayText(feedback.zone_label) },
         { label: '待确认原因', value: this.uncertainReasonLabel(question.uncertain_reason) },
-        { label: '批语', value: this.tooltipComment(question) },
+        { label: '批语', value: comment, layers: commentLayers },
+        ...markingRows,
+        { label: '理解', value: this.cleanText(question.understanding) },
         zoneRow,
       ].filter(row => row.value)
+    },
+    stripCurriculumCodes(value) {
+      // 只去掉 EN_S2_040 这类课标码；保留 [tense_usage, 理解, 语音] 与中文说明
+      const key = String(value || '').trim()
+      if (!key) return ''
+      const line = key.match(/^([A-Z]{2}_S\d+_\d+)(\s*\[[^\]]*\])?(?:\s+(.+))?$/)
+      if (line) {
+        const meta = (line[2] || '').trim()
+        const desc = (line[3] || '').trim()
+        const parts = [meta, desc].filter(Boolean)
+        if (parts.length) return parts.join(' ')
+        return ''
+      }
+      return key.replace(/\b[A-Z]{2}_S\d+_\d+\b/g, '').replace(/\s{2,}/g, ' ').trim()
     },
     kpName(label) {
       const key = String(label || '').trim()
@@ -1824,11 +2795,24 @@ export default {
       }
       if (this.kpNameMap[key]) return this.kpNameMap[key]
       if (localMap[key]) return localMap[key]
+      const stripped = this.stripCurriculumCodes(key)
+      if (stripped && stripped !== key) {
+        if (this.kpNameMap[stripped]) return this.kpNameMap[stripped]
+        return stripped
+      }
+      if (/^[A-Z]{2}_S\d+_\d+$/.test(key)) {
+        return this.kpNameMap[key] || '相关知识点'
+      }
       return this.safeInternalLabel(key, '相关知识点')
     },
     safeInternalLabel(value, fallback) {
       const text = String(value || '').trim()
       if (!text) return ''
+      if (/^[A-Z]{2}_S\d+_\d+$/.test(text)) return fallback
+      if (/[A-Z]{2}_S\d+_\d+/.test(text)) {
+        const stripped = this.stripCurriculumCodes(text)
+        return stripped || fallback
+      }
       if (/^[A-Za-z][A-Za-z0-9_/-]*$/.test(text)) return fallback
       return text
     },
@@ -1996,6 +2980,19 @@ export default {
 </script>
 
 <style scoped>
+.hg-skill-usage { padding: 12px 18px; font-size: 13px; overflow-wrap: anywhere; }
+.hg-skill-usage p { margin: 8px 0; line-height: 1.5; }
+.hg-page-context {
+  padding: 12px 20px;
+  background: #f3f7fc;
+  border-bottom: 1px solid #dce5ee;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  max-height: 25vh;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+.hg-page-context p { margin: 4px 0 0; }
 .hg-panel-overlay {
   position: fixed;
   inset: 0;
@@ -2005,12 +3002,23 @@ export default {
   justify-content: flex-end;
 }
 
-.hg-panel-overlay.is-page-only {
+.hg-panel-overlay.is-page-only,
+.hg-panel-overlay.is-verify-assist {
   background: transparent;
   pointer-events: none;
 }
 
-.hg-panel-overlay.is-page-only .hg-dialog-overlay {
+.hg-panel-overlay.is-page-only .hg-dialog-overlay,
+.hg-panel-overlay.is-verify-assist .hg-dialog-overlay {
+  pointer-events: none;
+}
+
+.hg-panel-overlay.is-verify-assist .hg-va-side,
+.hg-panel-overlay.is-verify-assist .hg-va-rail-btn {
+  pointer-events: auto;
+}
+
+.hg-panel-overlay.is-page-only:not(.is-verify-assist) .hg-dialog-overlay {
   pointer-events: auto;
 }
 
@@ -2063,6 +3071,105 @@ export default {
   overflow: auto;
   padding: 16px 18px;
 }
+
+.hg-check-warning {
+  flex-shrink: 0;
+  margin: 10px 18px;
+  padding: 10px 12px;
+  border: 1px solid #e7c887;
+  border-radius: 6px;
+  background: #fff8e8;
+  color: #785419;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.hg-verify-banner {
+  flex-shrink: 0;
+  margin: 10px 18px;
+  padding: 12px 14px;
+  border: 1px solid #e8b4b0;
+  border-left: 4px solid #c45c54;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fff6f5 0%, #fffaf8 100%);
+  color: #5a2e2a;
+}
+.hg-verify-banner-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.hg-verify-banner-head strong { font-size: 14px; }
+.hg-verify-counts { display: flex; gap: 8px; font-size: 12px; }
+.hg-verify-counts em {
+  font-style: normal;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #f8e4e2;
+  color: #a33d36;
+}
+.hg-verify-summary {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #6b3f3a;
+}
+.hg-verify-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.hg-verify-chip {
+  appearance: none;
+  border: 1px solid #d0dbe8;
+  background: #e8eef5;
+  color: #3b6ea5;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.hg-verify-chip.is-critical {
+  background: #fdecea;
+  border-color: #ecc0bc;
+  color: #a5342c;
+}
+.hg-verify-chip.is-careful {
+  background: #fff4e5;
+  border-color: #edd2a8;
+  color: #8a5a14;
+}
+.hg-verify-tier { margin: 0 0 8px; }
+.hg-verify-tier-name {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 2px 0 4px;
+  color: #5a2e2a;
+}
+.hg-verify-tier-name em { font-style: normal; font-weight: 600; margin-left: 4px; }
+.hg-verify-chip.is-i { background: #fdecea; border-color: #ecc0bc; color: #a5342c; }
+.hg-verify-chip.is-ii { background: #fff4e5; border-color: #edd2a8; color: #8a5a14; }
+.hg-verify-chip.is-iii { background: #f4f1ea; border-color: #ddd4c4; color: #5c5346; }
+.hg-verify-counts em.is-i { background: #f8e4e2; color: #a33d36; }
+.hg-verify-counts em.is-ii { background: #fff4e5; color: #8a5a14; }
+.hg-verify-counts em.is-iii { background: #f4f1ea; color: #5c5346; }
+.hg-verify-chip:hover { filter: brightness(0.97); }
+.hg-verify-more {
+  appearance: none;
+  border: 1px dashed #c4a8a4;
+  background: #fff;
+  color: #7a4a44;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.hg-verify-chips.is-full { margin-top: 6px; }
 
 .hg-layer {
   border: 1px solid #e1e8f3;
@@ -2442,6 +3549,13 @@ export default {
   background: #fff;
 }
 
+.hg-progress-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #8a97ab;
+  line-height: 1.4;
+}
+
 .hg-progress-title {
   font-size: 12px;
   color: #53647d;
@@ -2470,6 +3584,21 @@ export default {
   justify-content: center;
 }
 
+.hg-dialog-overlay.is-verify-assist {
+  z-index: 2400;
+  background: transparent;
+  justify-content: space-between;
+  align-items: stretch;
+  padding: 10px;
+  gap: 0;
+}
+
+.hg-dialog-overlay.is-verify-assist.is-va-collapsed {
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 10px 8px;
+}
+
 .hg-dialog {
   width: min(1180px, 94vw);
   max-height: 92vh;
@@ -2478,6 +3607,140 @@ export default {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.hg-va-side {
+  position: relative;
+  height: calc(100vh - 20px);
+  max-width: min(46vw, 720px);
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 36px rgba(20, 32, 50, 0.22);
+  border: 1px solid #d9e2ef;
+  transition: transform 0.22s ease, opacity 0.18s ease;
+}
+
+.hg-va-side.is-left {
+  margin-right: auto;
+}
+
+.hg-va-side.is-right {
+  margin-left: auto;
+}
+
+.hg-va-side-header {
+  flex-shrink: 0;
+  padding: 10px 12px;
+}
+
+.hg-va-side-header .hg-dialog-meta {
+  font-size: 11px;
+}
+
+.hg-page-context.is-va-compact {
+  flex-shrink: 0;
+  max-height: 72px;
+  overflow: hidden;
+  padding: 6px 10px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #5a6b82;
+  border-bottom: 1px solid #e8eef6;
+}
+
+.hg-page-context.is-va-compact strong {
+  font-size: 11px;
+  font-weight: 650;
+  color: #3a4a63;
+}
+
+.hg-page-context.is-va-compact .hg-va-context-summary {
+  margin: 2px 0 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: #718096;
+}
+
+.hg-va-side-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 10px 12px;
+}
+
+.hg-va-side-body .hg-image-title {
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.hg-va-resize {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 3;
+}
+
+.hg-va-resize.is-left-panel {
+  right: -3px;
+}
+
+.hg-va-resize.is-right-panel {
+  left: -3px;
+}
+
+.hg-va-resize::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 3px;
+  height: 36px;
+  margin-top: -18px;
+  border-radius: 2px;
+  background: #c5d0e0;
+}
+
+.hg-va-toggle,
+.hg-va-rail-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d5deea;
+  border-radius: 6px;
+  background: #f4f7fb;
+  color: #5a6b82;
+  cursor: pointer;
+  padding: 0;
+}
+
+.hg-va-toggle:hover,
+.hg-va-rail-btn:hover {
+  background: #eaf0f8;
+  color: #2d6fae;
+}
+
+.hg-va-rail-btn {
+  margin-top: 8px;
+  box-shadow: 0 4px 14px rgba(20, 32, 50, 0.16);
+}
+
+.hg-va-rail-btn.is-right {
+  margin-left: auto;
+}
+
+.hg-va-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 
 .hg-dialog-meta {
@@ -2545,6 +3808,57 @@ export default {
   pointer-events: none;
 }
 
+.hg-va-raw-stage {
+  position: relative;
+}
+
+.hg-verify-focus-box {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: auto;
+  border: 2px solid #2d6fae;
+  border-radius: 3px;
+  background: rgba(45, 111, 174, 0.16);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.92);
+  z-index: 2;
+}
+
+.hg-verify-focus-tag {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(24, 34, 52, 0.94);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+  white-space: nowrap;
+}
+
+.hg-verify-focus-arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  z-index: 3;
+  pointer-events: none;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.95));
+}
+
+.hg-verify-focus-arrow.is-from-left {
+  border-top: 9px solid transparent;
+  border-bottom: 9px solid transparent;
+  border-left: 16px solid #2d6fae;
+}
+
+.hg-verify-focus-arrow.is-from-right {
+  border-top: 9px solid transparent;
+  border-bottom: 9px solid transparent;
+  border-right: 16px solid #2d6fae;
+}
+
 .hg-question-box {
   position: absolute;
   pointer-events: auto;
@@ -2589,19 +3903,52 @@ export default {
 .hg-tooltip {
   position: absolute;
   z-index: 5;
-  width: min(300px, 42vw);
+  display: flex;
+  flex-direction: column;
+  width: min(360px, 48vw);
   padding: 10px;
   border-radius: 6px;
   background: rgba(24, 34, 52, 0.94);
   color: #fff;
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
-  pointer-events: none;
+  pointer-events: auto;
+  overflow: hidden;
 }
 
 .hg-tooltip-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-weight: 700;
   font-size: 12px;
   margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.hg-tooltip-expand {
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+  color: #d7e6f8;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.2;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.hg-tooltip-expand:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.hg-tooltip-body {
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding-right: 2px;
+  overscroll-behavior: contain;
 }
 
 .hg-tooltip-row {
@@ -2622,6 +3969,54 @@ export default {
   font-weight: 500;
   word-break: break-word;
   white-space: pre-wrap;
+}
+.hg-tooltip-row.is-block {
+  grid-template-columns: 1fr;
+}
+.hg-three-q-compact {
+  gap: 6px;
+}
+.hg-tooltip .hg-three-q-item strong {
+  color: #d7e6f8;
+}
+.hg-tooltip .hg-three-q-item p {
+  color: #fff;
+}
+
+/* open material overview */
+.hg-open-overview-header {
+  cursor: default;
+}
+
+.hg-open-overview-content {
+  display: grid;
+  gap: 10px;
+}
+
+.hg-open-overview-card {
+  border: 1px solid #d8e5f4;
+  border-radius: 6px;
+  background: #f8fbff;
+  padding: 10px 12px;
+}
+
+.hg-open-overview-card h4 {
+  margin: 0 0 6px;
+  color: #245f98;
+  font-size: 13px;
+}
+
+.hg-open-overview-card p,
+.hg-open-overview-card ol {
+  margin: 0;
+  color: #2f3c55;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.hg-open-overview-card ol {
+  padding-left: 20px;
 }
 
 /* diagnosis section */
@@ -2659,6 +4054,33 @@ export default {
   font-size: 13px;
   line-height: 1.7;
   color: #2a3b55;
+}
+.hg-three-q {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hg-three-q-item strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #1f4e79;
+}
+.hg-three-q-item p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.hg-mean-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hg-mean-tags em {
+  font-style: normal;
+  margin-right: 6px;
+  color: #1f4e79;
+}
+.hg-basis-strip {
+  margin-bottom: 10px;
 }
 
 .hg-process-card {

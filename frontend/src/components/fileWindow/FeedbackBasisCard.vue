@@ -1,6 +1,6 @@
 <template>
-  <section class="feedback-basis-card">
-    <strong>本版本材料信息</strong>
+  <section class="feedback-basis-strip">
+    <strong>本版本材料依据</strong>
     <p v-if="context">{{ context.education_level_name || '未知学段' }} · {{ context.grade_label || '未知年级' }} · {{ context.subject_name || '未知课程' }} · {{ context.material_name || '未知类型' }}</p>
     <p v-else>此版本未保存可恢复的材料信息，原结果仍可查看。</p>
     <p v-if="context">{{ context.curriculum_binding ? `已绑定课标 · 版本 ${context.curriculum_binding.version}` : '未绑定课标' }}</p>
@@ -22,7 +22,7 @@
 
 <script>
 export default {
-  name: 'FeedbackBasisCard',
+  name: 'FeedbackBasisStrip',
   props: { result: Object, task: Object },
   computed: {
     context() { return this.result?.feedback_context || (!this.result ? this.task?.feedback_context : null) },
@@ -54,9 +54,9 @@ export default {
 </script>
 
 <style scoped>
-.feedback-basis-card { background: #f7f9fc; border: 1px solid #dce3ed; border-radius: 8px; padding: 12px; margin-bottom: 14px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
-.feedback-basis-card p { margin: 5px 0; }
-.feedback-basis-card summary { cursor: pointer; color: #385779; }
-.feedback-basis-card .el-alert { margin: 8px 0; }
-.feedback-basis-card code { font-size: 11px; word-break: break-all; }
+.feedback-basis-strip { background: #f7f9fc; border: 1px solid #dce3ed; border-radius: 8px; padding: 12px; margin-bottom: 14px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.feedback-basis-strip p { margin: 5px 0; }
+.feedback-basis-strip summary { cursor: pointer; color: #385779; }
+.feedback-basis-strip .el-alert { margin: 8px 0; }
+.feedback-basis-strip code { font-size: 11px; word-break: break-all; }
 </style>

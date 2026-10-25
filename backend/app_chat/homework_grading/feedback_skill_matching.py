@@ -2,7 +2,8 @@
 import copy
 
 from .feedback_context import freeze_feedback_context
-from .feedback_skills import load_registry, validate_manifest
+from .feedback_skills import validate_manifest
+from .feedback_capabilities import load_capability_registry
 
 
 def scope_reason(manifest, metadata, unit_type='question'):
@@ -46,12 +47,14 @@ def _conflicts(a, b):
 
 def compose_skills(metadata, skills=None, *, unit_type='question', exclusions=None):
     if skills is None:
-        skills, registry_exclusions = load_registry()
+        skills, registry_exclusions = load_capability_registry()
     else:
         registry_exclusions = []
     excluded = copy.deepcopy((exclusions or []) + registry_exclusions)
     candidates=[]
     for skill in skills:
+        if skill['content'].get('resource_schema') not in (None, 'feedback-capabilities-v1'):
+            raise ValueError('不支持的冻结能力资源格式')
         manifest=skill['content']['manifest']
         validate_manifest(manifest)
         reason=scope_reason(manifest,metadata,unit_type)
@@ -95,5 +98,9 @@ def compose_skills(metadata, skills=None, *, unit_type='question', exclusions=No
 
 def bind_skills(metadata, *, skills=None, curriculum_binding=None):
     selected,audit=compose_skills(metadata,skills)
+    if skills is None:
+        from .managed_feedback_rules import bind_managed_rules
+        selected, managed_ids = bind_managed_rules(metadata, selected)
+        audit['managed_rule_ids'] = managed_ids
     context=freeze_feedback_context(metadata,skill_bindings=[{k:s[k] for k in ('id','version','content_hash')} for s in selected],curriculum_binding=curriculum_binding)
     return context,selected,audit

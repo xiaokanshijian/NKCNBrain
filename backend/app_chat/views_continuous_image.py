@@ -1,3 +1,4 @@
+import nkcn_public_config as _public_config
 import base64
 import json
 import os
@@ -69,6 +70,7 @@ from app_chat.ci.auto_iteration import (
 from app_chat.ci.layout_iteration import iterate_ci_layout_regions
 from app_chat.homework_classifier import ensure_homework_attrs_for_file, is_homework_pdf_attrs, is_pdf_filename, load_document_attrs
 from app_chat.homework_grading.feedback_request import resolve_feedback_request
+from app_chat.feedback_material_settings import merge_saved_material_settings
 from app_chat.homework_grading.service import (
     build_homework_analysis_id,
     check_homework_stage_ready,
@@ -112,15 +114,15 @@ from app_chat.homework_grading.pass3_service import (
 from app_chat.ci._utils import _safe_json_dump, _safe_json_load
 
 
-_REFINE_GEMINI_BASE = 'https://www.dmxapi.cn/v1'
-_REFINE_GEMINI_KEY = os.environ.get("DMX_API_KEY", "")
+_REFINE_GEMINI_BASE = _public_config.endpoint('NKCN_REVIEW_GATEWAY_V1_URL', 'http://localhost:9999/v1')
+_REFINE_GEMINI_KEY = _public_config.secret('NKCN_LLM_DMXAPI_API_KEY')
 _REFINE_GEMINI_MODEL = 'gemini-3.1-pro-preview'
 _REFINE_QWEN_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
 _REFINE_QWEN_KEY = (
     os.environ.get('DEEPSEEK_API_KEY_ALI')
     or os.environ.get('DASHSCOPE_API_KEY')
     or os.environ.get('NKCN_SNIPPET_QWEN_API_KEY')
-    or os.environ.get("DASHSCOPE_API_KEY", "")
+    or _public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY')
 )
 _REFINE_QWEN_MODEL = 'qwen3.6-plus'
 _REFINE_T_HISTORY_FILE = 't_layer_refine_history.json'
@@ -454,11 +456,18 @@ def ci_query(request):
         clean_files = [f for f in files if f]
         feedback_request = None
         if len(clean_files) == 1 and is_pdf_filename(clean_files[0]):
+            effective_data, _ = merge_saved_material_settings(
+                getattr(request, 'ci_workspace', '') or username,
+                clean_files[0],
+                data,
+            )
             feedback_request = resolve_feedback_request(
-                clean_files[0], data.get('feedback_overrides'), data.get('requested_action', 'auto'),
+                clean_files[0], effective_data.get('feedback_overrides'), effective_data.get('requested_action', 'auto'),
                 legacy_attrs=load_document_attrs(username, clean_files[0], scene_name=scene_name),
             )
         result = query_ci_analyses(username, clean_files)
+        from app_chat.homework_grading.feedback_task_recovery import enrich_query_records
+        enrich_query_records(username, result.get('singles', []))
         if feedback_request is not None:
             from app_chat.ci._utils import _resolve_user_file_path
             from app_chat.homework_grading.feedback_observation import collect_observation
@@ -507,6 +516,11 @@ def ci_start(request):
         if requested_action == 'grading' and (mode != 'single' or len(files) != 1 or not is_pdf_filename(files[0])):
             return JsonResponse({'error_num': 1, 'msg': '批改当前仅支持单份PDF'})
         if mode == 'single' and len(files) == 1 and is_pdf_filename(files[0]):
+            data, _ = merge_saved_material_settings(
+                getattr(request, 'ci_workspace', '') or username,
+                files[0],
+                data,
+            )
             resolution = resolve_feedback_request(
                 files[0], data.get('feedback_overrides'), requested_action,
                 legacy_attrs=load_document_attrs(username, files[0], scene_name=scene_name),
@@ -596,6 +610,7 @@ def ci_progress(request, task_id):
     if not task:
         return JsonResponse({
             'error_num': 1, 'msg': '任务不存在',
+            'error_code': 'task_not_found', 'retryable': False,
             'current_item': 0, 'total_items': 0,
             'current_section': '任务记录缺失', 'completed': False, 'error': '任务不存在',
         })
@@ -605,11 +620,22 @@ def ci_progress(request, task_id):
             task = recover_abandoned_task(task)
         except (OSError, ValueError, KeyError) as exc:
             return JsonResponse({'error_num': 1, 'msg': f'任务恢复检查失败: {exc}',
+                                 'error_code': 'recovery_unavailable', 'retryable': True,
                                  'completed': False, 'failure_stage': 'recovery', 'error': str(exc)})
+    completion = task.get('completion')
+    if task.get('_ci_persistent') and task.get('task_kind') in ('homework_grading', 'homework_red_blue_review'):
+        from app_chat.homework_grading.feedback_task_recovery import completion_for_task
+        try:
+            completion = completion_for_task(task)
+        except (OSError, ValueError, KeyError):
+            return JsonResponse({'error_num': 1, 'msg': '批改状态暂不可读，请重新连接',
+                                 'error_code': 'result_state_unavailable', 'retryable': True})
     return JsonResponse({
         'error_num': 0,
         'current_item': task.get('current_item', 0),
         'run_id': task.get('run_id', ''),
+        'completion': completion,
+        'workspace': task.get('_ci_workspace') or task.get('username', ''),
         'config_fingerprint': task.get('config_fingerprint', ''),
         'status': task.get('status', ''),
         'failure_stage': task.get('failure_stage', ''),
@@ -864,7 +890,9 @@ def ci_homework_rerun(request):
         files = manifest.get('selected_files') or []
         if len(files) != 1 or not isinstance(files[0], str):
             raise ValueError('原运行未保存单份PDF文件名，请从材料入口完整新跑')
-        return JsonResponse(start_grading_request(username, files[0], data, rerun=True))
+        from app_chat.feedback_material_identity import resolve_source_filename
+        filename = resolve_source_filename(username, files[0], manifest.get('source_document_sha256'))
+        return JsonResponse(start_grading_request(username, filename, data, rerun=True))
     except Exception as exc:
         return JsonResponse({'error_num': 1, 'msg': f'迭代失败: {exc}'})
 
@@ -879,6 +907,8 @@ def ci_homework_red_blue_retry(request):
         data = json.loads(request.body)
         username = (data.get('username') or '').strip()
         analysis_id = (data.get('analysis_id') or '').strip()
+        if data.get('run_id') not in (None, '', 'current'):
+            return JsonResponse({'error_num': 1, 'msg': '历史版本仅供查看，请切回当前版本再评分'})
         if not username or not analysis_id:
             return JsonResponse({'error_num': 1, 'msg': '缺少 username 或 analysis_id'})
         if not is_homework_analysis_id(analysis_id):
@@ -887,6 +917,169 @@ def ci_homework_red_blue_retry(request):
         return JsonResponse(start_quality_retry(username, analysis_id, sid=data.get('sid')))
     except Exception as e:
         return JsonResponse({'error_num': 1, 'msg': f'重新评分失败: {e}'})
+
+
+@csrf_exempt
+@ci_access
+def ci_homework_pin_result_cards(request):
+    """重新沉淀：可选重调模型生成可点短句，再钉卡（异步任务，前端右下角轮询进度）。"""
+    if request.method != 'POST':
+        return JsonResponse({'error_num': 1, 'msg': '仅支持POST'})
+    try:
+        data = json.loads(request.body)
+        username = (data.get('username') or '').strip()
+        analysis_id = (data.get('analysis_id') or '').strip()
+        run_id = data.get('run_id')
+        force_regen = bool(
+            data.get('force_regen_suggestions')
+            or data.get('regen_suggestions')
+            or data.get('force_regen')
+        )
+        rebuild_verification = bool(
+            data.get('rebuild_user_verification')
+            or data.get('regen_user_verification')
+        )
+        if rebuild_verification:
+            force_regen = True
+        if run_id not in (None, '', 'current'):
+            return JsonResponse({'error_num': 1, 'msg': '历史版本仅供查看，请切回当前版本再沉淀'})
+        if not username or not analysis_id:
+            return JsonResponse({'error_num': 1, 'msg': '缺少 username 或 analysis_id'})
+        if not is_homework_analysis_id(analysis_id):
+            return JsonResponse({'error_num': 1, 'msg': '非作业批改分析'})
+        from app_chat.homework_grading.result_cards import start_pin_result_cards_job
+        job_id = start_pin_result_cards_job(
+            username,
+            analysis_id,
+            force_regen_suggestions=force_regen,
+            rebuild_user_verification=rebuild_verification,
+        )
+        return JsonResponse({
+            'error_num': 0,
+            'msg': 'started',
+            'job_id': job_id,
+            'force_regen_suggestions': force_regen,
+            'rebuild_user_verification': rebuild_verification,
+        })
+    except Exception as e:
+        return JsonResponse({'error_num': 1, 'msg': f'重新沉淀失败: {e}'})
+
+
+@csrf_exempt
+@ci_access
+def ci_homework_pin_result_cards_status(request):
+    """轮询重新沉淀任务进度。"""
+    if request.method != 'POST':
+        return JsonResponse({'error_num': 1, 'msg': '仅支持POST'})
+    try:
+        data = json.loads(request.body)
+        job_id = str(data.get('job_id') or '').strip()
+        if not job_id:
+            return JsonResponse({'error_num': 1, 'msg': '缺少 job_id'})
+        from app_chat.homework_grading.result_cards import get_pin_job
+        job = get_pin_job(job_id)
+        if not job:
+            return JsonResponse({'error_num': 1, 'msg': '任务不存在或已过期'})
+        return JsonResponse({'error_num': 0, 'msg': 'success', 'job': job})
+    except Exception as e:
+        return JsonResponse({'error_num': 1, 'msg': f'查询进度失败: {e}'})
+
+
+@csrf_exempt
+@ci_access
+def ci_homework_verify_save(request):
+    """解释精要/核实闭环：保存单条人工核验结果（不立刻重批）。"""
+    if request.method != 'POST':
+        return JsonResponse({'error_num': 1, 'msg': '仅支持POST'})
+    try:
+        data = json.loads(request.body)
+        username = (data.get('username') or '').strip()
+        analysis_id = (data.get('analysis_id') or '').strip()
+        if data.get('run_id') not in (None, '', 'current'):
+            return JsonResponse({'error_num': 1, 'msg': '历史版本仅供查看，请切回当前版本再核验'})
+        if not username or not is_homework_analysis_id(analysis_id):
+            return JsonResponse({'error_num': 1, 'msg': '缺少本子或有效批改标识'})
+        from app_chat.homework_grading import verify_loop as vl
+        item = vl.save_verification_item(
+            username,
+            analysis_id,
+            qid_global=str(data.get('qid_global') or '').strip(),
+            label=str(data.get('label') or '').strip(),
+            verdict=str(data.get('verdict') or '').strip(),
+            step_notes=data.get('step_notes') if isinstance(data.get('step_notes'), dict) else {},
+        )
+        bundle = vl.load_verifications(username, analysis_id)
+        return JsonResponse({
+            'error_num': 0,
+            'msg': 'success',
+            'item': item,
+            'verified_count': len(bundle.get('items') or {}),
+        })
+    except Exception as e:
+        return JsonResponse({'error_num': 1, 'msg': f'保存核验失败: {e}'})
+
+
+@csrf_exempt
+@ci_access
+def ci_homework_verify_list(request):
+    """列出当次批改已提交的核验记录。"""
+    if request.method != 'POST':
+        return JsonResponse({'error_num': 1, 'msg': '仅支持POST'})
+    try:
+        data = json.loads(request.body)
+        username = (data.get('username') or '').strip()
+        analysis_id = (data.get('analysis_id') or '').strip()
+        if not username or not is_homework_analysis_id(analysis_id):
+            return JsonResponse({'error_num': 1, 'msg': '缺少本子或有效批改标识'})
+        from app_chat.homework_grading import verify_loop as vl
+        bundle = vl.load_verifications(username, analysis_id)
+        return JsonResponse({'error_num': 0, 'msg': 'success', 'verifications': bundle})
+    except Exception as e:
+        return JsonResponse({'error_num': 1, 'msg': f'读取核验失败: {e}'})
+
+
+@csrf_exempt
+@ci_access
+def ci_homework_verify_iterate(request):
+    """按已提交核验局部重批并回写当次结果（异步任务）。"""
+    if request.method != 'POST':
+        return JsonResponse({'error_num': 1, 'msg': '仅支持POST'})
+    try:
+        data = json.loads(request.body)
+        username = (data.get('username') or '').strip()
+        analysis_id = (data.get('analysis_id') or '').strip()
+        if data.get('run_id') not in (None, '', 'current'):
+            return JsonResponse({'error_num': 1, 'msg': '历史版本仅供查看，请切回当前版本再迭代更新'})
+        if not username or not is_homework_analysis_id(analysis_id):
+            return JsonResponse({'error_num': 1, 'msg': '缺少本子或有效批改标识'})
+        from app_chat.homework_grading import verify_loop as vl
+        bundle = vl.load_verifications(username, analysis_id)
+        if not (bundle.get('items') or {}):
+            return JsonResponse({'error_num': 1, 'msg': '请先至少提交一条核验结果'})
+        job_id = vl.start_verify_iterate_job(username, analysis_id)
+        return JsonResponse({'error_num': 0, 'msg': 'started', 'job_id': job_id})
+    except Exception as e:
+        return JsonResponse({'error_num': 1, 'msg': f'启动迭代更新失败: {e}'})
+
+
+@csrf_exempt
+@ci_access
+def ci_homework_verify_iterate_status(request):
+    """轮询核验迭代任务进度。"""
+    if request.method != 'POST':
+        return JsonResponse({'error_num': 1, 'msg': '仅支持POST'})
+    try:
+        data = json.loads(request.body)
+        job_id = str(data.get('job_id') or '').strip()
+        if not job_id:
+            return JsonResponse({'error_num': 1, 'msg': '缺少 job_id'})
+        from app_chat.homework_grading import verify_loop as vl
+        job = vl.get_job(job_id)
+        if not job:
+            return JsonResponse({'error_num': 1, 'msg': '任务不存在或已过期'})
+        return JsonResponse({'error_num': 0, 'msg': 'success', 'job': job})
+    except Exception as e:
+        return JsonResponse({'error_num': 1, 'msg': f'查询进度失败: {e}'})
 
 
 @csrf_exempt
@@ -1768,40 +1961,14 @@ def ci_overlay_iterate(request):
 
 
 def _ci_layout_preview_path(abs_path: str, max_w: int) -> str:
-    parent = os.path.dirname(abs_path)
-    stem = os.path.splitext(os.path.basename(abs_path))[0]
-    return os.path.join(parent, f'.preview_w{max_w}_{stem}.jpg')
+    from app_chat.homework_grading.layout_preview import preview_path
+    return preview_path(abs_path, max_w)
 
 
 def _ci_ensure_layout_preview(abs_path: str, max_w: int) -> Tuple[str, str]:
     """按需生成并落盘预览 JPEG；失败则回退原图。"""
-    preview = _ci_layout_preview_path(abs_path, max_w)
-    try:
-        src_stat = os.stat(abs_path)
-        if os.path.isfile(preview):
-            prv_stat = os.stat(preview)
-            if prv_stat.st_mtime >= src_stat.st_mtime and prv_stat.st_size > 0:
-                return preview, 'image/jpeg'
-        from PIL import Image
-        with Image.open(abs_path) as img:
-            img = img.convert('RGB') if img.mode not in ('RGB', 'L') else img
-            if img.mode == 'L':
-                img = img.convert('RGB')
-            w, h = img.size
-            if w > max_w:
-                new_h = max(1, int(round(h * (max_w / float(w)))))
-                # Pillow>=9 用 Resampling；兼容旧版
-                try:
-                    resample = Image.Resampling.LANCZOS
-                except AttributeError:
-                    resample = Image.LANCZOS
-                img = img.resize((max_w, new_h), resample)
-            img.save(preview, format='JPEG', quality=82, optimize=True)
-        return preview, 'image/jpeg'
-    except Exception as exc:
-        print(f'[ci_layout_visual] 预览生成失败，回退原图: {abs_path} w={max_w} err={exc}', flush=True)
-        mime_type, _ = mimetypes.guess_type(abs_path)
-        return abs_path, (mime_type or 'application/octet-stream')
+    from app_chat.homework_grading.layout_preview import ensure_preview
+    return ensure_preview(abs_path, max_w, force=False)
 
 
 def _ci_file_etag(abs_path: str) -> str:
@@ -1868,12 +2035,16 @@ def ci_layout_visual(request):
     if preview_w and ext != '.pdf':
         serve_path, mime_type = _ci_ensure_layout_preview(abs_path, preview_w)
 
+    # 前端带 &_= 缓存戳时禁止长缓存，迭代回写后才能立刻看到新预览
+    cache_bust = (request.GET.get('_') or '').strip()
+    cache_control = 'private, no-cache' if cache_bust else 'private, max-age=86400'
+
     etag = _ci_file_etag(serve_path)
     if_none_match = (request.META.get('HTTP_IF_NONE_MATCH') or '').strip()
-    if if_none_match and if_none_match == etag:
+    if if_none_match and if_none_match == etag and not cache_bust:
         resp = HttpResponseNotModified()
         resp['ETag'] = etag
-        resp['Cache-Control'] = 'private, max-age=86400'
+        resp['Cache-Control'] = cache_control
         resp['Access-Control-Allow-Origin'] = '*'
         resp['Cross-Origin-Resource-Policy'] = 'cross-origin'
         return resp
@@ -1883,7 +2054,7 @@ def ci_layout_visual(request):
         resp = FileResponse(f, content_type=mime_type)
         resp['Content-Disposition'] = f'inline; filename="{os.path.basename(serve_path)}"'
         resp['ETag'] = etag
-        resp['Cache-Control'] = 'private, max-age=86400'
+        resp['Cache-Control'] = cache_control
         resp['X-Frame-Options'] = 'SAMEORIGIN'
         resp['Access-Control-Allow-Origin'] = '*'
         resp['Cross-Origin-Resource-Policy'] = 'cross-origin'
@@ -2678,7 +2849,7 @@ def ci_grade_understanding(request):
 
         gemini_cfg = {
             'model': 'gemini-3.1-pro-preview',
-            'base_url': 'https://www.dmxapi.cn/v1',
+            'base_url': _public_config.endpoint('NKCN_REVIEW_GATEWAY_V1_URL', 'http://localhost:9999/v1'),
             'api_key': _REFINE_GEMINI_KEY,
         }
         gemini_prompt = (

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="320" viewBox="0 0 720 320">
+<rect width="720" height="320" fill="#f1f5f9"/><text x="40" y="60" font-family="sans-serif" font-size="24" fill="#334155">Public demo · configure your own data</text>
+<rect x="40" y="100" width="640" height="160" rx="12" fill="white"/>
+<path d="M80 220 L170 180 L260 195 L350 145 L440 165 L530 125 L620 135" fill="none" stroke="#3b82f6" stroke-width="4"/>
+</svg>

@@ -87,9 +87,9 @@ export default {
       // alert(this.selectedValue);
       if(this.selectedValue==="0.self_attn.k_proj.weight")
       {
-        this.selectedImage="zym_img/0.png";
-        this.selectedImage2="zym_img/2.png";
-        this.selectedImage3="zym_img/3.png";
+        this.selectedImage="public-example.svg";
+        this.selectedImage2="public-example.svg";
+        this.selectedImage3="public-example.svg";
       }
       else
       {
@@ -163,4 +163,4 @@ export default {
   border-radius: 5px;
 }
 </style>
-<!--path=../../../public/zym_img/0.png-->
+<!--path=../../../public/public-example.svg-->

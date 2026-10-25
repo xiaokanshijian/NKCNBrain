@@ -8,7 +8,7 @@
   "config": {
     "model_name": "claude-3-5-sonnet-20241022-X",
     "openai_api_key": "env:ANTHROPIC_API_KEY",
-    "openai_api_base": "https://chat.cloudapi.vip/v1/",
+    "openai_api_base": "env:NKCN_MODEL_GATEWAY_V1_URL",
     "default_headers": {
       "x-foo": "true"
     },

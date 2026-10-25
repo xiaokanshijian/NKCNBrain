@@ -1,5 +1,5 @@
+import nkcn_public_config as _public_config
 #encoding=utf-8
-import os
 import re
 import argparse
 import string
@@ -97,8 +97,8 @@ def post_process_claude_response(response_text):
 
 def make_claude_text_requests(user_prompt, system_prompt="", model=None):
     client = OpenAI(
-        api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-        base_url='https://chat.cloudapi.vip/v1/',
+        api_key=_public_config.secret('OPENAI_API_KEY'),
+        base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
         default_headers={"x-foo": "true"}
     )
     if model is None:
@@ -171,8 +171,8 @@ async def make_claude_text_requests_async(user_prompt, system_prompt=""):
     # )
     # return message.content[0].text
     client = OpenAI(
-        api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-        base_url='https://chat.cloudapi.vip/v1/',
+        api_key=_public_config.secret('OPENAI_API_KEY'),
+        base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
         default_headers={"x-foo": "true"}
     )
     message = client.chat.completions.create(
@@ -190,7 +190,7 @@ async def make_claude_text_requests_async(user_prompt, system_prompt=""):
 def make_gpt4o_text_requests(user_prompt, system_prompt=""):
     res = ""
     client = OpenAI(
-        api_key=os.environ.get("OPENAI_API_KEY", ""),
+        api_key=_public_config.secret('NKCN_CLAUDE_API_API_KEY'),
     )
     response = client.chat.completions.create(
         model='gpt-4o',
@@ -205,8 +205,8 @@ def make_gpt4o_text_requests(user_prompt, system_prompt=""):
 
 def make_claude_image_text_requests(user_prompt, base64_image, system_prompt="", use_fixed_params=False, text_after_image=None):
     client = OpenAI(
-        api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-        base_url='https://chat.cloudapi.vip/v1/',
+        api_key=_public_config.secret('OPENAI_API_KEY'),
+        base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
         default_headers={"x-foo": "true"},
     )
 
@@ -280,8 +280,8 @@ def get_question_split(question, answer, username, special_prompt, depth_suggest
     if depth_suggestion:
         user_prompt += "\n\n【追问策略建议】（小模型建议，供你生成追问时作为重要参考之一）：\n" + depth_suggestion
     client = OpenAI(
-        api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-        base_url='https://chat.cloudapi.vip/v1/',
+        api_key=_public_config.secret('OPENAI_API_KEY'),
+        base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
         default_headers={"x-foo": "true"},
     )
     response = client.chat.completions.create(

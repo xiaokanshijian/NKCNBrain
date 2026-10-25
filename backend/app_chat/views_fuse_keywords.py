@@ -2,6 +2,7 @@
 """
 🔥 关键词融合相关的视图函数
 """
+import nkcn_public_config as _public_config
 import json
 import os
 import re
@@ -25,15 +26,15 @@ import pandas as pd
 def get_small_model_server_url(username):
     """
     根据username从全局变量获取小模型ID，返回对应的服务器URL
-    3007 -> 192.0.2.1
-    3001-3006 -> 192.0.2.1
+    3007 -> 127.0.0.1
+    3001-3006 -> 127.0.0.1
     """
     from app_chat.global_state import GLOBAL_STATE
     model_id = GLOBAL_STATE.user_little_model_id.get(username, "3003")
     if str(model_id) == "3007":
-        return "http://192.0.2.1:8000"
+        return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
     else:
-        return "http://192.0.2.1:8000"
+        return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
 
 
 # 自定义to_thread函数（兼容Python 3.7+）
@@ -1797,7 +1798,7 @@ def confirm_fuse_keyword(request):
             async def get_evalSFT():
                 try:
                     text = full_content.replace("\n", "\\n")
-                    # command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","text":"{text}"}}\' http://192.0.2.1:8000/invoke_rate'
+                    # command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","text":"{text}"}}\' http://localhost:8000/invoke_rate'
                     server_url = get_small_model_server_url(username)
                     command = f'curl -X POST -H "Content-Type: application/json" -d \'{{"username":"{username}","text":"{text}"}}\' {server_url}/invoke_rate'
                     result = await asyncio.wait_for(

@@ -4,6 +4,7 @@ from .feedback_request import resolve_feedback_request
 from .feedback_runtime import freeze_feedback_runtime, prepare_feedback_runtime
 from .feedback_runtime_service import restore_feedback_runtime, execution_configuration, build_request_runtime
 from .preprocess import normalize_preprocess_mode
+from .completion import RECOVERABLE
 
 
 def request_bool(data, key):
@@ -15,7 +16,7 @@ def request_bool(data, key):
     raise ValueError(key + '必须为布尔值')
 
 
-def choose_rerun_runtime(root, filename, data):
+def choose_rerun_runtime(root, filename, data, *, workspace=None):
     stage = data.get('rerun_stage', 'all')
     if stage not in ('all', 'layout', 'understanding', 'grading'):
         raise ValueError('重跑阶段无效')
@@ -31,6 +32,9 @@ def choose_rerun_runtime(root, filename, data):
     full = request_bool(data, 'full_recompute')
     if full and (stage != 'all' or has_sessions or resume):
         raise ValueError('完整新跑不能同时使用阶段、篇目或续跑参数')
+    skill_change = 'notebook_skill_selection' in data
+    if skill_change and (not full or stage != 'all' or has_sessions or resume):
+        raise ValueError('重新选择本子 Skill 必须完整新跑，不能与篇目或续跑混用')
     try:
         original = restore_feedback_runtime(root)
     except (ValueError, OSError, KeyError, TypeError):
@@ -40,7 +44,7 @@ def choose_rerun_runtime(root, filename, data):
         if parsed['route'] != 'homework_grading':
             raise ValueError('该材料类型暂不支持题目批改')
         runtime = build_request_runtime(parsed['feedback_context'], data,
-                                        preprocess_mode=data.get('preprocess_mode', 'auto'))
+                                        preprocess_mode=data.get('preprocess_mode'), workspace=workspace)
         return runtime, {'stage': stage, 'resume': False, 'clone': False, 'changed': True,
                          'warnings': ['原历史快照不能恢复，本轮完整重算，不复用原页面结果']}
 
@@ -72,8 +76,22 @@ def choose_rerun_runtime(root, filename, data):
     if 'reference_text' in data:
         if not isinstance(data['reference_text'], str):
             raise ValueError('参考文本必须为文字')
-        deps['references'] = {'reference_text': data['reference_text'], 'documents': [],
+        deps['references'] = {**deps['references'], 'reference_text': data['reference_text'], 'documents': [],
                               'status': 'provided_text' if data['reference_text'] else 'not_provided'}
+    if skill_change:
+        from .notebook_skills import freeze_selection
+        skill_ctx = {
+            'material_type': context.get('material_type'),
+            'material_name': context.get('material_name'),
+            'subject_code': context.get('subject_code'),
+            'subject_name': context.get('subject_name'),
+            'grade_label': context.get('grade_label'),
+            'reference_text': deps['references'].get('reference_text') or data.get('reference_text') or '',
+            'filename': data.get('filename') or data.get('sample_id') or '',
+            'sample_id': data.get('sample_id') or '',
+        }
+        deps['references']['notebook_skills'] = freeze_selection(
+            workspace, data['notebook_skill_selection'], context=skill_ctx)
     selection = data.get('curriculum_selection',
                          original.dependencies['retrieval'].get('curriculum_selection', 'auto'))
     if selection not in ('auto', None):
@@ -85,10 +103,12 @@ def choose_rerun_runtime(root, filename, data):
     else:
         runtime = freeze_feedback_runtime(context, **deps)
     changed = runtime.fingerprint != original.fingerprint
-    if changed and (stage != 'all' or has_sessions or resume):
+    from .stage_dependencies import reusable_upstream
+    execution_only_change = changed and reusable_upstream(original, runtime)
+    if changed and not execution_only_change and (stage != 'all' or has_sessions or resume):
         raise ValueError('材料或运行依据已变化，必须完整重跑整份材料，不能混用篇目或续跑参数')
     return runtime, {'stage': stage, 'resume': resume, 'changed': changed,
-                     'clone': not changed and not full and (stage != 'all' or has_sessions or resume),
+                     'clone': (not changed or execution_only_change) and not full and (stage != 'all' or has_sessions or resume),
                      'warnings': []}
 
 
@@ -109,7 +129,15 @@ def prepare_rerun_workspace(destination, original, workspace, analysis_id, runti
     if use_feedback and not plan['resume'] and review.get('status') != 'ready':
         raise ValueError('当前红蓝卡标不可用，请关闭参考开关或先重新评分')
     meta = {}
-    if 'session_ids' in data or plan['resume']:
+    from .utils import safe_json_load
+    original_manifest = safe_json_load(original / 'manifest.json')
+    whole_resume = plan['resume'] and not original_manifest.get('session_rerun', {}).get('resume_available')
+    if whole_resume:
+        if original_manifest.get('status') not in RECOVERABLE:
+            raise ValueError('当前没有可恢复的中断任务')
+        # 保留已成功的请求检查点；阶段产物仍须通过依赖和代码指纹核验。
+        meta = {'checkpoint_resume': True}
+    elif 'session_ids' in data or plan['resume']:
         meta = prepare_homework_session_rerun(workspace, analysis_id, stage,
             session_ids=data.get('session_ids'), resume=plan['resume'],
             workspace_root=destination)
@@ -120,5 +148,5 @@ def prepare_rerun_workspace(destination, original, workspace, analysis_id, runti
                    session_ids=meta.get('effective_session_ids', []), feedback_runtime=runtime))
     save_iteration_context({'base': str(destination / 'homework_grading')}, context)
     return {**meta, 'scope_page_nums': set(meta['scope_page_nums']) if 'scope_page_nums' in meta else None,
-            'force_preprocess_scope': bool(meta) and stage == 'all',
+            'force_preprocess_scope': bool(meta.get('scope_page_nums')) and stage == 'all',
             'red_blue_feedback_used': bool(context.get('enabled'))}

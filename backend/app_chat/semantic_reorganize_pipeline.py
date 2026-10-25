@@ -1,6 +1,7 @@
 # encoding=utf-8
 """本子级语义关键词梳理精进流水线（抽样 / 并发抽词+浓缩 / 问题合并 / 补词 / 连边 / 属性）。"""
 from __future__ import annotations
+import nkcn_public_config as _public_config
 
 import json
 import math
@@ -108,7 +109,7 @@ def _link_strength_prompt_blurb(*, primary_is_topology: bool = True) -> str:
 
 
 def _deepseek_client() -> OpenAI:
-    api_key = os.environ.get('DEEPSEEK_API_KEY') or os.environ.get("DEEPSEEK_API_KEY", "")
+    api_key = os.environ.get('DEEPSEEK_API_KEY') or _public_config.secret('DEEPSEEK_API_KEY')
     return OpenAI(api_key=api_key, base_url='https://api.deepseek.com', timeout=180.0)
 
 

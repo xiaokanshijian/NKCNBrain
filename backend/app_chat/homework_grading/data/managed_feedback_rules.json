@@ -1,0 +1,1023 @@
+{
+  "schema_version": "managed-feedback-rules-v1",
+  "rules": [
+    {
+      "id": "general-evidence",
+      "name": "通用证据与作答记录规范",
+      "education_levels": [],
+      "grades": [],
+      "subjects": [],
+      "material_types": [],
+      "usages": [
+        "layout",
+        "understanding",
+        "grading"
+      ],
+      "body": "依据原页定位并忠实记录学生最终有效作答。先转写再理解评价，不能按正确答案修正学生笔迹。客观题依据可见题意独立求解；开放题依据任务要求和已有材料评价。缺少音频、题干、清晰笔迹等依据时说明具体缺失，不猜测，不制造正确答案或练习次数。反馈使用中文，引用真实题号。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "general-feedback",
+        "version": "1.0.0",
+        "rule_id": "general-evidence",
+        "text_key": "general-evidence"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "detect",
+        "grade",
+        "cross_page",
+        "review",
+        "sessions",
+        "memory",
+        "profile",
+        "ontology",
+        "pass2",
+        "filter",
+        "quality"
+      ],
+      "condition": "always",
+      "evaluation_item": "evidence",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "math-detect-rules",
+      "name": "数学分栏与跨页题目识别",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "math"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "layout"
+      ],
+      "body": "\n【数学分栏题特别提醒】\n1. 应用题/图形题的大题条件常在左栏底部，后续 (2)(3) 小题可能排在右栏顶部；右栏小题必须继承左栏同一大题的 parent_group_id 与 parent_stem_excerpt。\n2. 若同页已出现 N-1，随后出现「(2)当……」这类小题，应优先编号为 N-2，而不是 auto-*。\n3. 对所有数学题都必须输出 is_application_major_problem。应用题大题（非填空题）及其子题填 true；看图填空、表格填空、公式填空、括号内填空（如“m=( )”“( )元”）即使有生活情境或图表条件也填 false；口算、化简、选择、判断、纯单位换算或纯表达式练习填 false。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "math-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "math-detect-rules",
+        "text_key": "math-detect-rules"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "detect"
+      ],
+      "condition": "always",
+      "evaluation_item": "math-detect-rules",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "math-grade-rules",
+      "name": "数学作答判定与评分细则",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "math"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【数学评分细则】\n1. 先结合题目真实要求、学生最终手写和参考答案判断，不要只看数值等价，也不要因为题干出现“多少/单位/过程”等词就自动降分。\n2. 所有应用题大题（非填空题）均要检查最终答话：学生只有算式、数字、式子或中间过程，缺少最终答话时，通常不应判 correct。即使小题要求“用含有字母的式子表示”“结果各是多少”等，只要它隶属于应用题大题且不是填空题，也适用本规则；但独立填空、看图填空、表格填空、公式填空、括号内填空等填空式题目，以及口算、化简、选择或判断题不因缺答话扣分。\n3. 必须先读取题目清单中的 final_unit_requirement，并严格区分“计算过程”和“答：……”两个区域：\n   - required：普通应用题的最终答话需有与题意兼容的单位；缺单位通常 partial，单位不兼容通常 wrong。\n   - forbidden：典型为“当 x=...时”代入求式子的值，仅表示含字母式子代入求值时，计算过程末值必须写成纯数，不得在该数值后加括号单位；数值正确但过程末值加了单位通常 partial。它绝不禁止“答：……”中的单位、量词或“倍”等关系词；最终答话中的数量仍须写与题意兼容的单位，例如过程写“=300”，答话写“平均每月生产300个”。\n   - optional：单位不是本题评分点，加或不加都不单独扣分。\n   若题型本身只填数字，或单位已在括号/表头中给出，通常为 optional，不因学生未重复写单位扣分。\n   识别涂改时只保留学生最终有效笔迹：若计算结果后的“(米)”等括号单位已被横线、斜线或涂抹明确删除，student_answer 只转写保留下来的数值，不得把被删除单位用于扣分。\n4. 只要学生最终答案是代数表达式，必须先独立化简/规范化，检查是否仍有可完成的常数运算或可合并同类项；不得把学生未化简式原样抄入 correct_answer 后直接判 correct。随后结合题型决定最终形式是否属于评分点：\n   - 题目求最终数量、差、和、结果，或要求填写最终答案时，应给出与当前学段相符的规范化结果。例如“上午比下午多卖多少元”中，50a-30a 应化简为 20a；思路正确但未化简通常判 partial，correct_answer 填 20a，error_type 填 final_form_required。\n   - 题目要求“列式”或“用含有字母的式子表示”时，只要式子准确表达数量关系，不强制展开、因式分解或改变结构；如 3(b+50)、12(a-b)、(m-n)÷5 可保持原形式。\n   - 题目明确要求“化简/最简/约分/展开/因式分解/指定形式”时，必须满足该形式；等值但未达到要求的答案通常判 partial。\n5. 题目要求“用指定方法/写出过程/运算律或性质名称”时，过程、方法或术语完整性属于评分点；若题目只问结果，不强行要求过程或术语。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "math-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "math-grade-rules",
+        "text_key": "math-grade-rules"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade",
+        "review",
+        "cross_page"
+      ],
+      "condition": "always",
+      "evaluation_item": "math-grade-rules",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "math-pass1-grade-transcription-lock",
+      "name": "数学手写转写保真规则",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "math"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "【数学手写转写冻结规则（最高优先级）】\n本规则只约束 student_answer 的视觉转写；你仍须正常理解题意、求出 correct_answer，并给出 verdict、understanding、error_type 等正式批改字段，不能退化为只做纯转写。\n1. 必须先在不阅读题意、不求解、不看相邻答案的状态下，只根据图中学生黑笔有效笔迹冻结 student_answer；冻结后再独立理解、求解和判分。求解后不得回头重读或改写 student_answer。\n2. 禁止按数学常识、题意、标准答案、印刷内容、相邻小题或后续步骤纠正、补全、交换、化简学生笔迹；数学常识只能用于 correct_answer 和 verdict。\n3. student_answer 只记录学生写入答题空白、括号或解答区的黑笔内容；不得复制等号左侧、题干算式、单位等任何印刷内容，也不得把“印刷题干=学生填空”拼成完整等式。\n4. 原样保留可见字符的重复、先后次序、运算符、上下标和大小写。若可见黑笔是连续两个 m，student_answer 只能写成 mm，不得改成 m²；只有图中确有与主体基线分离、位于右上角的清晰黑笔数字 2 时才能转写为 m²。若可见黑笔是 360÷a，必须保留为 360÷a，不得因题意或后续答案改写成 a÷6。\n5. “结合上下文应该是……”“学生意图是……”“为了使等式成立……”“常见写法是……”均是违规推理。视觉候选与数学答案冲突时，以视觉候选为 student_answer，并在 verdict 中判错；不得消除这种冲突。\n6. 视觉存在歧义时，保留能确认的可见字符并用 ? 标记疑点，同时降低 recognition_confidence 或设为 uncertain；不得在多个候选中优先选择数学上正确、常见或能与后续步骤吻合的写法。若两个候选的视觉证据相当而其中一个数学上正确，仍不得选择该正确候选，必须保留 ?。\n7. 每题必须先输出 visual_answer_segments：按阅读顺序逐空列出“学生新增的黑笔字形”，一空一项，不含任何印刷字符；student_answer 必须只是这些片段的原样串联，不得出现 visual_answer_segments 中没有的字符或规范化写法。该审计字段只用于锁定证据，不替代后续理解与判分。\n8. 例如印刷的 m×m= 后由学生黑笔写入 mm，则 visual_answer_segments 为 [\"mm\"]、student_answer 为 \"mm\"，不得含印刷的 m×m=，也不得写成 m²；印刷的 b= 后由学生写入 360÷a，则两字段只能记录 360÷a。\n9. 学生原写法即使明显错误、不完整、不合常理，也必须保留在 student_answer；应通过 correct_answer、verdict、understanding 和 error_type 说明错误，严禁污染原始转写。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "math-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "math-pass1-grade-transcription-lock",
+        "text_key": "math-pass1-grade-transcription-lock"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade"
+      ],
+      "condition": "always",
+      "evaluation_item": "math-pass1-grade-transcription-lock",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "math-pass1-grade-user-audit",
+      "name": "数学逐题提交前核验",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "math"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n\n【数学本页提交前强制审计】\n逐题按以下不可逆顺序工作，但仍一次性输出正式批改 JSON：\nA. 只看 position 对应的答题区域，把学生逐空新增的黑笔字形填入 visual_answer_segments；不抄印刷题干或等号左侧。\nB. 把 visual_answer_segments 原样串联为 student_answer 后立即冻结这两个字段；二者必须字符一致。此后题意、求解结果、相邻小题和数学常识都没有权限修改它们。\nC. 使用题意生成 correct_answer，并把它与已冻结的 student_answer 比较来生成 verdict；二者允许且应当冲突。\n输出前删除所有源于“应该、意图、常见写法、为了成立、结合上下文”的转写修正。可见连续 mm 就保留 mm；可见 360÷a 就保留 360÷a。若确实看不清，写带 ? 的视觉转写并降低置信度，绝不能用正确答案消除问号。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "math-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "math-pass1-grade-user-audit",
+        "text_key": "math-pass1-grade-user-audit"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade"
+      ],
+      "condition": "always",
+      "evaluation_item": "math-pass1-grade-user-audit",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "math-operation-law-full-name-grade-rules",
+      "name": "数学运算律完整名称核验",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "math"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【本页含运算律名称填空：完整术语专项核验】\n1. 本规则只用于要求填写、判断或说明“运用了什么律/运算律/性质名称”的小题；只要求写字母公式、变形算式或计算结果的题不适用。\n2. correct_answer 必须使用由运算符和变形方式确定的规范完整名称：乘法题写“乘法交换律”或“乘法结合律”，加法题写“加法交换律”或“加法结合律”，不得把 correct_answer 缩写成“交换律”“结合律”“交换”“结合”。多个规律并列时可写“乘法交换律和乘法结合律”，或在不产生歧义时写“乘法交换律和结合律”。\n3. 学生只写“结合律/结合”或“交换律/交换”，缺少“乘法/加法”这一运算类别时，不得按同义、省略或结合题意视为完整正确；其余槽位正确时整题通常判 partial，error_type 写 operation_law_name_incomplete。\n4. 必须区分学生手写与题干印刷字。若空格后已印有“律”，学生在空内只写“结合”，页面拼接后虽显示“结合律”，仍缺少“乘法/加法”；不得把印刷的“律”当成学生多写了一字，更不得替学生补出“乘法/加法”。\n5. 例如“35×125×8 可以运用（ ）律，先算（ ）”：规范答案是“乘法结合律，125×8”。学生写“结合/结合律，125×8”时，第二空正确但第一空术语不完整，必须判 partial，不能判 correct。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "math-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "math-operation-law-full-name-grade-rules",
+        "text_key": "math-operation-law-full-name-grade-rules"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade",
+        "review"
+      ],
+      "condition": "math_operation_law",
+      "evaluation_item": "math-operation-law-full-name-grade-rules",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "math-verification-suffix",
+      "name": "数学独立计算与验算要求",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "math"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【验算要求】\n1. 对每道计算题，请先识别学生作答内容，再自行独立计算出正确答案。\n2. 将你的计算结果与学生答案逐位对比，确认是否一致。\n3. 若不一致，在 error_type 中具体说明错误环节（如\"进位遗漏\"、\"退位错误\"、\"乘法口诀记错\"等）。\n4. 对应用题，请先理解题意、列出算式，再计算结果；correct_answer 填写最终数值。\n5. 学生答案为代数表达式时，必须独立化简/规范化后再判断，并把与题意匹配的标准形式写入 correct_answer；不得把学生式子原样复制为 correct_answer 后直接判对。\n6. 求最终数量、差、和、结果或填写最终答案时，仍有可完成运算或可合并同类项通常不得判 correct；例如 50a-30a 应化简为 20a，思路正确但未化简时判 partial，error_type 填 final_form_required。若题目仅要求列式或“用含有字母的式子表示”，则不强制展开或改变能准确表达数量关系的结构。\n7. 你的计算过程请在思考中完成，最终输出仅包含 JSON，不输出任何 Markdown 或其他内容。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "math-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "math-verification-suffix",
+        "text_key": "math-verification-suffix"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade"
+      ],
+      "condition": "always",
+      "evaluation_item": "math-verification-suffix",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "-uncertain-rules[math]",
+      "name": "数学无法判定情形",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "math"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【uncertain 触发条件（数学）】\n以下情形必须将 verdict 设为 \"uncertain\"，不要强行给出 correct/wrong：\n1. 画图/画线/涂色/操作类题目（无法判断图形正确性）。\n2. 题干或选项因图片截断而不完整。\n3. 应用题答案需要阅读材料但材料不在本页。\n4. 学生答案字迹完全无法辨认（≥50% 区域模糊）。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "math-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "-uncertain-rules[math]",
+        "text_key": "-uncertain-rules[math]"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade"
+      ],
+      "condition": "always",
+      "evaluation_item": "-uncertain-rules[math]",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "-subject-hints[math]",
+      "name": "数学批改注意事项",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "math"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "请仔细复算每道计算题，给出你认为的 correct_answer；若无法确定则填 null。转写时区分印刷题干与手写演算；已划掉的算式不要写进 student_answer。若数字后的括号单位被横线、斜线或涂抹明确删除，只保留未删除的数字，不得转写已作废单位。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "math-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "-subject-hints[math]",
+        "text_key": "-subject-hints[math]"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade",
+        "review"
+      ],
+      "condition": "always",
+      "evaluation_item": "-subject-hints[math]",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "chinese-grade-rules",
+      "name": "语文专项批改规则",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "chinese"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【语文专项批改规则】\n1. 阅读理解、仿写、概括、表达理由类题，若阅读材料在本页可见且学生回答能围绕文本或生活经验自圆其说、言之有理，应判 correct；不要仅因「无唯一标准答案」设为 uncertain。\n2. 这类题只有在材料缺失、回答离题、答非所问、关键依据明显错误或字迹大面积不可辨时，才判 wrong/partial/uncertain。\n3. 对于「读拼音，写词语」「读拼音，结合语境写字词」「看拼音写词语」这类根据拼音写字词的题，需要额外关注学生最终保留手写词是否写成明显错别字；若写错，要在 error_type 写明「字形错误」或「错别字」。\n4. 其它语文题按题意和答案内容批改，不需要刻意做汉字部件级字形审查。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "chinese-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "chinese-grade-rules",
+        "text_key": "chinese-grade-rules"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade",
+        "cross_page"
+      ],
+      "condition": "always",
+      "evaluation_item": "chinese-grade-rules",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "chinese-slash-tianzige-rules",
+      "name": "语文涂改、删除线与田字格识别",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "chinese"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【语文手写涂改 / 斜杠划掉 / 田字格】\n1. 斜杠删除线多为从左上到右下方向的斜线(也不排除其他可能)；被杠掉的部分可能是偏旁/部首、单个字或多个字，以图像实际划线范围为准，被杠掉即作废。\n2. 「读拼音写词」常用田字格；学生涂改或斜杠修正后的最终字，常写在田字格外（格子上/下/左/右、格缝旁），仍应计入最终作答。\n3. 转写 student_answer / visual_answer 时，只写最终保留、未被划掉的有效手写；若格内被斜杠划掉而在格外重写，以格外的修正字为准。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "chinese-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "chinese-slash-tianzige-rules",
+        "text_key": "chinese-slash-tianzige-rules"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade",
+        "review"
+      ],
+      "condition": "always",
+      "evaluation_item": "chinese-slash-tianzige-rules",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "chinese-pronunciation-selection-detect-rules",
+      "name": "语文读音选择作答位置识别",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "chinese"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "layout"
+      ],
+      "body": "\n【“给加点字选择正确读音”题内作答槽位（仅该题型）】\n1. 若题干要求“给加点字（或给加点的字）选择正确的读音”，保持整道题一个 questions 记录和原题 id，不得拆成多个题目。\n2. 除题目总 position 外，必须额外输出 answer_slots；每个加点字一项，按页面阅读顺序排列。其它语文题不要输出 answer_slots。\n3. 每个 answer_slots 项严格使用以下字段：\n   - slot_id：\"<题目id>:<加点字>\"；\n   - target：对应的加点字；\n   - slot_position：紧凑包围该字的全部候选拼音及学生黑色勾选标记；\n   - candidate_regions：逐个候选拼音的印刷区域，每项为 {\"label\": \"带声调拼音\", \"position\": [x1,y1,x2,y2]}；\n   - mark_position：只紧密包围学生黑色勾/圈选笔迹，允许与候选拼音重叠；\n   - layout_confidence：该槽位坐标置信度（0–100）。\n4. 所有坐标均相对整页归一化到 0–1000。candidate_regions 通常恰有两个候选；必须保留声调，候选标签和坐标一一对应。\n5. 本阶段不得判断学生选择了哪个候选，不得输出 selected_answer，也不得按正确读音推测勾选位置；只做客观版面标记。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "chinese-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "chinese-pronunciation-selection-detect-rules",
+        "text_key": "chinese-pronunciation-selection-detect-rules"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "detect"
+      ],
+      "condition": "always",
+      "evaluation_item": "chinese-pronunciation-selection-detect-rules",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "chinese-pronunciation-selection-grade-rules",
+      "name": "语文读音选择转写核验",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "chinese"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【本页含经坐标校验的读音选择槽位（仅约束客观转写）】\n1. 题目一类记录中的 answer_slots 是无损版面阶段给出的定位证据：candidate_regions 是印刷候选读音及其区域，mark_position 是学生黑色勾选笔迹区域，slot_position 是该字完整候选组。\n2. 必须按 target 顺序逐槽观察原图，结合 mark_position 与 candidate_regions 的空间重叠/落点，先确定学生实际勾选的印刷候选，再组成 student_answer。\n3. 不得根据词语的正确读音反推学生选择，不得忽略声调，不得把相邻槽位的勾串位；槽位与原图明显冲突时设 uncertain。\n4. student_answer 只输出按 target 顺序排列的纯拼音列表，例如 \"wēng, fǔ, mái\"；不得输出“嗡(wēng)√”、加点字、括号或勾号。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "chinese-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "chinese-pronunciation-selection-grade-rules",
+        "text_key": "chinese-pronunciation-selection-grade-rules"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade"
+      ],
+      "condition": "chinese_pronunciation_slots",
+      "evaluation_item": "chinese-pronunciation-selection-grade-rules",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "chinese-sentence-contraction-page-rules",
+      "name": "语文缩句与句子主干核验",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "chinese"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【本页含缩句题：句子主干专项核验（仅约束 correct_answer 与判分）】\n1. 先从印刷原句独立提取句子主干，再比较各选项；不得因为学生选择了某项，就反向把该项解释为正确缩句。\n2. 缩句可以删除定语、状语、补语等修饰限制成分，但必须保留主语中心语、全部核心谓语和必要宾语；不得把“主谓宾”误解为每句只保留一个谓语。\n3. 同一主语支配两个或以上由“和、并、又、且、同时”等连接的并列核心动词时，这些动词共同承担谓语功能，缩句后必须全部保留，并保留表达并列关系所需的连接词；漏掉任一核心动词都不是完整主干。\n4. 例如“探索精神，极大地震撼和鼓舞着人们”的主干是“精神震撼和鼓舞着人们”，不能缩成只含“鼓舞”的“精神鼓舞着人们”。\n5. 本规则不得改写 student_answer：选择题括号内学生最终保留的黑笔字母必须按图转写；教师红笔圈改、浅色残影和正确选项只能用于判分，不能混入学生答案。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "chinese-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "chinese-sentence-contraction-page-rules",
+        "text_key": "chinese-sentence-contraction-page-rules"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade"
+      ],
+      "condition": "chinese_sentence_contraction",
+      "evaluation_item": "chinese-sentence-contraction-page-rules",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "chinese-review-rules",
+      "name": "语文批改复核重点",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "chinese"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【语文复核重点】\n1. 对「读拼音，写词语」「读拼音，结合语境写字词」「看拼音写词语」这类根据拼音写字词的题，先从图像中重新转写学生最终保留的手写字，不要直接相信 student_answer；再检查是否明显写成错别字。\n2. 仅当明显错别字（缺偏旁、写成另一常用字、整词与拼音/语境明显不符）时，才 ok=false，fix.verdict 设为 wrong 或 partial，并在 fix.error_type 写明「字形错误」或「错别字」。\n3. 注意涂改、斜杠划掉后在上方/旁边/田字格外修正等情况：斜杠多为左上→右下，被杠掉的可能是部首或一字或多字等等；田字格题修正字常在格外，以未划掉的最终保留内容为准；若修正后字词正确，必须 ok=true，不得改判。\n4. 笔迹略糊、结构略挤但可辨认是目标字时，保持 correct；无法确定时 ok=true，不要矫枉过正。\n5. 对阅读理解和表达理由题，若答案言之有理且材料可见，可把原 uncertain 修正为 correct。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "chinese-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "chinese-review-rules",
+        "text_key": "chinese-review-rules"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "review"
+      ],
+      "condition": "always",
+      "evaluation_item": "chinese-review-rules",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "chinese-cross-page-suffix",
+      "name": "语文跨页阅读材料核对",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "chinese"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "layout"
+      ],
+      "body": "\n【语文阅读题特别提示】\n若本页包含阅读理解题，请判断：\n- 阅读材料（短文/诗歌/段落）是否完整出现在本页？\n  若短文开头或结尾明显缺失，请设置 boundary.continues_from_prev 或 continues_to_next。\n- 阅读小题是否有前续题目缺失（如题号从第2题开始、第1题不见）？\n  若有，设置 continues_from_prev，对缺少前文的小题设 cross_page = true, verdict = \"uncertain\"。\n仅标记你确实观察到截断证据的情形，不要过度标记。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "chinese-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "chinese-cross-page-suffix",
+        "text_key": "chinese-cross-page-suffix"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "detect"
+      ],
+      "condition": "always",
+      "evaluation_item": "chinese-cross-page-suffix",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "-uncertain-rules[chinese]",
+      "name": "语文无法判定情形",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "chinese"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【uncertain 触发条件（语文）】\n以下情形必须将 verdict 设为 \"uncertain\"：\n1. 习作/看图写话/主观写作题（无标准答案，无法机器判定）。\n2. 阅读理解题依赖的原文不在本页（跨页缺失）。\n3. 连线/画线/标注类操作题。\n4. 朗读/背诵类任务（本质为口头评价，图片无法呈现完整信息）。\n5. 学生答案严重模糊（≥50% 无法辨认）。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "chinese-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "-uncertain-rules[chinese]",
+        "text_key": "-uncertain-rules[chinese]"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade"
+      ],
+      "condition": "always",
+      "evaluation_item": "-uncertain-rules[chinese]",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "-subject-hints[chinese]",
+      "name": "语文批改注意事项",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "chinese"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "阅读理解类题以言之有理、贴合文本为主要判定标准；遇到读拼音/看拼音写词语类题时，再关注最终保留手写词是否明显错别字；阅读材料多为印刷体，student_answer 只转写学生手写部分。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "chinese-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "-subject-hints[chinese]",
+        "text_key": "-subject-hints[chinese]"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade",
+        "review"
+      ],
+      "condition": "always",
+      "evaluation_item": "-subject-hints[chinese]",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "english-grade-rules",
+      "name": "英语专项批改规则",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "english"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【英语专项批改规则】\n0. 听力题源锁优先：题干含 Listen/listening/听力/听录音/听短文/听对话，且图像中没有音频、听力原文或录音材料时，必须 verdict=uncertain；不得因为表格栏目、常识或猜测把听力题判 correct/wrong。\n1. 表格填写、仿照示例问答、角色扮演、信息整理类题，优先判断交际意图和栏目语义是否匹配；若答案能表达题目要求的信息，可判 correct。\n2. 非拼写专项题中，轻微拼写、大小写、单复数或语法瑕疵但不影响理解时，不要直接判 wrong 或 uncertain；可在 error_type 为空或轻描淡写说明。\n3. 只有听力依赖音频、关键信息材料确实不在图像中、长篇自由写作无明确评价依据、或学生答案严重不可辨时，才设为 uncertain。\n4. 若题目给出词库/示例/表格栏目，材料已经足够判断，不要以「缺少对话原文/来源文本」为由设为 uncertain。\n5. 家庭成员职业/地点/才能等调查表格通常没有唯一标准答案；只要 Who/What/Where 或人物/才能等栏目对应关系合理，driver/worker/postman/cook/sing 等信息可理解，就判 correct。类似 station 写成 staicion、movie 写成 movid、place/station 拼写不规范但语义仍可辨时，不作为 wrong 理由。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "english-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "english-grade-rules",
+        "text_key": "english-grade-rules"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade",
+        "cross_page"
+      ],
+      "condition": "always",
+      "evaluation_item": "english-grade-rules",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "english-review-rules",
+      "name": "英语批改复核重点",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "english"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【英语复核重点】\n0. 听力源锁优先：若题干含 Listen/listening/听力/听录音/听短文/听对话，且图像中没有音频或听力原文，不得把原 uncertain 改成 correct/wrong/partial；必须保持无法判断。\n1. 表格、问答、仿写类题若答案能表达栏目要求的信息，可把原 uncertain 修正为 correct。\n2. 表格调查题通常没有唯一标准答案；若人物/职业/地点/才能栏目关系合理，不要要求额外来源文本。\n3. 非拼写专项中轻微拼写或语法问题不作为 wrong/uncertain 理由；例如 station 写成 staicion、movie 写成 movid 但语义可辨，应判 correct。只有无法理解或材料确实缺失时才保留 uncertain/wrong。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "english-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "english-review-rules",
+        "text_key": "english-review-rules"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "review"
+      ],
+      "condition": "always",
+      "evaluation_item": "english-review-rules",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "english-page15-visual-transcription-lock",
+      "name": "英语手写转写保真规则",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "english"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【英语 student_answer 视觉转写锁（最高优先级）】\n0. 必须先暂时忽略题意、上下文、语法、词义、词库、示例、正确答案和常见搭配，只观察学生最终保留的黑色或近黑色笔迹，逐字符转写 student_answer；转写完成后立即冻结，后续理解与判分不得回头补写、删改或替换任何字符。\n0.1 禁止根据语法或语义知识脑补学生没有写出的字母、词尾、单词或选项。黑笔只写出词干时就保留词干，不得擅自补成现在分词、第三人称单数、复数、过去式或规范拼写；即使补全后才符合语境，也只能把规范形式写入 correct_answer。\n0.2 选择题必须只按括号、横线或勾选槽位中的最终黑笔字母/标记转写。即使依据短文或语法可以确定另一选项才正确，student_answer 仍必须保留图中黑笔选择；正确选项只能写入 correct_answer，并据二者冲突判 wrong。\n0.3 学生先写后划掉的英文视为作废，只保留未被划掉的最终黑笔内容；教师红笔订正、红笔删除线、去红后的淡色或断续残影均不得加入 student_answer。\n0.4 英语宽容规则只允许影响 verdict 和 error_type，绝无权限把 student_answer 规范化。若题目明确考查特定词形、拼写或选项，缺少必要词尾/字母或选错选项不是可忽略的轻微瑕疵，须按冻结转写与 correct_answer 的实际差异判分。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "english-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "english-page15-visual-transcription-lock",
+        "text_key": "english-page15-visual-transcription-lock"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade"
+      ],
+      "condition": "fixed_english_transcription",
+      "evaluation_item": "english-page15-visual-transcription-lock",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "english-parenthesized-choice-slot-grade-rules",
+      "name": "英语括号选择题转写核验",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "english"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【本页含经固定样例校验的英语括号选择槽位（最高优先级）】\n1. 题目清单中 slot_type=parenthesized_choice 的 answer_slots 是无损版面证据：slot_position 紧凑包围作答括号，mark_position 只包围括号内学生最终保留的黑色手写字母，candidate_regions 仅给出本题印刷候选 A/B 的位置。\n2. 完整页图后附有按题号标明的局部放大 ROI。必须逐题优先观察对应 ROI 的 mark_position，只转写其中实际可见的单个黑笔字母；不得把 candidate_regions 中的印刷 A/B 当成学生笔迹。\n3. 先把 ROI 读到的字母原样写入并冻结 student_answer，再独立理解短文、生成 correct_answer 和 verdict。即使短文语义明确支持另一个选项，也绝不允许把正确选项反写为 student_answer。\n4. answer_slots 不预填 selected_answer；若其中存在 observed_label，它来自不含题干和选项语义的独立 ROI-only 视觉转写，并已通过本地固定样例门禁，必须原样作为 student_answer。不得声称槽位“证明正确答案”。若局部黑笔确实不可辨，student_answer 写 \"?\" 并降低 recognition_confidence，禁止用语法或语义消除视觉不确定性。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "english-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "english-parenthesized-choice-slot-grade-rules",
+        "text_key": "english-parenthesized-choice-slot-grade-rules"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade"
+      ],
+      "condition": "fixed_english_choice_slots",
+      "evaluation_item": "english-parenthesized-choice-slot-grade-rules",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "-uncertain-rules[english]",
+      "name": "英语无法判定情形",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "english"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "\n【uncertain 触发条件（英语）】\n以下情形必须将 verdict 设为 \"uncertain\"：\n1. 听力题（题干含 Listen/听，答案依赖音频，图片无法提供）。\n2. 口语/朗读/表演类任务。\n3. 主观写作题（写信/写短文，无固定标准答案）。\n4. 连线/图形匹配类操作题。\n5. 学生答案严重模糊（≥50% 无法辨认）。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "english-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "-uncertain-rules[english]",
+        "text_key": "-uncertain-rules[english]"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade"
+      ],
+      "condition": "always",
+      "evaluation_item": "-uncertain-rules[english]",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "-subject-hints[english]",
+      "name": "英语批改注意事项",
+      "education_levels": [
+        "primary"
+      ],
+      "grades": [
+        4
+      ],
+      "subjects": [
+        "english"
+      ],
+      "material_types": [
+        "homework",
+        "exam"
+      ],
+      "usages": [
+        "understanding"
+      ],
+      "body": "按题型判断英语答案：拼写专项要逐词核查，表格/问答/仿写题优先看信息是否匹配；不要把印刷选项/印刷例句误当成学生作答。",
+      "source": {
+        "kind": "builtin",
+        "skill_id": "english-primary4-question",
+        "version": "1.0.0",
+        "rule_id": "-subject-hints[english]",
+        "text_key": "-subject-hints[english]"
+      },
+      "built_in": true,
+      "enabled": true,
+      "stages": [
+        "grade",
+        "review"
+      ],
+      "condition": "always",
+      "evaluation_item": "-subject-hints[english]",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "notes-layout-and-annotation",
+      "name": "笔记两类版面及彩色标注理解",
+      "education_levels": [],
+      "grades": [],
+      "subjects": [],
+      "material_types": [
+        "notes"
+      ],
+      "usages": [
+        "layout",
+        "understanding"
+      ],
+      "body": "本轮为笔记材料。逐页判断当前页更接近独立笔记，还是教材／练习册原页上的圈划与旁批；同一 PDF 可以包含两种版面，不得用文件名或前页类型覆盖当前页证据。独立笔记要区分主体记录与不同颜色的补充、强调或归纳，说明它们的组织关系。教材／练习册页要区分印刷正文、手写作答、荧光笔／下划线／圈画及彩色旁批，指出标记覆盖或指向的原文以及旁批与原文的联系，不把印刷内容当作书写者原创。颜色本身不证明作者、掌握程度或对错；未知背景保持未知。 每个书写单元区分真实作答、知识记录、旁批、自问、教学提示、教材阅读提示和纯印刷材料。教学提示、自问和未填写的教材阅读提示不自动构成漏答；纯题干或材料开头不是独立未答题。只标色没有手写文字时仍可评价标记与正文的关系，但不得称正文是学生填写或原创。不同来源材料可交错放入PDF；页边截断只表示该原页不完整，不证明下一张PDF页就是续页。跨页必须比较来源、印刷页码、题干及材料内容；同样的材料一、题号或课名不足以证明同题。",
+      "source": {
+        "kind": "managed",
+        "label": "第二周开放材料改造"
+      },
+      "built_in": false,
+      "enabled": true,
+      "stages": [
+        "detect",
+        "grade",
+        "cross_page",
+        "review"
+      ],
+      "condition": "always",
+      "evaluation_item": "managed:notes-layout-and-annotation",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "composition-paragraph-continuity",
+      "name": "作文段落与跨页连续性",
+      "education_levels": [],
+      "grades": [],
+      "subjects": [],
+      "material_types": [
+        "composition"
+      ],
+      "usages": [
+        "layout",
+        "understanding"
+      ],
+      "body": "本轮为作文材料。整份 PDF 按同一篇文章理解，依据标题、缩进、换行、语义承接和跨页续写识别内容段落；页边界不是天然段落边界。可见段落或紧密相关的相邻内容块分别定位并保留页码、位置和跨页关系，不按每页生成一段孤立总评，也不为凑数量硬拆短句。页面延续、cross_page=true、auto-* 编号或作文没有唯一标准答案，都不能单独成为 uncertain 的理由；只要当页可见文字足以理解，就应按实际内容给出形成性结论。仅在有效文字大面积不可辨或页面没有可评价内容时使用 uncertain／unanswered。即使跨页补全阶段未启用，也要保留当页可见内容和理解，供整篇汇总共同评价。先忠实概括作者实际表达，再评价主题、材料、结构、语言和具体字词问题；字迹或上下文不足时说明具体缺失，不补写文章内容。",
+      "source": {
+        "kind": "managed",
+        "label": "第二周开放材料改造"
+      },
+      "built_in": false,
+      "enabled": true,
+      "stages": [
+        "detect",
+        "grade",
+        "cross_page",
+        "review"
+      ],
+      "condition": "always",
+      "evaluation_item": "managed:composition-paragraph-continuity",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "open-material-formation-feedback",
+      "name": "作文笔记主体内容与下一步建议",
+      "education_levels": [],
+      "grades": [],
+      "subjects": [],
+      "material_types": [
+        "notes",
+        "composition"
+      ],
+      "usages": [
+        "grading"
+      ],
+      "body": "作文和笔记采用形成性反馈，不强制百分制，不因存在提升空间就把已完成内容判为错误。先结合已确认的学段、年级、学科、材料用途、附加信息和原页证据说明主体与版面；未注明的信息明确保持未知，局部内容与文件主体不一致时只说明该页差异，不据此改写整份材料身份。单页的 continues_from_prev／continues_to_next、cross_page 或页尾截断只描述页面关系；相邻页已存在时，不得据此声称整份 PDF 不完整、全文结构无法核验或字数无法判断。复核若改变 verdict，必须同步清空已经不成立的 error_type；若保留 partial／wrong，必须写出独立于跨页关系的真实内容问题。随后忠实概括实际写了什么、圈划了什么，并给出有证据的亮点、问题和内容评述。最后只给一至两条必要、可执行的下一步建议，指明对应页、段落或标记；建议前先核对原页是否已经写过，不能要求复制整章教材、面面俱到或学习未确认的超前内容。用学生和教师都容易理解的直白中文，避免内部术语和空泛套话。 笔记按本份材料的内容观察评价，不按页码推断第几次练习、即时进步、退步或稳定障碍；没有独立时间依据不生成掌握轨迹。待确认、未观察、非作答与确定错误严格分开；不能由未确认或没有评分推断不会、零分或概念未建立。能读清的局部按局部内容评价，局部裁切不扩大为整页缺陷。圈划和旁批须交代对应原文及关系，教材提示与自问不强制补答。未进入三区的正确内容直接肯定，不以此要求人工复核；需要复核时说明具体字迹或材料缺失。各区块结论一致，优先建议只在概述中给一至两条，逐条反馈说明观察，不再逐题追加练习任务。",
+      "source": {
+        "kind": "managed",
+        "label": "第二周开放材料改造"
+      },
+      "built_in": false,
+      "enabled": true,
+      "stages": [
+        "pass2"
+      ],
+      "condition": "always",
+      "evaluation_item": "managed:open-material-formation-feedback",
+      "refines": [],
+      "conflicts": []
+    },
+    {
+      "id": "open-material-zone-definitions",
+      "name": "作文笔记三区定义与评价要求",
+      "education_levels": [],
+      "grades": [],
+      "subjects": [],
+      "material_types": [
+        "notes",
+        "composition"
+      ],
+      "usages": [
+        "grading"
+      ],
+      "body": "【作文与笔记的三区定义】\n盲区：当前材料已有证据支持的理解缺口；未写、未标记不等于不会，不把教材印刷内容当学生原创。\n内耗区：当前表达、组织或修改中可见的困难；不据单份材料断言长期、反复障碍，不机械按正确率或对错枚举分区。\n最近发展区：基于已有理解、有效标注或主动提问，可以通过少量支持完成的下一步。纯圈划、旁批、自问可以支持形成性建议，不因此变成错题。\n【学·教·育视角】\n学：关注怎样理解、选取重点、组织联系、提问和改进，先说明实际可见的依据。\n教：给出适合的提示、示范或需要核实的教学背景，不能把所有改进都变成学生补抄任务。\n育：支持自主表达、依据材料、主动检查与修订，不从笔色、圈划数量或单页材料推断性格、态度或作者身份。\n结合printed_text_marked、handwritten_text_marked、annotation_links和understanding分析标注与内容的关系；明确区分观察和可能意图，不由高亮推断掌握程度，不由颜色推断先后。没有足够依据的区域可以没有观察，不为凑三区制造问题。建议保持一至两条，说明具体位置和可执行的小步行动。",
+      "source": {
+        "kind": "managed",
+        "label": "20260918颜色标记与三区开放需求"
+      },
+      "built_in": false,
+      "enabled": true,
+      "stages": [
+        "pass2"
+      ],
+      "condition": "always",
+      "evaluation_item": "managed:open-material-zone-definitions",
+      "refines": [],
+      "conflicts": []
+    }
+  ]
+}

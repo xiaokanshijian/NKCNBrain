@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """场景模型配置：admin 可改，每次读文件，保存即生效。"""
 from __future__ import annotations
+import nkcn_public_config as _public_config
 
 import json
 import os
@@ -12,6 +13,24 @@ _MODEL_CONFIG_DIR = os.path.join(os.path.dirname(__file__), 'config', 'model_con
 # type：config_abbr = 仅换 abbr，走 config_manager；raw = 直连 API 的 model 字符串
 SCENE_SLOTS: Dict[str, Dict[str, Any]] = {
     # ── P0 ──
+    'card_shallow_rate': {
+        'label': '建卡·红蓝浅评',
+        'group': 'P0',
+        'type': 'config_abbr',
+        'default': 'claude-4-sonnet',
+        'options': [],
+        'options_from': 'qa_after_claude4_sonnet',
+        'hint': '钉卡/生成卡片时的红蓝浅评流式模型；可选项为问答可选、且接入时间不早于 claude-4-sonnet 的模型。',
+    },
+    'doc_file_summary': {
+        'label': '文档·点摘要生成',
+        'group': 'P0',
+        'type': 'config_abbr',
+        'default': 'claude-4-sonnet',
+        'options': [],
+        'options_from': 'qa_after_claude4_sonnet',
+        'hint': '前端点击「生成摘要」用的模型（非上传后 PreSummary）；可选项同上。',
+    },
     'card_html': {
         'label': 'HTML助记卡生成',
         'group': 'P0',
@@ -55,14 +74,24 @@ SCENE_SLOTS: Dict[str, Dict[str, Any]] = {
         'group': 'P0',
         'type': 'raw',
         'default': 'gpt-image-2',
-        'options': ['gpt-image-2', 'gpt-image-2-all'],
+        'options': [
+            'gpt-image-2',
+            'gpt-image-2-all',
+            'gpt-image-2.5-flare',
+            'gpt-image-2.5-sunburst',
+        ],
     },
     'card_image_gpt_fallback': {
         'label': '卡片生图 · GPT 备用',
         'group': 'P0',
         'type': 'raw',
         'default': 'gpt-image-2-all',
-        'options': ['gpt-image-2-all', 'gpt-image-2'],
+        'options': [
+            'gpt-image-2-all',
+            'gpt-image-2',
+            'gpt-image-2.5-flare',
+            'gpt-image-2.5-sunburst',
+        ],
     },
     'card_image_claude_spec': {
         'label': '卡片生图前 · Claude 写生图描述',
@@ -294,6 +323,35 @@ SCENE_SLOTS: Dict[str, Dict[str, Any]] = {
         ],
         'hint': '定期整理记忆用更强模型；失败会降级到写记忆模型。',
     },
+    'cross_reorganize_plan': {
+        'label': '交叉梳理·规划',
+        'group': 'P4',
+        'type': 'llm_slot',
+        'default': 'claude-opus-4.8',
+        'options': [
+            'claude-opus-5.5',
+            'gpt-6-astra',
+            'kimi-k3',
+            'claude-opus-4.8',
+            'claude-opus-4.6',
+            'claude-sonnet-4.6',
+            'claude-sonnet-5',
+        ],
+        'hint': '双击交叉梳理后规划 n 个主题；失败会：同模型再试1次→deepseek-v4-pro→deepseek-chat。',
+    },
+    'cross_reorganize_write': {
+        'label': '交叉梳理·写 Skill',
+        'group': 'P4',
+        'type': 'llm_slot',
+        'default': 'deepseek-chat',
+        'options': [
+            'deepseek-chat',
+            'deepseek-v4-flash',
+            'claude-sonnet-4.6',
+            'claude-opus-4.8',
+        ],
+        'hint': '写 n 份交叉主题 Skill 与微调 notebook-hub；默认与文档→Skill 一致用 deepseek-chat。',
+    },
     # ── P5（仅 Admin 展示，暂不可改）──
     'volcano_tts': {
         'label': '语音合成 · volcano_tts',
@@ -304,6 +362,91 @@ SCENE_SLOTS: Dict[str, Dict[str, Any]] = {
         'hint': '暂不支持在此修改：各语音合成服务调用方式不同，后续再开放。',
     },
 }
+
+
+def _scan_model_config_entries() -> List[Dict[str, Any]]:
+    """读取 model_config 目录：abbr / model_id / sequence。"""
+    entries: List[Dict[str, Any]] = []
+    if not os.path.isdir(_MODEL_CONFIG_DIR):
+        return entries
+    for name in os.listdir(_MODEL_CONFIG_DIR):
+        if not name.endswith('.json'):
+            continue
+        path = os.path.join(_MODEL_CONFIG_DIR, name)
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                raw = json.load(f)
+        except Exception:
+            continue
+        if not isinstance(raw, dict):
+            continue
+        abbr = str(raw.get('abbr_name') or name[:-5]).strip()
+        model_id = str(raw.get('model_id') or '').strip()
+        try:
+            seq = int(raw.get('sequence'))
+        except (TypeError, ValueError):
+            continue
+        if not abbr or not model_id:
+            continue
+        entries.append({'abbr': abbr, 'model_id': model_id, 'sequence': seq, 'file': name})
+    entries.sort(key=lambda item: (item['sequence'], item['abbr']))
+    return entries
+
+
+def list_qa_abbrs_since_claude4_sonnet() -> List[str]:
+    """问答可接入模型中，接入序号 >= claude-4-sonnet 的缩写列表（含自身）。"""
+    entries = _scan_model_config_entries()
+    baseline = next((e['sequence'] for e in entries if e['abbr'] == 'claude-4-sonnet'), 15)
+    out: List[str] = []
+    seen = set()
+    for item in entries:
+        if item['sequence'] < baseline:
+            continue
+        abbr = item['abbr']
+        if abbr in seen:
+            continue
+        seen.add(abbr)
+        out.append(abbr)
+    if 'claude-4-sonnet' not in seen:
+        out.insert(0, 'claude-4-sonnet')
+    return out
+
+
+def slot_options(key: str) -> List[str]:
+    meta = SCENE_SLOTS.get(key) or {}
+    if meta.get('options_from') == 'qa_after_claude4_sonnet':
+        return list_qa_abbrs_since_claude4_sonnet()
+    return list(meta.get('options') or [])
+
+
+def abbr_to_model_id(abbr: str) -> str:
+    abbr = str(abbr or '').strip()
+    if not abbr:
+        return ''
+    for item in _scan_model_config_entries():
+        if item['abbr'] == abbr:
+            return item['model_id']
+    cfg_path = os.path.join(_MODEL_CONFIG_DIR, f'{abbr}.json')
+    if os.path.isfile(cfg_path):
+        try:
+            with open(cfg_path, 'r', encoding='utf-8') as f:
+                raw = json.load(f)
+            return str((raw or {}).get('model_id') or '').strip()
+        except Exception:
+            pass
+    return ''
+
+
+def resolve_scene_model_id(key: str, default_abbr: str = 'claude-4-sonnet') -> str:
+    """场景槽位 abbr → 问答用 model_id（供浅评/摘要流式 handler）。"""
+    meta = SCENE_SLOTS.get(key) or {}
+    fallback = str(meta.get('default') or default_abbr or 'claude-4-sonnet')
+    abbr = get_scene_value(key, fallback) or fallback
+    mid = abbr_to_model_id(abbr)
+    if mid:
+        return mid
+    mid = abbr_to_model_id(fallback)
+    return mid or '1126'
 
 
 def _default_values() -> Dict[str, str]:
@@ -371,8 +514,10 @@ def validate_scene_value(key: str, value: str) -> Optional[str]:
     if not val:
         return f'{key} 不能为空'
     slot_type = meta.get('type')
-    options = meta.get('options') or []
+    options = slot_options(key)
     if slot_type == 'config_abbr':
+        if options and val not in options:
+            return f'{meta.get("label")}: {val} 不在允许列表'
         cfg_path = os.path.join(_MODEL_CONFIG_DIR, f'{val}.json')
         if not os.path.isfile(cfg_path):
             return f'{meta.get("label")}: 配置缩写 {val} 无对应 json'
@@ -384,6 +529,9 @@ def validate_scene_value(key: str, value: str) -> Optional[str]:
             return None
         # 建卡语义关键词：kimi 走 moonshot 专用路径，无需强制依赖 model_config json
         if key == 'card_semantic_keywords' and val.lower() in ('kimi', 'moonshot', 'kimi-legacy'):
+            return None
+        # deepseek-chat 走官方 API 写死解析，不要求同名 json
+        if val.lower() == 'deepseek-chat':
             return None
         cfg_path = os.path.join(_MODEL_CONFIG_DIR, f'{val}.json')
         if not os.path.isfile(cfg_path):
@@ -465,10 +613,10 @@ def _dmxapi_default_cfg(model: str = 'gemini-3.1-pro-preview') -> Dict[str, str]
     import os
     return {
         'model': model,
-        'base_url': os.environ.get('NKCN_DMT_GEMINI_BASE_URL', 'https://www.dmxapi.cn/v1').rstrip('/'),
+        'base_url': os.environ.get('NKCN_DMT_GEMINI_BASE_URL', _public_config.endpoint('NKCN_REVIEW_GATEWAY_V1_URL', 'http://localhost:9999/v1')).rstrip('/'),
         'api_key': os.environ.get(
             'NKCN_DMT_GEMINI_API_KEY',
-            os.environ.get("DMX_API_KEY", ""),
+            _public_config.secret('NKCN_LLM_DMXAPI_API_KEY'),
         ),
     }
 
@@ -486,25 +634,34 @@ def resolve_llm_slot_cfg(
     return resolve_openai_cfg_from_abbr(
         str(val or default_abbr),
         default_model='claude-sonnet-4-6',
-        default_base='https://chat.cloudapi.vip/v1/',
-        default_key=os.environ.get("NKCN_LLM_API_KEY", ""),
+        default_base=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
+        default_key=_public_config.secret('OPENAI_API_KEY'),
     )
 
 
 def get_admin_payload() -> Dict[str, Any]:
     values = load_scene_models_config()
     slots: List[Dict[str, Any]] = []
+    resolved_model_ids: Dict[str, str] = {}
     for key, meta in SCENE_SLOTS.items():
         is_display_only = meta.get('type') == 'display_only'
+        opts = slot_options(key)
+        value = meta.get('default') if is_display_only else values.get(key, meta.get('default'))
         slots.append({
             'key': key,
             'label': meta.get('label'),
             'group': meta.get('group'),
             'type': meta.get('type'),
             'default': meta.get('default'),
-            'options': meta.get('options') or [],
-            'value': meta.get('default') if is_display_only else values.get(key, meta.get('default')),
+            'options': opts,
+            'value': value,
             'hint': meta.get('hint') or '',
             'editable': not is_display_only,
         })
-    return {'values': values, 'slots': slots}
+        if key in ('card_shallow_rate', 'doc_file_summary'):
+            resolved_model_ids[key] = resolve_scene_model_id(key)
+    return {
+        'values': values,
+        'slots': slots,
+        'resolved_model_ids': resolved_model_ids,
+    }

@@ -1,5 +1,5 @@
+import nkcn_public_config as _public_config
 #encoding=utf-8
-import os
 import re
 import argparse
 import string
@@ -160,8 +160,8 @@ def post_process_gpt4_response(response):
 
 def make_gpt4o_image_text_requests(user_prompt, base64_image, system_prompt="", use_fixed_params=False, text_after_image=None):
     client = OpenAI(
-        api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-        base_url='https://chat.cloudapi.vip/v1/',
+        api_key=_public_config.secret('OPENAI_API_KEY'),
+        base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
         default_headers={"x-foo": "true"},
     )
 
@@ -221,8 +221,8 @@ def make_gpt4o_image_text_requests_stream(user_prompt, base64_image, system_prom
                                           text_after_image=None):
     """流式版本的GPT-4o图片文本请求"""
     client = OpenAI(
-        api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-        base_url='https://chat.cloudapi.vip/v1/',
+        api_key=_public_config.secret('OPENAI_API_KEY'),
+        base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
         default_headers={"x-foo": "true"},
     )
 
@@ -285,8 +285,8 @@ def make_gpt4o_image_text_requests_stream(user_prompt, base64_image, system_prom
 def make_gpt4o_text_requests(user_prompt, system_prompt="", use_fixed_params=False):
     res = ""
     client = OpenAI(
-        api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-        base_url='https://chat.cloudapi.vip/v1/',
+        api_key=_public_config.secret('OPENAI_API_KEY'),
+        base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
         default_headers={"x-foo": "true"},
     )
     response = client.chat.completions.create(
@@ -309,8 +309,8 @@ def make_gpt4o_text_requests(user_prompt, system_prompt="", use_fixed_params=Fal
 async def make_gpt4o_text_requests_async(user_prompt, system_prompt=""):
     res = ""
     client = OpenAI(
-        api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-        base_url='https://chat.cloudapi.vip/v1/',
+        api_key=_public_config.secret('OPENAI_API_KEY'),
+        base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
         default_headers={"x-foo": "true"},
     )
     response = client.chat.completions.create(
@@ -346,8 +346,8 @@ def get_question_split(question, answer, username, special_prompt, depth_suggest
     if depth_suggestion:
         user_prompt += "\n\n【追问策略建议】（小模型建议，供你生成追问时作为重要参考之一）：\n" + depth_suggestion
     client = OpenAI(
-        api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-        base_url='https://chat.cloudapi.vip/v1/',
+        api_key=_public_config.secret('OPENAI_API_KEY'),
+        base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
         default_headers={"x-foo": "true"},
     )
     response = client.chat.completions.create(
@@ -373,7 +373,7 @@ def get_question_split(question, answer, username, special_prompt, depth_suggest
 
 
 if __name__ == "__main__":
-    api_key = os.environ.get("OPENAI_API_KEY", "")
+    api_key = _public_config.secret('NKCN_GPT4_API_API_KEY')
 
     chinese_input = 'Come up with a series of tasks with the same format:\n1. 如何使用信息技术为思政教育赋能？\n2. 请详细说明劳模精神、劳动精神、工匠精神的内涵和作用分别是什么，以及如何培育这些精神\n3. 红蓝融合中，理论和实践哪一个更重要？\n4. 见义勇为是否值得提倡？\n5. 信息时代，如何激发创新活力，产出创新成果？\n6. 请列举几个知行合一的名人事例\n7. 领导让我作一周工作的汇报总结，但我这周没有做实质性的工作，我该怎么办？\n8. 为什么要讲红蓝融合，其内涵是什么？\n9.'
     input = "Come up with a series of tasks with the same format:1.What's your name? 2.How's the weather? 3.How old are you? 4."

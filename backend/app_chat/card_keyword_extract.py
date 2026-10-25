@@ -3,6 +3,7 @@
 Claude 调用失败时重试 1 次，仍失败则降级 deepseek-v4-pro（thinking 关闭）。
 """
 from __future__ import annotations
+import nkcn_public_config as _public_config
 
 from typing import List, Optional, Sequence, Tuple
 
@@ -91,7 +92,7 @@ def _build_user_prompt(
 
 
 def _call_kimi(system_prompt: str, user_prompt: str) -> str:
-    """沿用现有 moonshot kimi_api 路径（moonshot-v1-32k）。"""
+    """沿用现有 moonshot kimi_api 路径（kimi-k3）。"""
     import kimi_api
     from llm_langchain import global_var
 
@@ -180,7 +181,7 @@ def _call_openai_compat(
                 ds_key = (os.environ.get(ds_key[4:]) or '').strip()
         if not ds_key:
             # 与 views / semantic_keyword_service 等同项目回退
-            ds_key = os.environ.get("DEEPSEEK_API_KEY", "")
+            ds_key = _public_config.secret('DEEPSEEK_API_KEY')
         client = OpenAI(
             api_key=ds_key,
             base_url='https://api.deepseek.com',

@@ -12,7 +12,7 @@ hierarchy_links（连边+强度）、keywordFourColorDMT（四色/DMT/三类知�
   python app_chat/export_semantic_reorganize_bundle.py --username marklee_DuJiangYan
   python app_chat/export_semantic_reorganize_bundle.py -o marklee_DuJiangYan_semantic_bundle.txt
 
-将生成的 txt 拷到服务器 /home/ubuntu/Backend 后，用 import_semantic_reorganize_bundle.py 导入。
+将生成的 txt 拷到服务器 ./runtime 后，用 import_semantic_reorganize_bundle.py 导入。
 """
 
 from __future__ import annotations
@@ -207,7 +207,7 @@ def main() -> int:
         f'attrs={st.get("keyword_attrs")}',
         flush=True,
     )
-    print('请将此文件拷到服务器 /home/ubuntu/Backend 后执行 import 脚本。', flush=True)
+    print('请将此文件拷到服务器 ./runtime 后执行 import 脚本。', flush=True)
     return 0
 
 

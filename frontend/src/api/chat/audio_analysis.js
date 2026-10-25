@@ -2,7 +2,7 @@ import axios from 'axios'
 import { API_BASE_URL } from '@/config/apiConfig'
 
 // 呼吸音频分析API端点（独立服务器）
-const AUDIO_ANALYSIS_API_URL = 'http://192.0.2.1:8000/api/respllm/predict/'
+const AUDIO_ANALYSIS_API_URL = (process.env.VUE_APP_SERVICE_8000_API_RESPLLM_PREDICT_URL || "http://localhost:8000/api/respllm/predict/")
 
 export function findMetadataFile(audioFileName, fileNameList) {
   if (!fileNameList || fileNameList.length === 0) return null;

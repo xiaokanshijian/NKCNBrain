@@ -1,3 +1,4 @@
+import nkcn_public_config as _public_config
 import base64
 import copy
 import io
@@ -36,10 +37,10 @@ from app_chat.views_card_image import (
 )
 
 
-CI_DMT_GEMINI_BASE_URL = os.environ.get('NKCN_DMT_GEMINI_BASE_URL', 'https://www.dmxapi.cn/v1')
+CI_DMT_GEMINI_BASE_URL = os.environ.get('NKCN_DMT_GEMINI_BASE_URL', _public_config.endpoint('NKCN_REVIEW_GATEWAY_V1_URL', 'http://localhost:9999/v1'))
 CI_DMT_GEMINI_API_KEY = os.environ.get(
     'NKCN_DMT_GEMINI_API_KEY',
-    os.environ.get("DMX_API_KEY", ""),
+    _public_config.secret('NKCN_LLM_DMXAPI_API_KEY'),
 )
 CI_DMT_GEMINI_MODEL_DEFAULT = 'gemini-3.1-pro-preview'
 CI_DMT_GEMINI_TIMEOUT = 300
@@ -72,7 +73,7 @@ def _merge_overlay_item_preserved_state(current: Dict[str, Any], target: Dict[st
 
 # 与原草图手写占比检测（Qwen3.6-plus，整图一张）
 _CI_SKETCH_QWEN_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-_CI_SKETCH_QWEN_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
+_CI_SKETCH_QWEN_KEY = _public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY')
 _CI_SKETCH_QWEN_MODEL_DEFAULT = 'qwen3.6-plus'
 
 

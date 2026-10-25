@@ -111,7 +111,8 @@
 <script>
 // import { ref } from 'vue'
 import { ElForm, ElFormItem, ElInput, ElButton, ElDialog, ElRadioGroup, ElRadioButton, ElSelect, ElOption } from 'element-plus'
-import { addUser, verifyUser, get_userChosen } from '@/api/user'
+import { getLoginSession } from '@/api/authSession'
+import { addUser, verifyUser } from '@/api/user'
 // import router from "@/router/index.js";
 import router from '@/router'
 import { addScene } from "@/views/pages/mainHome/my_js"
@@ -147,46 +148,19 @@ export default {
     }
   },
   mounted() {
+    localStorage.removeItem('password');
     // 去除默认边距
     document.body.style.margin = '0';
-    console.log("浏览器内存记录用户名：", localStorage.getItem('originRealName'))
-    if (localStorage.getItem('originRealName') !== null) {
-      this.getChosen()
-    } else {
-      if (localStorage.getItem('home2login') === "true") {
-        localStorage.setItem('home2login', 'false');
-      }
-    }
+    this.getChosen();
   },
   methods: {
-    getChosen(){
-      let formData = new FormData();
-      formData.append('username', localStorage.getItem('originRealName'));
-      get_userChosen(formData).then(data => {
-        if(data['error_num'] === 0) {
-          let choose = data['choose']
-          if(choose === 0) {
-            this.uiMode = "full"
-          } else if(choose === 1) {
-            this.uiMode = "simple"
-          } else if(choose === 2) {
-            this.uiMode = "minimal"
-          } else {
-            this.uiMode = "unicast"
-          }
-          if (localStorage.getItem('home2login') !== "true") {
-            this.quickLogin()
-          } else {
-            localStorage.setItem('home2login', 'false');
-            this.loginForm.username = localStorage.getItem('originRealName')
-            this.loginForm.password = localStorage.getItem('password')
-          }
-        } else {
-          this.$message.error(data['message'])
-        }
-      }).catch(error => {
-        console.error("An error occurred:", error); // 错误处理
-      });
+    async getChosen() {
+      this.loginForm.username = localStorage.getItem('originRealName') || '';
+      if (localStorage.getItem('home2login') === 'true') {
+        localStorage.setItem('home2login', 'false');
+        return;
+      }
+      await this.quickLogin();
     },
     register() {
       this.dialogVisible = true;
@@ -233,7 +207,23 @@ export default {
       this.loginForm.username = ''
       this.loginForm.password = ''
     },
-    quickLogin() {
+    async quickLogin() {
+      // Browser storage is only a remembered name, never proof of login.
+      localStorage.removeItem('password');
+      let session;
+      try {
+        session = await getLoginSession();
+      } catch (error) {
+        this.loginForm.username = localStorage.getItem('originRealName') || '';
+        localStorage.removeItem('userId');
+        localStorage.removeItem('realName');
+        return;
+      }
+      if (session.error_num !== 0 || !session.name) return;
+      localStorage.setItem('originRealName', session.name);
+      localStorage.setItem('coacherName', session.coacherName);
+      localStorage.setItem('level', session.level);
+      this.uiMode = ['full', 'simple', 'minimal', 'unicast'][session.choose] || 'full';
       this.$message.success('浏览器已有登录记录，自动登录成功！');
       localStorage.setItem('userId', localStorage.getItem('originRealName'));
       localStorage.setItem('realName', localStorage.getItem('originRealName'));
@@ -273,7 +263,7 @@ export default {
             localStorage.setItem('coacherName', response.coacherName);
             localStorage.setItem('level', response.level);
             localStorage.setItem('byuplevel', 'false');
-            localStorage.setItem('password', this.loginForm.password);
+            localStorage.removeItem('password');
             // 管理员用户admin
             if(response.name === 'admin') {
               localStorage.setItem('byadmin', 'true');
@@ -303,6 +293,8 @@ export default {
           this.$message.error('登录失败，请检查网络！')
           console.log(response['msg'])
         }
+      }).catch(() => {
+        this.$message.error('登录失败，请检查网络、Cookie 或服务端配置');
       })
     }
   }

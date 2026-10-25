@@ -76,16 +76,16 @@
   
   <script>
   // import MainNav from '@/components/MainNav.vue'
-  import BrainNavigator from '@/components/brainNavigator/BrainNavigator.vue'
-  import ThoughtNetwork3D from '@/components/thoughtNetwork/ThoughtNetwork3D.vue'
+  // import BrainNavigator from '@/components/brainNavigator/BrainNavigator.vue'
+  // import ThoughtNetwork3D from '@/components/thoughtNetwork/ThoughtNetwork3D.vue'
   import { ElMessage } from 'element-plus'
   
   export default {
     name: 'BrainNavigatorHome',
       components: {
       // MainNav,
-      BrainNavigator,
-      ThoughtNetwork3D
+      // BrainNavigator,
+      // ThoughtNetwork3D
       },
       data() {
           return {

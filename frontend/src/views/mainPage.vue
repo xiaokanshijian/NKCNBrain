@@ -168,6 +168,7 @@
                 <button @click="handleOpenHomeworkPageView('layout')" class="card-obj-btn card-hg-btn" v-if="showPdfViewer&&ciHomeworkToolbarReady">无损版面</button>
                 <button @click="handleOpenHomeworkPageView('understanding')" class="card-obj-btn card-hg-btn" v-if="showPdfViewer&&ciHomeworkToolbarReady">无损理解</button>
                 <button @click="handleOpenHomeworkPageView('grading')" class="card-obj-btn card-hg-btn" v-if="showPdfViewer&&ciHomeworkToolbarReady">三区批改</button>
+                <button @click="ciSkillManagerVisible = true" class="card-obj-btn card-hg-btn" v-if="showPdfViewer&&ciHomeworkToolbarReady">Skill 管理</button>
               </div>
               <div style="display: flex; align-items: flex-start; gap: 8px;">
                 <button @click="openPdfInNewWindows" class="card-obj-btn" v-if="showPdfViewer">新窗口显示</button>
@@ -345,6 +346,7 @@
                   :formLui2="formLui2" @LUI2_agent="LUI2_agent" @LUI2_A_dia="LUI2_A_dia" @LUI2_A_err="LUI2_A_err"
                   :LUI2_result_index="LUI2_result_index" :isHistoryUsed="isHistoryUsed" :isSummaryUsed="isSummaryUsed"
                   :isMemorySystemUsed="isMemorySystemUsed"
+                  :isSocraticProbeUsed="isSocraticProbeUsed"
                   @goCardGrid="showCardWindow" :keyTopics="keyTopics" @dragStart="handleDragStart" @dragEnd="handleDragEnd"
                   :rounds="rounds" :portraitStates="portraitStates" :threeModelQAState="threeModelQAState" :ModelContentMerge="ModelContentMerge"
                   @mergeEnd="mergeEnd" :choosedCardIdList="choosedCardIdList" @getCardRelQue="getCardRelQue"
@@ -353,7 +355,8 @@
                   @pinCard="pinCard" @retryCompleted="handleRetryCompleted" @pdfUploaded="handlePdfUploaded"
                   @scrollToCardGridTop="handleScrollToCardGridTop" @clearCardSingleMaking="handleClearCardSingleMaking"
                   :coreKeyword="coreKeyword"
-                  :crossNotebookContext="isCrossNotebookContext">
+                  :crossNotebookContext="isCrossNotebookContext"
+                  :cardShallowRateModelId="cardShallowRateModelId">
                 </ChatWindow>
               </div>
             </div>
@@ -376,14 +379,15 @@
                   @cardUpdate="handleCardUpdate" @cardUpdateStream="handleCardUpdateStream" @cardUpdateStreamOver="handleCardUpdateStreamOver" 
                   @cardOpeUpdStream="handleCardOpeUpdStream" @cardOpeUpdStreamOver="handleCardOpeUpdStreamOver" @cardOpeUpd="handleCardOpeUpd" :formLui2="formLui2" @LUI2_agent="LUI2_agent" @LUI2_A_dia="LUI2_A_dia"
                   @LUI2_A_err="LUI2_A_err" :LUI2_result_index="LUI2_result_index" :isHistoryUsed="isHistoryUsed"
-                  :isSummaryUsed="isSummaryUsed" :isMemorySystemUsed="isMemorySystemUsed" @goCardGrid="showCardWindow" :keyTopics="keyTopics"
+                  :isSummaryUsed="isSummaryUsed" :isMemorySystemUsed="isMemorySystemUsed" :isSocraticProbeUsed="isSocraticProbeUsed" @goCardGrid="showCardWindow" :keyTopics="keyTopics"
                   @dragStart="handleDragStart" @dragEnd="handleDragEnd" :rounds="rounds" :portraitStates="portraitStates"
                   :choosedCardIdList="choosedCardIdList" @goCardGridWithoutMaking="showCardWindowWithoutMaking"
                   :subSceneName="subSceneName" :sceneName="sceneName" :openCardId="openCardId" :chosenContent="chosenContent"
                   :fileNameList="fileNameList" @updateFileCardBanStyle="updateFileCardBanStyle" @pinCard="pinCard" @retryCompleted="handleRetryCompleted"
                   @scrollToCardGridTop="handleScrollToCardGridTop" @clearCardSingleMaking="handleClearCardSingleMaking"
                   :coreKeyword="coreKeyword"
-                  :crossNotebookContext="isCrossNotebookContext">
+                  :crossNotebookContext="isCrossNotebookContext"
+                  :cardShallowRateModelId="cardShallowRateModelId">
                 </ChatWindow>
               </div>
 
@@ -405,14 +409,15 @@
                   @cardUpdate="handleCardUpdate" @cardUpdateStream="handleCardUpdateStream" @cardUpdateStreamOver="handleCardUpdateStreamOver" 
                   @cardOpeUpdStream="handleCardOpeUpdStream" @cardOpeUpdStreamOver="handleCardOpeUpdStreamOver" @cardOpeUpd="handleCardOpeUpd" :formLui2="formLui2" @LUI2_agent="LUI2_agent" @LUI2_A_dia="LUI2_A_dia"
                   @LUI2_A_err="LUI2_A_err" :LUI2_result_index="LUI2_result_index" :isHistoryUsed="isHistoryUsed"
-                  :isSummaryUsed="isSummaryUsed" :isMemorySystemUsed="isMemorySystemUsed" @goCardGrid="showCardWindow" :keyTopics="keyTopics"
+                  :isSummaryUsed="isSummaryUsed" :isMemorySystemUsed="isMemorySystemUsed" :isSocraticProbeUsed="isSocraticProbeUsed" @goCardGrid="showCardWindow" :keyTopics="keyTopics"
                   @dragStart="handleDragStart" @dragEnd="handleDragEnd" :rounds="rounds" :portraitStates="portraitStates"
                   :choosedCardIdList="choosedCardIdList" @goCardGridWithoutMaking="showCardWindowWithoutMaking"
                   :subSceneName="subSceneName" :sceneName="sceneName" :openCardId="openCardId" :chosenContent="chosenContent"
                   :fileNameList="fileNameList" @updateFileCardBanStyle="updateFileCardBanStyle" @pinCard="pinCard" @retryCompleted="handleRetryCompleted"
                   @scrollToCardGridTop="handleScrollToCardGridTop" @clearCardSingleMaking="handleClearCardSingleMaking"
                   :coreKeyword="coreKeyword"
-                  :crossNotebookContext="isCrossNotebookContext">
+                  :crossNotebookContext="isCrossNotebookContext"
+                  :cardShallowRateModelId="cardShallowRateModelId">
                 </ChatWindow>
               </div>
             </div>
@@ -599,6 +604,18 @@
                         :class="['toggle-switch', isCrossNotebookContext ? 'enabled' : '']"
                       >
                         <span :class="['toggle-dot', isCrossNotebookContext ? 'enabled' : '']">
+                        </span>
+                      </button>
+                    </div>
+
+                    <!-- 语义反问（机问人答）开关：关闭则不调用 DS 判定 -->
+                    <div class="toggle-row">
+                      <span class="label">是否启用反问（机问人答）</span>
+                      <button
+                        @click="OnOffSocraticProbe"
+                        :class="['toggle-switch', isSocraticProbeUsed ? 'enabled' : '']"
+                      >
+                        <span :class="['toggle-dot', isSocraticProbeUsed ? 'enabled' : '']">
                         </span>
                       </button>
                     </div>
@@ -1113,15 +1130,14 @@
           >
             拖拽我
           </div> -->
-          <button class="change-multiQAScore" :class="{ 'change-multiQAScore-active': isMultiQAScore || isAppendSuggestions }" @click="changeMultiQAScore()">
-            {{ 
-              !isMultiQAScore && !isAppendSuggestions 
-                ? '启用多QA对打分' 
-                : isMultiQAScore && !isAppendSuggestions 
-                  ? '追加建议及初始滚动迭代' 
-                  : '切回普通生成' 
-            }}
-          </button>
+          <!-- 多QA对打分：逻辑保留，按钮按方案隐藏 -->
+          <div class="add-card-presets" style="margin: 0 0 12px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+            <span style="color:#606266;font-size:13px;">预选项：</span>
+            <el-button size="small" :type="addCardPresetKind==='grading_config'?'primary':'default'" @click="applyAddCardPreset('grading_config')">批改配置卡</el-button>
+            <el-button size="small" :type="addCardPresetKind==='todo'?'primary':'default'" @click="applyAddCardPreset('todo')">TODO清单卡</el-button>
+            <el-button size="small" :type="addCardPresetKind==='directory'?'primary':'default'" @click="applyAddCardPreset('directory')">目录卡</el-button>
+            <el-button size="small" type="info" plain @click="clearAddCardPreset">清除预选项</el-button>
+          </div>
           <el-form :model="userDefineForm" label-width="80px" class="inline-form">
             <div class="input-button-group">
               <!-- <el-input type="textarea" placeholder="请写出要直接生成卡片的内容" v-model="userDefineForm.userText"></el-input> -->
@@ -1277,41 +1293,70 @@
     </el-container>
   </div>
 
+  <el-dialog :model-value="!!ciSkillPending" title="本次批改" width="520px" class="ci-skill-start-dialog"
+    :close-on-click-modal="false" @close="finishCISkillStart(null)">
+    <p>{{ ciSkillPending?.filename }}</p>
+    <NotebookSkillSelector v-if="ciSkillPending" v-model="ciSkillSelection"
+      :username="ciSkillPending.username" @valid="ciSkillValid = $event" />
+    <template #footer>
+      <el-button @click="finishCISkillStart(null)">取消</el-button>
+      <el-button type="primary" :disabled="!ciSkillValid" @click="finishCISkillStart(ciSkillSelection)">开始处理</el-button>
+    </template>
+  </el-dialog>
   <FeedbackMaterialDialog :visible="ciMaterialVisible" :filename="ciMaterialFilename"
     :username="ciMaterialUsername" :scene-name="sceneName" :submitting="ciMaterialSubmitting"
     :initial-context="ciMaterialInitialContext"
     @close="ciMaterialVisible = false" @submit="submitFeedbackMaterial" />
+
+  <el-dialog v-model="ciSkillManagerVisible" title="Skill 管理" width="min(1200px, 94vw)"
+    append-to-body destroy-on-close>
+    <div style="max-height: 72vh; overflow-y: auto;">
+      <FeedbackRuleManager v-if="ciSkillManagerVisible" />
+    </div>
+  </el-dialog>
 
   <!-- 连续图片作业批改面板 -->
   <HomeworkGradingPanel
     ref="homeworkGradingPanelRef"
     v-if="showContinuousImagePanel && (
       (ciActiveResult && ciActiveResult.analysis_type === 'homework_grading')
-      || (ciRunningTask && ciRunningTask.analysis_type === 'homework_grading' && (!ciRunningTask.completed || ciRunningTask.error))
+      || (!ciActiveResult && ciRunningTask && ciRunningTask.analysis_type === 'homework_grading' && (!ciRunningTask.completed || ciRunningTask.error))
     )"
     :activeAnalysisId="ciActiveAnalysisId"
     :activeResult="ciActiveResult"
     :activeRunId="ciHomeworkRunId"
+    :assetCacheBust="ciHomeworkAssetCacheBust"
     :homeworkVersions="ciHomeworkVersions"
     :versionsLoading="ciHomeworkVersionsLoading"
     :keyVersionLoading="ciHomeworkKeyVersionLoading"
     :rerunLoading="ciHomeworkRerunLoading"
+    :pin-loading="pinResultCardsJob.running"
     :redBlueRetryLoading="ciHomeworkRedBlueRetryLoading"
-    :runningTask="ciRunningTask"
-    :page-view-only="ciHomeworkPageViewOnly"
+    :runningTask="ciViewedGradingTask"
+    :page-view-only="ciHomeworkPageViewOnly || ciHomeworkVerifyAssist"
+    :verify-assist="ciHomeworkVerifyAssist"
     @close="handleCloseContinuousImagePanel"
+    @close-verify-assist="handleCloseHomeworkVerifyAssist"
     @start-pass3="handleCIStartPass3"
     @rerun="handleCIHomeworkRerun"
     @retry-red-blue="handleCIHomeworkRedBlueRetry"
     @switch-version="handleCIHomeworkSwitchVersion"
     @toggle-key-version="handleCIHomeworkToggleKeyVersion"
+    @start-pin-result-cards="handleStartPinResultCards"
+    @result-cards-pinned="refreshHomeworkResultCards"
   />
+
+  <div v-if="ciRunningTask?.connection_paused || ciResultRetry" class="ci-task-recovery" role="status">
+    <span>{{ ciRunningTask?.connection_paused ? ciRunningTask.connection_error : ciResultRetry?.message }}</span>
+    <button v-if="ciRunningTask?.connection_paused" type="button" @click="reconnectCIGradingTask">重新连接</button>
+    <button v-if="ciResultRetry && !ciResultRetry.loading" type="button" @click="reloadCIGradingResult">重新加载结果</button>
+  </div>
 
   <!-- 双科交叉诊断面板 -->
   <CrossSubjectPanel
     v-if="showContinuousImagePanel && ciActiveResult && ciActiveResult.analysis_type === 'cross_subject'"
     :activeResult="ciActiveResult"
-    :runningTask="ciRunningTask"
+    :runningTask="ciRunningTask?.analysis_type === 'homework_grading' ? ciViewedGradingTask : ciRunningTask"
     @close="handleCloseContinuousImagePanel"
   />
 
@@ -1326,7 +1371,7 @@
     :availableAnalyses="ciAvailableAnalyses"
     :activeAnalysisId="ciActiveAnalysisId"
     :activeResult="ciActiveResult"
-    :runningTask="ciRunningTask"
+    :runningTask="ciRunningTask?.analysis_type === 'homework_grading' ? ciViewedGradingTask : ciRunningTask"
     :singleWorkAreaAutoOpenSignal="ciSingleWorkAreaAutoOpenSignal"
     :selectedContextDocs="fileNameList"
     :selectedContextCardIds="choosedCardIdList"
@@ -1409,8 +1454,10 @@ import { feedbackMaterialSettings } from '@/api/continuous_image'
 import ContinuousImagePanel from "@/components/fileWindow/ContinuousImagePanel.vue"
 import HomeworkGradingPanel from "@/components/fileWindow/HomeworkGradingPanel.vue"
 import FeedbackMaterialDialog from "@/components/fileWindow/FeedbackMaterialDialog.vue"
+import NotebookSkillSelector from "@/components/fileWindow/NotebookSkillSelector.vue"
+import FeedbackRuleManager from "@/components/admin/FeedbackRuleManager.vue"
 import CrossSubjectPanel from "@/components/fileWindow/CrossSubjectPanel.vue"
-import { queryCIAnalyses, startCIAnalysis, startHomeworkFeedback, startImageUnderstanding, getCIProgress, getCIResult, redoCIAnalysis, listCIHomeworkVersions, markCIHomeworkVersionKey, rerunCIHomework, retryCIHomeworkRedBlue, startCIReproduction, startCISketchRQuickstart, updateCIReproductionContext, iterateCIReproductionUnit, iterateCIReproductionLayoutRegions, autoIterateCIReproductionRound, applyCILiteBundleToReproduction, rollbackCIReproductionUnit, getCIPdfPageCount, startCIPass3 } from "@/api/continuous_image"
+import { queryCIAnalyses, startCIAnalysis, startHomeworkFeedback, startImageUnderstanding, getCIProgress, getCIResult, redoCIAnalysis, listCIHomeworkVersions, markCIHomeworkVersionKey, rerunCIHomework, retryCIHomeworkRedBlue, startCIReproduction, startCISketchRQuickstart, updateCIReproductionContext, iterateCIReproductionUnit, iterateCIReproductionLayoutRegions, autoIterateCIReproductionRound, applyCILiteBundleToReproduction, rollbackCIReproductionUnit, getCIPdfPageCount, startCIPass3, startCIHomeworkVerifyIterate, getCIHomeworkVerifyIterateStatus, pinCIHomeworkResultCards, getCIHomeworkPinResultCardsStatus } from "@/api/continuous_image"
 import CardGrid from "@/components/cardWindow/CardGrid.vue"
 import CardGridFold from "@/components/cardWindow/CardGridFold.vue"
 import ModelCard from "@/components/chatWindow/ModelCard.vue"
@@ -1424,14 +1471,14 @@ import { get_file, get_file_summary, get_file_topics, get_file_text, get_img_tex
 import { animation } from "@/utils/util";
 import { card_evalSFT } from "@/api/card/send_card"
 import radarChart2 from '@/components/radar-chart2.vue';
-import { getModel, modelHL, modelHLStream, getLittleModel, getMultimodalLittleModel, getDefaultModelsConfig, getDepthSuggestion } from "@/api/getData"
+import { getModel, modelHL, modelHLStream, getLittleModel, getMultimodalLittleModel, getDefaultModelsConfig, getSceneModelsConfig, getDepthSuggestion } from "@/api/getData"
 import { getUseToFinetune } from "@/api/getBackData"
 import { chat_switch, img_getTopics, asr_chat_send } from "@/api/chat/send_message"
 import { test_get_speech_text } from '@/api/test'
 import router from '@/router'
 import { getSubScene, setNewSubExcel, addCardDirect, multiQAScore, multiQAScorePlus, merge2Responses, getCardsContentByIds } from "@/api/card_zym/card_js";
 import { card_upload, card_updateContentById } from "@/api/card/send_card";
-import { chat_sendParams, chat_sendSuperParams, agent_LUI1, reget_topics, reget_ques, update_context, execute_commands, question_enhance, enhance_question_with_small_model, generate_cross_document_suggestion_card, update_cross_document_suggestion_card, group_twin_gxx_start, get_group_twin_gxx_progress } from "@/api/chat/send_message"
+import { chat_sendParams, chat_sendSuperParams, agent_LUI1, reget_topics, reget_ques, update_context, execute_commands, question_enhance, enhance_question_with_small_model, generate_cross_document_suggestion_card, update_cross_document_suggestion_card, group_twin_gxx_start, get_group_twin_gxx_progress, cross_reorganize_skills_start, knowledge_conflict_start } from "@/api/chat/send_message"
 import { user_exit } from '@/api/user'
 import { saveAutomationRecords, checkHasRecords } from "@/api/automation"
 import { exportUserData, importUserData } from '@/api/dataExport'
@@ -1496,6 +1543,8 @@ export default {
     ContinuousImagePanel,
     HomeworkGradingPanel,
     FeedbackMaterialDialog,
+    NotebookSkillSelector,
+    FeedbackRuleManager,
     CrossSubjectPanel
   },
   watch: {
@@ -1739,11 +1788,13 @@ export default {
       isMemorySystemUsed: false,
       isSummaryUsed: false,
       isCrossNotebookContext: false,
+      isSocraticProbeUsed: false,
 
       // 卡片直接生成 (含是否启用多QA打分)
       multiQASplit: [],
       isMultiQAScore: false,
       isAppendSuggestions: false,
+      addCardPresetKind: '',
       userDefineForm: {
         userText: ''
       },
@@ -1983,6 +2034,9 @@ export default {
       curModelInfo: null,
       curModelInfoUp: null,
       curModelInfoDown: null,
+      // Admin 场景槽位解析出的 model_id（默认 claude-4-sonnet=1126）
+      cardShallowRateModelId: '1126',
+      docFileSummaryModelId: '1126',
       inputMsg: "",
       fileNameList: [],
       importAreaImagePool: [],
@@ -2037,6 +2091,10 @@ export default {
       // 连续图片认知理解相关（新架构）
       showContinuousImagePanel: false,
       ciMaterialVisible: false,
+      ciSkillPending: null,
+      ciSkillSelection: { enabled: false, names: [] },
+      ciSkillValid: true,
+      ciSkillManagerVisible: false,
       ciMaterialSubmitting: false,
       ciMaterialFilename: "",
       ciMaterialUsername: "",
@@ -2051,6 +2109,10 @@ export default {
       ciActiveResult: null,
       // 运行中任务进度 { task_id, analysis_id, section, item, total, error } | null
       ciRunningTask: null,
+      ciPollFailures: 0,
+      ciResultRetry: null,
+      ciResultGeneration: 0,
+      ciResultTarget: null,
       ciHomeworkRunId: 'current',
       ciHomeworkAnalysisId: '',
       ciHomeworkVersions: [],
@@ -2061,13 +2123,43 @@ export default {
       ciHomeworkToolbarReady: false,
       ciHomeworkToolbarFilename: '',
       ciHomeworkPageViewOnly: false,
+      ciHomeworkVerifyAssist: false,
       ciHomeworkPendingPageView: '',
       ciSingleWorkAreaAutoOpenSignal: null,
       ciReproductionConfirming: '',
       ciPollTimer: null,
+      ciPollGeneration: 0,
+      ciPollInFlightGeneration: null,
       // ElNotification 实例引用
       ciProgressNotification: null,
+      verifyIterateNotification: null,
+      _verifyIterateCloseTimer: null,
+      ciHomeworkAssetCacheBust: 0,
       ciBatchSketchRDialogVisible: false,
+      verifyIterate: {
+        running: false,
+        status: '',
+        progress: 0,
+        msg: '',
+        jobId: '',
+        analysisId: '',
+        cid: null,
+        cardPollingStarted: false,
+      },
+      _verifyIterateTimer: null,
+      pinResultCardsJob: {
+        running: false,
+        status: '',
+        progress: 0,
+        msg: '',
+        jobId: '',
+        analysisId: '',
+        pageIndex: 0,
+        pagesTotal: 0,
+      },
+      pinResultCardsNotification: null,
+      _pinResultCardsTimer: null,
+      _pinResultCardsCloseTimer: null,
       ciBatchSketchRCandidates: [],
       ciBatchSketchRSelected: [],
       ciBatchSketchR: {
@@ -2106,8 +2198,16 @@ export default {
     ciAnalysisRunning() {
       return !!(this.ciRunningTask && !this.ciRunningTask.completed)
     },
+    ciViewedGradingTask() {
+      const task = this.ciRunningTask
+      const workspace = this.ciActiveResult?.manifest?.username || localStorage.getItem('userId')
+      return task && task.analysis_id === this.ciActiveAnalysisId
+        && (!task.workspace || task.workspace === workspace) ? task : null
+    },
     // 连续图片理解进度百分比（用于通知组件）
     _ciProgressPercent() {
+      if (this.ciRunningTask?.analysis_type === 'homework_grading' && this.ciRunningTask.completed
+          && this.ciRunningTask.completion?.status === 'complete') return 100
       if (!this.ciRunningTask || this.ciRunningTask.total <= 0) return 10
       return Math.min(Math.round((this.ciRunningTask.item / this.ciRunningTask.total) * 100), 100)
     },
@@ -2222,6 +2322,61 @@ export default {
   },
   mounted() {
     console.log('mounted');
+    this._onNkcnHomeworkJump = (event) => {
+      this.handleNkcnHomeworkJump((event && event.detail) || {})
+    }
+    this._onNkcnHomeworkJumpMessage = (event) => {
+      const data = event && event.data
+      if (!data || data.type !== 'nkcn-homework-jump') return
+      this.handleNkcnHomeworkJump({
+        evidence: data.evidence,
+        analysisId: data.analysisId || data.analysis_id || '',
+        runId: data.runId || data.run_id || '',
+      })
+    }
+    this._onNkcnHomeworkVerifyAssist = (event) => {
+      this.handleNkcnHomeworkVerifyAssist((event && event.detail) || {})
+    }
+    this._onNkcnHomeworkVerifyAssistClose = () => {
+      this.handleCloseHomeworkVerifyAssist()
+    }
+    this._onNkcnHomeworkVerifyAssistMessage = (event) => {
+      const data = event && event.data
+      if (!data) return
+      if (data.type === 'nkcn-homework-verify-assist') {
+        this.handleNkcnHomeworkVerifyAssist({
+          evidence: data.evidence,
+          analysisId: data.analysisId || data.analysis_id || '',
+          runId: data.runId || data.run_id || '',
+        })
+        return
+      }
+      if (data.type === 'nkcn-homework-verify-assist-close') {
+        this.handleCloseHomeworkVerifyAssist()
+      }
+    }
+    this._onNkcnHomeworkVerifyIterate = (event) => {
+      this.handleNkcnHomeworkVerifyIterate((event && event.detail) || {})
+    }
+    // 与题号跳转一致：iframe 内 postMessage 直接由宿主承接（不依赖 Card 转发）
+    this._onNkcnHomeworkVerifyIterateMessage = (event) => {
+      const data = event && event.data
+      if (!data || data.type !== 'nkcn-homework-verify-iterate') return
+      this.handleNkcnHomeworkVerifyIterate({
+        username: data.username || '',
+        analysisId: data.analysisId || data.analysis_id || '',
+        runId: data.runId || data.run_id || 'current',
+        cid: data.cid || null,
+      })
+    }
+    window.addEventListener('nkcn-homework-jump', this._onNkcnHomeworkJump)
+    window.addEventListener('message', this._onNkcnHomeworkJumpMessage)
+    window.addEventListener('nkcn-homework-verify-assist', this._onNkcnHomeworkVerifyAssist)
+    window.addEventListener('nkcn-homework-verify-assist-close', this._onNkcnHomeworkVerifyAssistClose)
+    window.addEventListener('message', this._onNkcnHomeworkVerifyAssistMessage)
+    window.addEventListener('nkcn-homework-verify-iterate', this._onNkcnHomeworkVerifyIterate)
+    window.addEventListener('message', this._onNkcnHomeworkVerifyIterateMessage)
+    this._restoreCIGradingTask()
 
     // 🔥 新增：读取用户的system选择
     const savedChoice = localStorage.getItem('systemChoice');
@@ -2232,11 +2387,15 @@ export default {
     if (savedMem !== null) {
       this.isMemorySystemUsed = savedMem !== 'false';
     }
+    const savedSocratic = localStorage.getItem('isSocraticProbeUsed');
+    // 默认关闭；仅显式存为 true 时开启
+    this.isSocraticProbeUsed = savedSocratic === 'true';
     console.log('[MainPage] System Choice:', this.systemChoice === 0 ? 'System2(慢思考)' : 'System1(快思考)');
 
     this.handleUpdateBgcList();
     this.context.beginTime = localStorage.getItem('time')
     this.audioElement = this.$refs.audioElement; // 设置播放tts音频的变量
+    this.loadSceneModelIds();
     let modelInfoList = getModel();
     // this.curModelInfo = modelInfoList[0];
     // this.curModelInfoUp = modelInfoList[1];
@@ -2412,11 +2571,44 @@ export default {
     console.log('beforeDestroy');
     // 当组件销毁前，移除事件监听器
     window.removeEventListener('beforeunload', this.handleBeforeUnload);
+    if (this._onNkcnHomeworkJump) {
+      window.removeEventListener('nkcn-homework-jump', this._onNkcnHomeworkJump)
+      this._onNkcnHomeworkJump = null
+    }
+    if (this._onNkcnHomeworkJumpMessage) {
+      window.removeEventListener('message', this._onNkcnHomeworkJumpMessage)
+      this._onNkcnHomeworkJumpMessage = null
+    }
+    if (this._onNkcnHomeworkVerifyAssist) {
+      window.removeEventListener('nkcn-homework-verify-assist', this._onNkcnHomeworkVerifyAssist)
+      this._onNkcnHomeworkVerifyAssist = null
+    }
+    if (this._onNkcnHomeworkVerifyAssistClose) {
+      window.removeEventListener('nkcn-homework-verify-assist-close', this._onNkcnHomeworkVerifyAssistClose)
+      this._onNkcnHomeworkVerifyAssistClose = null
+    }
+    if (this._onNkcnHomeworkVerifyAssistMessage) {
+      window.removeEventListener('message', this._onNkcnHomeworkVerifyAssistMessage)
+      this._onNkcnHomeworkVerifyAssistMessage = null
+    }
+    if (this._onNkcnHomeworkVerifyIterate) {
+      window.removeEventListener('nkcn-homework-verify-iterate', this._onNkcnHomeworkVerifyIterate)
+      this._onNkcnHomeworkVerifyIterate = null
+    }
+    if (this._onNkcnHomeworkVerifyIterateMessage) {
+      window.removeEventListener('message', this._onNkcnHomeworkVerifyIterateMessage)
+      this._onNkcnHomeworkVerifyIterateMessage = null
+    }
+    if (this._verifyIterateTimer) {
+      clearInterval(this._verifyIterateTimer)
+      this._verifyIterateTimer = null
+    }
+    this._closeVerifyIterateNotification()
     // 组件销毁前停止定时器
     // this.stopPeriodicUpdate(); 
     document.removeEventListener('click', this.handleClickOutside)
     window.removeEventListener('scroll', this.updateTooltipPosition)
-    window.removeEventListener('resize', this.updateTooltipPosition)
+  window.removeEventListener('resize', this.updateTooltipPosition)
 
     // 移除事件监听
     document.removeEventListener('paste', this.handleGlobalPaste);
@@ -2424,9 +2616,43 @@ export default {
     this.cleanupBlobUrl();
   },
   beforeUnmount() {
+    this.finishCISkillStart(null)
     console.log('beforeUnmount');
     // 当组件销毁前，移除事件监听器
     window.removeEventListener('beforeunload', this.handleBeforeUnload);
+    if (this._onNkcnHomeworkJump) {
+      window.removeEventListener('nkcn-homework-jump', this._onNkcnHomeworkJump)
+      this._onNkcnHomeworkJump = null
+    }
+    if (this._onNkcnHomeworkJumpMessage) {
+      window.removeEventListener('message', this._onNkcnHomeworkJumpMessage)
+      this._onNkcnHomeworkJumpMessage = null
+    }
+    if (this._onNkcnHomeworkVerifyAssist) {
+      window.removeEventListener('nkcn-homework-verify-assist', this._onNkcnHomeworkVerifyAssist)
+      this._onNkcnHomeworkVerifyAssist = null
+    }
+    if (this._onNkcnHomeworkVerifyAssistClose) {
+      window.removeEventListener('nkcn-homework-verify-assist-close', this._onNkcnHomeworkVerifyAssistClose)
+      this._onNkcnHomeworkVerifyAssistClose = null
+    }
+    if (this._onNkcnHomeworkVerifyAssistMessage) {
+      window.removeEventListener('message', this._onNkcnHomeworkVerifyAssistMessage)
+      this._onNkcnHomeworkVerifyAssistMessage = null
+    }
+    if (this._onNkcnHomeworkVerifyIterate) {
+      window.removeEventListener('nkcn-homework-verify-iterate', this._onNkcnHomeworkVerifyIterate)
+      this._onNkcnHomeworkVerifyIterate = null
+    }
+    if (this._onNkcnHomeworkVerifyIterateMessage) {
+      window.removeEventListener('message', this._onNkcnHomeworkVerifyIterateMessage)
+      this._onNkcnHomeworkVerifyIterateMessage = null
+    }
+    if (this._verifyIterateTimer) {
+      clearInterval(this._verifyIterateTimer)
+      this._verifyIterateTimer = null
+    }
+    this._closeVerifyIterateNotification()
     // 组件销毁前停止定时器
     // this.stopPeriodicUpdate(); 
     document.removeEventListener('click', this.handleClickOutside)
@@ -3697,6 +3923,7 @@ export default {
               this.$refs.ChatWindow.getOurModelEval(cardContent, existingCardId, -1);
               this.$message.success('文档全面交叉梳理建议卡片已更新！');
               this.maybeStartGroupTwinAfterCrossDoc();
+              this.maybeStartCrossReorganizeSkillsAfterCrossDoc();
             } else {
               const errorMsg = response?.msg || '未知错误';
               this.$message.error('更新卡片失败: ' + errorMsg);
@@ -3774,6 +4001,7 @@ export default {
                 this.refreshCardWhenKeywordsReady(cid);
                 this.$message.success('文档全面交叉梳理建议卡片已创建！');
                 this.maybeStartGroupTwinAfterCrossDoc();
+                this.maybeStartCrossReorganizeSkillsAfterCrossDoc();
               } else {
                 this.$message.error('创建卡片失败: ' + (data.data['msg'] || '未知错误'));
                 this.cardMaking = false;
@@ -5147,6 +5375,15 @@ export default {
         this.$message.success('已关闭跨本子关联');
       }
     },
+    OnOffSocraticProbe() {
+      this.isSocraticProbeUsed = !this.isSocraticProbeUsed
+      localStorage.setItem('isSocraticProbeUsed', this.isSocraticProbeUsed ? 'true' : 'false')
+      if (this.isSocraticProbeUsed) {
+        this.$message.success('已开启反问：将调用模型判断是否需要机问人答');
+      } else {
+        this.$message.success('已关闭反问：不再调用模型做反问判定，直接回答');
+      }
+    },
 
     isUserTextValid(userText) {
       // 正则表达式，确保整个字符串严格符合序号分条的格式
@@ -5260,6 +5497,9 @@ export default {
         this.$message.warning('文本内容不可为空！');
         return
       }
+      if (!this.validateAddCardPresetBeforeCreate(userText)) {
+        return
+      }
 
       if(this.isMultiQAScore === false && this.isAppendSuggestions === false) {
         // level1：普通卡片生成
@@ -5275,6 +5515,7 @@ export default {
 
         this.$message.success('正在生成卡片，请稍等');
         this.showAddDirectDialog = false;
+        this.addCardPresetKind = '';
         // 🔥 先滚动到顶部，再显示等待卡片
         if (this.$refs.CardGrid) {
           this.$refs.CardGrid.scrollToTop();
@@ -5326,7 +5567,8 @@ export default {
           } else {
             this.cardMaking = false;
             this.cardUpdate = true;
-            this.$message.error('出错了，请退出重登再试，若再次出错，请联系管理员并暂勿使用此功能');
+            const errMsg = (data && data.data && (data.data.msg || data.data.message)) || '';
+            this.$message.error(errMsg || '出错了，请退出重登再试，若再次出错，请联系管理员并暂勿使用此功能');
           }
         })
       } else if(this.isMultiQAScore === true && this.isAppendSuggestions === false) {
@@ -5453,6 +5695,7 @@ export default {
         this.$message.error('您没有权限添加卡片');
         return
       }
+      this.addCardPresetKind = '';
       this.showAddDirectDialog = true
     },
     updateVoiceRecognitionStatus() {
@@ -5777,6 +6020,149 @@ export default {
         this.$message.success("已切换回普通LUI能力");
       }
     },
+    /** 交叉梳理卡就绪后：后台生成本子交叉 Skill 1+n（失败不影响卡片） */
+    maybeStartCrossReorganizeSkillsAfterCrossDoc() {
+      try {
+        cross_reorganize_skills_start({
+          username: localStorage.getItem('userId'),
+          sceneName: this.sceneName || '',
+        }).then((res) => {
+          if (res && res.error_num === 0) {
+            this.$message.info('本子交叉 Skill（1+n）已在后台生成…');
+          } else {
+            console.warn('[cross_reorganize] start failed', res);
+          }
+        }).catch((e) => {
+          console.warn('[cross_reorganize] start error', e);
+        });
+      } catch (e) {
+        console.warn('[cross_reorganize] start exception', e);
+      }
+      this.maybeStartKnowledgeConflictAfterCrossDoc();
+    },
+    /** 交叉梳理卡就绪后：后台知识冲突挖掘（失败不影响卡片） */
+    maybeStartKnowledgeConflictAfterCrossDoc() {
+      try {
+        knowledge_conflict_start({
+          username: localStorage.getItem('userId'),
+          sceneName: this.sceneName || '',
+        }).then((res) => {
+          if (res && res.error_num === 0) {
+            this.$message.info('可能的知识冲突已在后台挖掘…');
+          } else {
+            console.warn('[knowledge_conflict] start failed', res);
+          }
+        }).catch((e) => {
+          console.warn('[knowledge_conflict] start error', e);
+        });
+      } catch (e) {
+        console.warn('[knowledge_conflict] start exception', e);
+      }
+    },
+    clearAddCardPreset() {
+      this.addCardPresetKind = '';
+    },
+    applyAddCardPreset(kind) {
+      this.addCardPresetKind = kind;
+      this.isMultiQAScore = false;
+      this.isAppendSuggestions = false;
+      const tip = '已配好模板，按格式填写';
+      if (kind === 'grading_config') {
+        this.userDefineForm.userText = `【批改配置卡】
+
+——材料——
+材料标识：（文件名，须与本子导入区文件名完全一致）
+材料说明：（可选，材料情况说明）
+布置次序：
+第1次：（页码列表，可跳号，如 1-3,7,10）
+第2次：
+
+——材料——
+材料标识：（另一个文件名）
+材料说明：（可选）
+布置次序：
+第1次：
+`;
+        this.$message.success(tip);
+        return;
+      }
+      if (kind === 'todo') {
+        const docHint = (this.fileNameList && this.fileNameList[0]) ? this.fileNameList[0] : '文档名.pdf';
+        const titleHint = String(docHint).replace(/\.[^.]+$/, '') + '清单卡';
+        this.userDefineForm.userText = `1. （第一项待办）
+2. （第二项待办）
+3. （第三项待办）
+`;
+        this.$message.success(`已配好清单格式。生成后请把卡片标题改成「${titleHint}」，自动化才能识别`);
+        return;
+      }
+      if (kind === 'directory') {
+        const dirName = (this.sceneName || '本子').trim();
+        this.userDefineForm.userText = `${dirName}目录
+一、（第一章标题）
+1.（第一节标题）
+A.（小节标题，可删）
+2.（第二节标题）
+二、（第二章标题）
+1.（第一节标题）
+`;
+        this.$message.success(tip);
+      }
+    },
+    validateAddCardPresetBeforeCreate(userText) {
+      const kind = this.addCardPresetKind;
+      if (!kind) return true;
+      const text = userText || '';
+      if (kind === 'grading_config') {
+        if (!text.includes('【批改配置卡】') || !text.includes('——材料——') || !text.includes('材料标识')) {
+          this.$message.error('批改配置卡模板结构被改坏：须保留【批改配置卡】、——材料——、材料标识');
+          return false;
+        }
+        if (!/第\s*\d+\s*次[：:]/.test(text)) {
+          this.$message.error('批改配置卡须至少有一行「第k次：」布置');
+          return false;
+        }
+        // 材料标识 vs 本子文件名
+        const files = new Set(this.fileNameList || []);
+        const missing = [];
+        const re = /^材料标识[：:]\s*(.+?)\s*$/gm;
+        let m;
+        while ((m = re.exec(text)) !== null) {
+          const name = (m[1] || '').trim();
+          if (!name || name.startsWith('（') || name.startsWith('(')) {
+            this.$message.error('请把「材料标识」改成与导入区完全一致的真实文件名');
+            return false;
+          }
+          if (!files.has(name)) missing.push(name);
+        }
+        if (missing.length) {
+          this.$message.error('以下材料标识在本子中找不到匹配文件：' + missing.join('；'));
+          return false;
+        }
+        return true;
+      }
+      if (kind === 'todo') {
+        if (!/^\s*\d+\.\s*\S+/m.test(text)) {
+          this.$message.error('TODO清单卡须至少有一条「1. …」清单项');
+          return false;
+        }
+        return true;
+      }
+      if (kind === 'directory') {
+        const first = (text.trim().split('\n')[0] || '').trim();
+        if (!first.endsWith('目录')) {
+          this.$message.error('目录卡第一行须以「目录」结尾，例如「××论文目录」');
+          return false;
+        }
+        if (!/^[一二三四五六七八九十百]+[、.]/m.test(text) && !/^\d+\./m.test(text)) {
+          this.$message.error('目录卡须有「一、章名」或「1.节名」层级');
+          return false;
+        }
+        return true;
+      }
+      return true;
+    },
+
     changeMultiQAScore() {
       if (!this.isMultiQAScore && !this.isAppendSuggestions) {
         this.isMultiQAScore = true;
@@ -7063,7 +7449,8 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
       let formData = new FormData();
       formData.append('username', localStorage.getItem('userId'));
       // formData.append('model_id', this.curModelInfo.id);
-      formData.append('model_id', '1126');  // 对应claude-4-sonnet
+      // Admin「文档·点摘要生成」槽位最终由后端覆盖；此处仍传默认以便兼容
+      formData.append('model_id', this.docFileSummaryModelId || '1126');
 
       // 体联音频/短期块：收窄为 LONG + 同名 txt；常规 pdf/txt 等与改前完全一致
       const summaryPayload = this.getSummaryFileListForCurrentFile();
@@ -7465,6 +7852,93 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
     handleCardUpdateOver() {
       this.cardUpdate = false;
     },
+    refreshHomeworkResultCards(payload) {
+      const pinned = (payload && typeof payload === 'object' && !Array.isArray(payload))
+        ? payload
+        : { diagnosis_cid: payload }
+      const diagId = pinned.diagnosis_cid
+        || this.ciActiveResult?.manifest?.result_cards?.diagnosis_cid
+        || this.ciRunningTask?.result_cards?.diagnosis_cid
+      const excerptId = pinned.excerpt_cid
+        || this.ciActiveResult?.manifest?.result_cards?.excerpt_cid
+        || this.ciRunningTask?.result_cards?.excerpt_cid
+      const mediaIds = [diagId, excerptId].filter(Boolean)
+      const evalIds = mediaIds.slice()
+      this.cardUpdate = false
+      this.$nextTick(() => {
+        if (diagId && this.$refs.CardGrid && typeof this.$refs.CardGrid.setLastCreatedCardId === 'function') {
+          this.$refs.CardGrid.setLastCreatedCardId(diagId)
+        }
+        // 诊断卡 + 解释精要卡都挂上生图/HTML 状态轮询，左上角图标才能跟着转
+        if (this.$refs.CardGrid) {
+          mediaIds.forEach((cid) => {
+            if (typeof this.$refs.CardGrid.onSingleCardImageRequested === 'function') {
+              this.$refs.CardGrid.onSingleCardImageRequested(cid)
+            }
+            if (typeof this.$refs.CardGrid.onSingleCardHtmlRequested === 'function') {
+              this.$refs.CardGrid.onSingleCardHtmlRequested(cid)
+            }
+          })
+        }
+        this.cardUpdate = true
+        evalIds.forEach((cid) => this._startHomeworkPinnedCardEval(cid))
+      })
+    },
+    async _startHomeworkPinnedCardEval(cid) {
+      if (!cid || !this.$refs.ChatWindow) return
+      // 卡片列表里的 content 常是预览（🔑 关键词 / ……），不能直接拿来做红蓝浅评/深评
+      const looksLikePreview = (text) => {
+        const t = String(text || '')
+        if (!t.trim()) return true
+        if (t.includes('（理解生成中）')) return true
+        if (/🔑/.test(t) && /……|\.\.\.\.\.\./.test(t)) return true
+        if (t.trim().endsWith('......') && t.length < 800) return true
+        return false
+      }
+      let content = ''
+      const tryLoadFull = async () => {
+        try {
+          const formData = new FormData()
+          formData.append('username', localStorage.getItem('userId'))
+          formData.append('cid', cid)
+          const data = await get_card(formData)
+          // get_card 返回 { error_num, content: card对象 }，正文在 content.content
+          const body = data && data.data ? data.data : data
+          const cardObj = (body && body.content) || body || {}
+          return (cardObj && (cardObj.content || cardObj.lastContent)) || ''
+        } catch (e) {
+          console.error('[refreshHomeworkResultCards] 读取卡片正文失败', cid, e)
+          return ''
+        }
+      }
+      for (let i = 0; i < 10; i++) {
+        content = await tryLoadFull()
+        if (content && !looksLikePreview(content)) break
+        const card = (this.$refs.CardGrid && this.$refs.CardGrid.cardList || []).find((item) => item.cid === cid)
+        const listed = (card && card.content) || ''
+        if (listed && !looksLikePreview(listed) && listed.length > (content || '').length) {
+          content = listed
+          break
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      }
+      if (!content || looksLikePreview(content)) {
+        console.warn('[refreshHomeworkResultCards] 仍未拿到完整卡片正文，跳过红蓝评测', cid)
+        return
+      }
+      // 解释精要等长卡：浅评/深评输入做温和截断，保留结构与要点
+      const EVAL_MAX = 12000
+      let evalContent = content
+      if (evalContent.length > EVAL_MAX) {
+        const head = evalContent.slice(0, Math.floor(EVAL_MAX * 0.72))
+        const tail = evalContent.slice(-Math.floor(EVAL_MAX * 0.22))
+        evalContent = `${head}\n\n【中间篇幅较长已节选，前后要点已保留】\n\n${tail}`
+      }
+      // 去掉仅存库用的 marker，避免模型当成系统调试信息
+      evalContent = evalContent.replace(/<!--\s*nkcn_grading_card:[^>]*-->\s*/gi, '')
+      this.$refs.ChatWindow.getModelEval(evalContent, cid)
+      this.$refs.ChatWindow.getOurModelEval(evalContent, cid, -1)
+    },
 
     // 🔥 问答钉卡时，立即滚动到CardGrid顶部
     handleScrollToCardGridTop() {
@@ -7604,6 +8078,26 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         }
       }).catch(e => {
         this.$message.error(e);
+      });
+    },
+
+    loadSceneModelIds() {
+      getSceneModelsConfig().then(response => {
+        if (response && response.error_num === 0) {
+          const ids = response.resolved_model_ids || {};
+          if (ids.card_shallow_rate) {
+            this.cardShallowRateModelId = String(ids.card_shallow_rate);
+          }
+          if (ids.doc_file_summary) {
+            this.docFileSummaryModelId = String(ids.doc_file_summary);
+          }
+          console.log('[SceneModels] 浅评/摘要 model_id:', {
+            card_shallow_rate: this.cardShallowRateModelId,
+            doc_file_summary: this.docFileSummaryModelId,
+          });
+        }
+      }).catch(e => {
+        console.warn('[SceneModels] 加载场景模型配置失败，沿用默认 1126:', e);
       });
     },
 
@@ -7881,7 +8375,7 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
       }).catch(error => {
         console.error("An error occurred:", error); // 错误处理
       });
-      // const response = await fetch('http://192.0.2.1:8000/model_switch', {
+      // const response = await fetch((process.env.VUE_APP_SERVICE_8000_MODEL_SWITCH_URL || "http://localhost:8000/model_switch"), {
       //   method: 'POST',
       //   headers: {
       //     'Content-Type': 'application/json; charset=utf-8',
@@ -10352,7 +10846,7 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
       if (!analysisId) return
       this._setCIAvailableAnalyses(singleRecord, groupRecord)
       this.showContinuousImagePanel = true
-      await this._loadCIResult(analysisId, username)
+      await this._loadCIResult(analysisId, username, String(analysisId).startsWith('homework_') ? 'current' : undefined)
     },
 
     async _getCIPdfHint(files, username, singleMode = false) {
@@ -10464,6 +10958,520 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
       }
     },
 
+    /** 重新沉淀：右下角进度（关连续图片面板也不消失） */
+    async handleStartPinResultCards(detail = {}) {
+      if (this.pinResultCardsJob.running) {
+        this._showPinResultCardsNotification()
+        return
+      }
+      const username = String(detail.username || localStorage.getItem('userId') || '').trim()
+      const analysisId = String(detail.analysisId || '').trim()
+      if (!username || !analysisId) {
+        this.$message.warning('无法确定当前批改，稍后再试')
+        return
+      }
+      let forceRegenSuggestions = false
+      let rebuildVerification = true
+      try {
+        const pinChoice = ElMessageBox.confirm(
+          '<div style="text-align:left;line-height:1.65;font-size:14px;color:#303133">'
+          + '<div style="font-weight:600;margin-bottom:6px">需加强核实的位置</div>'
+          + '<label style="display:block;margin:2px 0"><input type="radio" name="pin-verify" value="1" checked> 按当前规则重新给出</label>'
+          + '<label style="display:block;margin:2px 0"><input type="radio" name="pin-verify" value="0"> 沿用现有名单</label>'
+          + '<div style="font-weight:600;margin:12px 0 6px">可点选项</div>'
+          + '<label style="display:block;margin:2px 0"><input type="radio" name="pin-suggest" value="0"> 沿用现有</label>'
+          + '<label style="display:block;margin:2px 0"><input type="radio" name="pin-suggest" value="1" checked> 重新调用大模型生成（覆盖已有模型可点选项）</label>'
+          + '<div class="pin-suggest-lock" style="margin-top:6px;color:#909399;font-size:12px">重新给出名单时，可点选项会按这份新名单重新生成，不能沿用旧题上的短句。</div>'
+          + '<div style="margin-top:10px;color:#909399;font-size:12px">完整批改 / 迭代仍按原规则形成名单。核验后的「迭代更新」只去掉已核条目。</div>'
+          + '</div>',
+          '重新沉淀',
+          {
+            confirmButtonText: '开始沉淀',
+            cancelButtonText: '取消',
+            distinguishCancelAndClose: true,
+            dangerouslyUseHTMLString: true,
+            type: 'info',
+            customClass: 'pin-regen-suggest-box',
+            beforeClose: (action, _instance, done) => {
+              if (action === 'confirm') {
+                const root = document.querySelector('.pin-regen-suggest-box')
+                const sug = root && root.querySelector('input[name="pin-suggest"]:checked')
+                const ver = root && root.querySelector('input[name="pin-verify"]:checked')
+                rebuildVerification = !ver || ver.value === '1'
+                forceRegenSuggestions = rebuildVerification || !!(sug && sug.value === '1')
+              }
+              done()
+            },
+          },
+        )
+        setTimeout(() => {
+          const pinBox = document.querySelector('.pin-regen-suggest-box')
+          if (!pinBox) return
+          const syncPinSuggest = () => {
+            const ver = pinBox.querySelector('input[name="pin-verify"]:checked')
+            const rebuild = !ver || ver.value === '1'
+            pinBox.querySelectorAll('input[name="pin-suggest"]').forEach((el) => {
+              el.disabled = rebuild
+              if (rebuild && el.value === '1') el.checked = true
+            })
+            const note = pinBox.querySelector('.pin-suggest-lock')
+            if (note) note.style.display = rebuild ? 'block' : 'none'
+          }
+          pinBox.querySelectorAll('input[name="pin-verify"]').forEach((el) => {
+            el.addEventListener('change', syncPinSuggest)
+          })
+          syncPinSuggest()
+        }, 0)
+        await pinChoice
+      } catch (action) {
+        return
+      }
+      this.pinResultCardsJob = {
+        running: true,
+        status: 'running',
+        progress: 2,
+        msg: '正在启动重新沉淀…',
+        jobId: '',
+        analysisId,
+        pageIndex: 0,
+        pagesTotal: 0,
+      }
+      this._showPinResultCardsNotification()
+      try {
+        const res = await pinCIHomeworkResultCards({
+          username,
+          analysis_id: analysisId,
+          run_id: 'current',
+          force_regen_suggestions: forceRegenSuggestions,
+          rebuild_user_verification: rebuildVerification,
+        })
+        if (!(res && res.error_num === 0 && res.job_id)) {
+          throw new Error((res && res.msg) || '重新沉淀失败')
+        }
+        this.pinResultCardsJob.jobId = res.job_id
+        const bits = []
+        bits.push(forceRegenSuggestions ? '重新生成可点短句' : '沿用可点短句')
+        bits.push(rebuildVerification ? '重新给出需加强核实的位置' : '沿用需加强核实名单')
+        this.pinResultCardsJob.msg = '已启动：' + bits.join('，') + '…'
+        this._showPinResultCardsNotification()
+        if (this._pinResultCardsTimer) clearInterval(this._pinResultCardsTimer)
+        this._pinResultCardsTimer = setInterval(() => this._pollPinResultCards(), 1500)
+        this._pollPinResultCards()
+      } catch (e) {
+        this.pinResultCardsJob.running = false
+        this.pinResultCardsJob.status = 'failed'
+        this.pinResultCardsJob.msg = (e && e.message) || '重新沉淀失败'
+        this._showPinResultCardsNotification()
+        this.$message.error(this.pinResultCardsJob.msg)
+        this._scheduleClosePinResultCardsNotification(6000)
+      }
+    },
+    _pinResultCardsFormatText() {
+      const v = this.pinResultCardsJob || {}
+      if (v.status === 'failed') return v.msg || '沉淀失败'
+      if (v.status === 'ok') return v.msg || '沉淀完成'
+      const pageBit = (v.pagesTotal > 0)
+        ? ` · ${v.pageIndex || 0}/${v.pagesTotal}页`
+        : ''
+      return `${v.msg || '处理中'}${pageBit} (${Math.max(0, Math.min(100, Number(v.progress) || 0))}%)`
+    },
+    _showPinResultCardsNotification() {
+      this._closePinResultCardsNotification()
+      this.pinResultCardsNotification = ElNotification({
+        title: '重新沉淀',
+        message: () => h('div', null, [
+          h(ElProgress, {
+            percentage: Math.max(0, Math.min(100, Number(this.pinResultCardsJob.progress) || 0)),
+            status: this.pinResultCardsJob.status === 'failed'
+              ? 'exception'
+              : (this.pinResultCardsJob.status === 'ok' ? 'success' : undefined),
+            format: () => this._pinResultCardsFormatText(),
+          }),
+        ]),
+        duration: 0,
+        position: 'bottom-right',
+        zIndex: 10000,
+      })
+    },
+    _closePinResultCardsNotification() {
+      if (this._pinResultCardsCloseTimer) {
+        clearTimeout(this._pinResultCardsCloseTimer)
+        this._pinResultCardsCloseTimer = null
+      }
+      if (this.pinResultCardsNotification) {
+        this.pinResultCardsNotification.close()
+        this.pinResultCardsNotification = null
+      }
+    },
+    _scheduleClosePinResultCardsNotification(ms) {
+      if (this._pinResultCardsCloseTimer) {
+        clearTimeout(this._pinResultCardsCloseTimer)
+        this._pinResultCardsCloseTimer = null
+      }
+      const token = this.pinResultCardsJob.jobId || `${Date.now()}`
+      this._pinResultCardsCloseTimer = window.setTimeout(() => {
+        this._pinResultCardsCloseTimer = null
+        if (this.pinResultCardsJob.running && this.pinResultCardsJob.jobId && this.pinResultCardsJob.jobId !== token) return
+        if (this.pinResultCardsJob.running) return
+        this._closePinResultCardsNotification()
+      }, ms)
+    },
+    async _pollPinResultCards() {
+      const jobId = this.pinResultCardsJob.jobId
+      if (!jobId) return
+      try {
+        const st = await getCIHomeworkPinResultCardsStatus({ job_id: jobId })
+        const job = (st && st.job) || {}
+        const prevProgress = Number(this.pinResultCardsJob.progress) || 0
+        const prevMsg = this.pinResultCardsJob.msg
+        const prevPage = this.pinResultCardsJob.pageIndex
+        this.pinResultCardsJob.progress = Math.max(0, Math.min(100, Number(job.progress) || prevProgress || 0))
+        this.pinResultCardsJob.msg = job.msg || this.pinResultCardsJob.msg
+        this.pinResultCardsJob.status = job.status || this.pinResultCardsJob.status
+        this.pinResultCardsJob.pageIndex = Number(job.page_index) || this.pinResultCardsJob.pageIndex || 0
+        this.pinResultCardsJob.pagesTotal = Number(job.pages_total) || this.pinResultCardsJob.pagesTotal || 0
+        if (
+          this.pinResultCardsJob.running
+          && (
+            this.pinResultCardsJob.progress !== prevProgress
+            || this.pinResultCardsJob.msg !== prevMsg
+            || this.pinResultCardsJob.pageIndex !== prevPage
+          )
+        ) {
+          this._showPinResultCardsNotification()
+        }
+        // 进入钉卡阶段即挂上卡片左上角生图/HTML 状态
+        if (
+          this.pinResultCardsJob.running
+          && (job.phase === 'cards' || this.pinResultCardsJob.progress >= 70)
+        ) {
+          this.refreshHomeworkResultCards(job.result_cards || this.ciActiveResult?.manifest?.result_cards || {})
+        }
+        if (job.status && job.status !== 'running') {
+          if (this._pinResultCardsTimer) {
+            clearInterval(this._pinResultCardsTimer)
+            this._pinResultCardsTimer = null
+          }
+          this.pinResultCardsJob.running = false
+          this.pinResultCardsJob.progress = 100
+          if (job.status === 'ok') {
+            this.pinResultCardsJob.msg = job.msg || '重新沉淀完成'
+            this.$message.success('已写入本子结果卡；诊断卡正在出图和 HTML')
+            this.refreshHomeworkResultCards(job.result_cards || {})
+            this._showPinResultCardsNotification()
+            this._scheduleClosePinResultCardsNotification(4000)
+          } else {
+            this.pinResultCardsJob.msg = job.error || job.msg || '重新沉淀失败'
+            this.$message.error(this.pinResultCardsJob.msg)
+            this._showPinResultCardsNotification()
+            this._scheduleClosePinResultCardsNotification(6000)
+          }
+        }
+      } catch (e) { /* keep polling */ }
+    },
+
+    /** 解释精要 HTML：核验后迭代更新批改结果（右下角进度，不挡操作） */
+    async handleNkcnHomeworkVerifyIterate(detail = {}) {
+      if (this.verifyIterate.running) {
+        this._showVerifyIterateNotification()
+        return
+      }
+      const now = Date.now()
+      // Card 转发 + iframe postMessage 可能同刻各到一次，短防抖避免双开任务
+      if (this._verifyIterateLastAt && now - this._verifyIterateLastAt < 1200) {
+        this._showVerifyIterateNotification()
+        return
+      }
+      this._verifyIterateLastAt = now
+      const username = String(detail.username || localStorage.getItem('userId') || '').trim()
+      const analysisId = String(detail.analysisId || '').trim()
+      if (!username || !analysisId) {
+        this.$message.warning('缺少本子或批改标识')
+        return
+      }
+      this.verifyIterate = {
+        running: true,
+        status: 'running',
+        progress: 2,
+        msg: '正在启动迭代更新…',
+        jobId: '',
+        analysisId,
+        cid: detail.cid || null,
+        cardPollingStarted: false,
+      }
+      this._showVerifyIterateNotification()
+      try {
+        const res = await startCIHomeworkVerifyIterate({
+          username,
+          analysis_id: analysisId,
+          run_id: 'current',
+        })
+        if (!(res && res.error_num === 0 && res.job_id)) {
+          this.verifyIterate.running = false
+          this.verifyIterate.status = 'failed'
+          this.verifyIterate.msg = (res && res.msg) || '启动失败'
+          this._showVerifyIterateNotification()
+          this.$message.error(this.verifyIterate.msg)
+          return
+        }
+        this.verifyIterate.jobId = res.job_id
+        this.verifyIterate.msg = '已启动，正在按核验结果回写…'
+        this._showVerifyIterateNotification()
+        if (this._verifyIterateTimer) clearInterval(this._verifyIterateTimer)
+        this._verifyIterateTimer = setInterval(() => this._pollVerifyIterate(), 2000)
+        this._pollVerifyIterate()
+      } catch (e) {
+        this.verifyIterate.running = false
+        this.verifyIterate.status = 'failed'
+        this.verifyIterate.msg = '启动失败'
+        this._showVerifyIterateNotification()
+        this.$message.error('启动迭代更新失败')
+      }
+    },
+    _showVerifyIterateNotification() {
+      this._closeVerifyIterateNotification()
+      this.verifyIterateNotification = ElNotification({
+        title: '迭代更新批改结果',
+        message: () => h('div', null, [
+          h(ElProgress, {
+            percentage: Math.max(0, Math.min(100, Number(this.verifyIterate.progress) || 0)),
+            status: this.verifyIterate.status === 'failed'
+              ? 'exception'
+              : (this.verifyIterate.status === 'ok' ? 'success' : undefined),
+            format: () => {
+              const v = this.verifyIterate || {}
+              if (v.status === 'failed') return v.msg || '更新失败'
+              if (v.status === 'ok') return v.msg || '更新完成'
+              return `${v.msg || '处理中'} (${Math.max(0, Math.min(100, Number(v.progress) || 0))}%)`
+            },
+          }),
+        ]),
+        duration: 0,
+        position: 'bottom-right',
+        zIndex: 10000,
+      })
+    },
+    _closeVerifyIterateNotification() {
+      if (this._verifyIterateCloseTimer) {
+        clearTimeout(this._verifyIterateCloseTimer)
+        this._verifyIterateCloseTimer = null
+      }
+      if (this.verifyIterateNotification) {
+        this.verifyIterateNotification.close()
+        this.verifyIterateNotification = null
+      }
+    },
+    _scheduleCloseVerifyIterateNotification(ms) {
+      if (this._verifyIterateCloseTimer) {
+        clearTimeout(this._verifyIterateCloseTimer)
+        this._verifyIterateCloseTimer = null
+      }
+      const token = this.verifyIterate.jobId || `${Date.now()}`
+      this._verifyIterateCloseTimer = window.setTimeout(() => {
+        this._verifyIterateCloseTimer = null
+        // 若已开新任务，勿关掉新通知
+        if (this.verifyIterate.running && this.verifyIterate.jobId && this.verifyIterate.jobId !== token) return
+        if (this.verifyIterate.running) return
+        this._closeVerifyIterateNotification()
+      }, ms)
+    },
+    _startVerifyIterateCardPolling(force = false) {
+      if (this.verifyIterate.cardPollingStarted && !force) return
+      this.verifyIterate.cardPollingStarted = true
+      const pinned = this.ciActiveResult?.manifest?.result_cards || {}
+      this.refreshHomeworkResultCards({
+        diagnosis_cid: pinned.diagnosis_cid || this.verifyIterate.cid,
+        excerpt_cid: pinned.excerpt_cid,
+      })
+    },
+    async _pollVerifyIterate() {
+      const jobId = this.verifyIterate.jobId
+      if (!jobId) return
+      try {
+        const st = await getCIHomeworkVerifyIterateStatus({ job_id: jobId })
+        const job = (st && st.job) || {}
+        const prevProgress = Number(this.verifyIterate.progress) || 0
+        const prevMsg = this.verifyIterate.msg
+        this.verifyIterate.progress = Math.max(0, Math.min(100, Number(job.progress) || prevProgress || 0))
+        this.verifyIterate.msg = job.msg || this.verifyIterate.msg
+        this.verifyIterate.status = job.status || this.verifyIterate.status
+        // 与批改进度条一致：进度/文案变化时刷新右下角通知
+        if (
+          this.verifyIterate.running
+          && (this.verifyIterate.progress !== prevProgress || this.verifyIterate.msg !== prevMsg)
+        ) {
+          this._showVerifyIterateNotification()
+        }
+        // 进入钉卡/出图阶段就挂上卡片左上角生图·HTML 状态
+        if (
+          this.verifyIterate.running
+          && (job.phase === 'cards' || this.verifyIterate.progress >= 92)
+        ) {
+          this._startVerifyIterateCardPolling()
+        }
+        if (job.status && job.status !== 'running') {
+          if (this._verifyIterateTimer) {
+            clearInterval(this._verifyIterateTimer)
+            this._verifyIterateTimer = null
+          }
+          this.verifyIterate.running = false
+          this.verifyIterate.progress = 100
+          if (job.status === 'ok') {
+            this.verifyIterate.msg = '更新完成：已回写核验题/条，并刷新报告与卡片'
+            this.$message.success('迭代更新完成')
+            try {
+              if (this.verifyIterate.analysisId) {
+                await this._openCIExistingResult(
+                  this.verifyIterate.analysisId,
+                  localStorage.getItem('userId'),
+                  null,
+                  null,
+                )
+              }
+            } catch (e) { /* ignore */ }
+            // 重载结果后再 bust，保证批改页 img URL 带新 &_=，绕过浏览器旧缓存
+            this.ciHomeworkAssetCacheBust = Date.now()
+            this.$nextTick(() => {
+              const panel = this.$refs.homeworkGradingPanelRef
+              if (panel && typeof panel.beginPageImageLoad === 'function') {
+                panel.beginPageImageLoad()
+              }
+            })
+            // 100% 后强制再挂一次，避免 92% 时尚未登记生图队列
+            this._startVerifyIterateCardPolling(true)
+            this._showVerifyIterateNotification()
+            this._scheduleCloseVerifyIterateNotification(4000)
+            window.dispatchEvent(new CustomEvent('nkcn-homework-verify-iterate-done', {
+              detail: {
+                analysisId: this.verifyIterate.analysisId,
+                cid: this.verifyIterate.cid,
+              },
+            }))
+          } else {
+            this.verifyIterate.msg = job.error || job.msg || '迭代更新失败'
+            this.$message.error(this.verifyIterate.msg)
+            this._showVerifyIterateNotification()
+            this._scheduleCloseVerifyIterateNotification(6000)
+          }
+        }
+      } catch (e) { /* keep polling */ }
+    },
+
+    /** 解释精要 HTML 题号点击：打开批改独立界面并跳到对应题 */
+    async handleNkcnHomeworkJump(detail = {}) {
+      const evidence = String(detail.evidence || '').trim()
+      if (!evidence) return
+      const now = Date.now()
+      if (this._nkcnJumpBusy
+        || (this._nkcnJumpLastEvidence === evidence && now - (this._nkcnJumpLastAt || 0) < 800)) {
+        return
+      }
+      this._nkcnJumpBusy = true
+      this._nkcnJumpLastEvidence = evidence
+      this._nkcnJumpLastAt = now
+      const username = localStorage.getItem('userId')
+      const analysisId = String(detail.analysisId || '').trim()
+        || this.ciHomeworkAnalysisId
+        || this.ciActiveAnalysisId
+        || ''
+      try {
+        // 普通跳转退出核验对照模式
+        this.ciHomeworkVerifyAssist = false
+        if (analysisId) {
+          const same = analysisId === this.ciActiveAnalysisId
+            && this.ciActiveResult?.analysis_type === 'homework_grading'
+          if (!same) {
+            await this._openCIExistingResult(analysisId, username, null, null)
+          } else {
+            this.showContinuousImagePanel = true
+          }
+        } else if (this.ciActiveResult?.analysis_type === 'homework_grading') {
+          this.showContinuousImagePanel = true
+        } else {
+          this.$message.warning('未找到对应批改结果，请先从材料打开批改界面')
+          return
+        }
+        this.ciHomeworkPageViewOnly = false
+        await this.$nextTick()
+        await this.$nextTick()
+        let panel = this.$refs.homeworkGradingPanelRef
+        for (let i = 0; i < 8 && !panel?.jumpToEvidence; i++) {
+          await new Promise((r) => setTimeout(r, 120))
+          panel = this.$refs.homeworkGradingPanelRef
+        }
+        if (panel?.jumpToEvidence) {
+          panel.jumpToEvidence(evidence)
+        } else if (panel?.openPageViewAt) {
+          panel.openPageViewAt(0, 'grading')
+          this.$message.info('已打开批改界面，请在页内核对对应题号')
+        } else {
+          this.$message.warning('批改面板尚未就绪，请稍后再试')
+        }
+      } catch (e) {
+        console.error('[handleNkcnHomeworkJump]', e)
+        this.$message.error('打开批改位置失败')
+      } finally {
+        this._nkcnJumpBusy = false
+      }
+    },
+
+    /** 提交核验：在弹窗旁打开可收起的逐页批改对照（不改 HTML 弹窗本身） */
+    async handleNkcnHomeworkVerifyAssist(detail = {}) {
+      const evidence = String(detail.evidence || '').trim()
+      if (!evidence) return
+      const now = Date.now()
+      if (this._nkcnVerifyAssistBusy
+        || (this._nkcnVerifyAssistLastEvidence === evidence && now - (this._nkcnVerifyAssistLastAt || 0) < 500)) {
+        return
+      }
+      this._nkcnVerifyAssistBusy = true
+      this._nkcnVerifyAssistLastEvidence = evidence
+      this._nkcnVerifyAssistLastAt = now
+      const username = localStorage.getItem('userId')
+      const analysisId = String(detail.analysisId || '').trim()
+        || this.ciHomeworkAnalysisId
+        || this.ciActiveAnalysisId
+        || ''
+      try {
+        if (analysisId) {
+          const same = analysisId === this.ciActiveAnalysisId
+            && this.ciActiveResult?.analysis_type === 'homework_grading'
+          if (!same) {
+            await this._openCIExistingResult(analysisId, username, null, null)
+          }
+        } else if (this.ciActiveResult?.analysis_type !== 'homework_grading') {
+          return
+        }
+        this.ciHomeworkVerifyAssist = true
+        this.ciHomeworkPageViewOnly = true
+        this.showContinuousImagePanel = true
+        await this.$nextTick()
+        await this.$nextTick()
+        let panel = this.$refs.homeworkGradingPanelRef
+        for (let i = 0; i < 8 && !panel?.jumpToEvidence; i++) {
+          await new Promise((r) => setTimeout(r, 120))
+          panel = this.$refs.homeworkGradingPanelRef
+        }
+        if (panel?.jumpToEvidence) {
+          panel.jumpToEvidence(evidence)
+        } else if (panel?.openPageViewAt) {
+          panel.openPageViewAt(0, 'grading')
+        }
+      } catch (e) {
+        console.error('[handleNkcnHomeworkVerifyAssist]', e)
+      } finally {
+        this._nkcnVerifyAssistBusy = false
+      }
+    },
+
+    handleCloseHomeworkVerifyAssist() {
+      if (!this.ciHomeworkVerifyAssist && !this.showContinuousImagePanel) return
+      this.ciHomeworkVerifyAssist = false
+      // 只收起对照面板，保留已加载的批改结果，避免下次再拉
+      this.showContinuousImagePanel = false
+      this.ciHomeworkPageViewOnly = false
+    },
+
     async handleOpenHomeworkPageView(mode = 'grading') {
       const filename = (this.curFileInfo?.name || '').trim()
       if (!filename || !this._isImageOrPdf(filename)) return
@@ -10474,6 +11482,7 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         const files = this.ciActiveResult?.manifest?.selected_files || []
         const activeMatches = this.ciActiveResult?.analysis_type === 'homework_grading'
           && files.includes(filename)
+          && (!this.ciActiveResult.manifest?.username || this.ciActiveResult.manifest.username === username)
         let record = null
         if (activeMatches) {
           if (this._isHomeworkStageReadyFromManifest(this.ciActiveResult?.manifest, mode)) {
@@ -10492,12 +11501,11 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         }
         record = this._findHomeworkRecordForFile(resp.singles, filename, 'homework_grading')
 
-        if (record?.status === 'running') {
-          const active = this.ciRunningTask?.analysis_id === record.analysis_id && !this.ciRunningTask?.completed
-          if (active) {
-            this.$message.warning('作业批改进行中，请稍候')
-            return
-          }
+        if (record?.task && !record.task.completed) {
+          this._resumeCIGradingTask(record.task, username)
+        }
+        if (record?.status === 'running' || record?.status === 'prepared') {
+          this.$message.info(record.task_lookup_error || '批改仍在执行，可查看已有阶段结果；任务将继续跟踪。')
         }
 
         if (record?.analysis_id) {
@@ -10974,13 +11982,46 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
       }
     },
 
+    finishCISkillStart(selection) {
+      const pending = this.ciSkillPending
+      this.ciSkillPending = null
+      pending?.resolve(selection ? { enabled: selection.enabled, names: [...selection.names] } : null)
+    },
+
     /** 启动分析（内部使用） */
     async _startCIAnalysis(files, mode, username, options = {}) {
+      if (this.ciRunningTask?.analysis_type === 'homework_grading' && !this.ciRunningTask.completed) {
+        this.$message.warning('当前批改仍在处理或等待重新连接，请先确认原任务状态')
+        return
+      }
       try {
+        let skillSelection
+        if (options.requestedAction === 'grading') {
+          if (this.ciSkillPending) return
+          this.ciSkillSelection = { enabled: false, names: [] }
+          this.ciSkillValid = true
+          skillSelection = await new Promise(resolve => {
+            this.ciSkillPending = { filename: files[0], username, resolve }
+          })
+          if (!skillSelection) return
+          if (localStorage.getItem('userId') !== username) {
+            this.$message.warning('当前本子已切换，请重新选择批改材料')
+            return
+          }
+          if (this.ciRunningTask && !this.ciRunningTask.completed) return
+        }
         const contextDocs = Array.isArray(options.contextDocs)
           ? options.contextDocs
           : this._ciSelectedContextDocs(files)
-        const payload = { username, files, mode, scene_name: this.sceneName, ...(options.material || {}) }
+        const payload = {
+          username,
+          files,
+          mode,
+          scene_name: this.sceneName,
+          sub_scene_name: this.subSceneName,
+          ...(options.material || {}),
+        }
+        if (skillSelection) payload.notebook_skill_selection = skillSelection
         if (contextDocs.length > 0) {
           payload.context_docs = contextDocs
         }
@@ -10994,8 +12035,26 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         console.log('[CI] files:', files, 'context_docs:', contextDocs, 'context_card_ids:', payload.context_card_ids || [], 'homework_target_stage:', payload.homework_target_stage || '')
         const start = options.requestedAction === 'grading' ? startHomeworkFeedback
           : options.requestedAction === 'understanding' ? startImageUnderstanding : startCIAnalysis
+        if (skillSelection && skillSelection.enabled) {
+          this.ciRunningTask = {
+            task_id: '',
+            analysis_id: '',
+            analysis_type: 'homework_grading',
+            section: '正在精选并交叉理解本子 Skill（请稍候，约需数十秒到两分钟）',
+            item: 0,
+            total: 0,
+            error: '',
+            completed: false,
+          }
+          this.showContinuousImagePanel = true
+          this._showCIProgressNotification(files)
+        }
         const resp = await start(payload)
         if (resp.error_num !== 0) {
+          if (skillSelection && skillSelection.enabled) {
+            this.ciRunningTask = null
+            this._closeCIProgressNotification()
+          }
           this.$message.error(resp.msg || '启动分析失败')
           return
         }
@@ -11025,6 +12084,10 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         return resp
       } catch (e) {
         console.error('[CI] _startCIAnalysis error:', e)
+        if (this.ciRunningTask && !this.ciRunningTask.task_id) {
+          this.ciRunningTask = null
+          this._closeCIProgressNotification()
+        }
         this.$message.error(e.message || '启动失败')
         return null
       }
@@ -11068,14 +12131,18 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         message: () => h('div', null, [
           h(ElProgress, {
             percentage: this._ciProgressPercent,
-            status: this.ciRunningTask?.error ? 'exception' : (this.ciRunningTask?.completed ? 'success' : ''),
+            status: this.ciRunningTask?.error ? 'exception' : (this.ciRunningTask?.completed
+              ? (this.ciRunningTask.analysis_type === 'homework_grading' && this.ciRunningTask.completion?.status !== 'complete' ? 'warning' : 'success') : ''),
             format: () => {
               const task = this.ciRunningTask
               if (!task) return '准备中...'
               if (task.error) return `失败: ${task.error}`
-              return `${this._formatCIProgressSection(task.section)} (${this._ciProgressPercent}%)`
+              return task.completion?.message && task.completed
+                ? task.completion.message : `${this._formatCIProgressSection(task.section)} (${this._ciProgressPercent}%)`
             }
-          })
+          }),
+          this.ciRunningTask?.analysis_type === 'homework_grading' && this.ciRunningTask.completed
+            ? h('button', { type: 'button', onClick: () => this.reloadCIGradingResult() }, '查看结果') : null
         ]),
         duration: 0,
         position: 'bottom-right',
@@ -11092,54 +12159,69 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
     },
 
     /** 加载已完成的分析结果 */
-    async _loadCIResult(analysisId, username, runId) {
+    async _loadCIResult(analysisId, username, runId, isCurrent = () => true, quiet = false) {
       if (!analysisId) return
       const u = username || localStorage.getItem('userId')
-      const effectiveRunId = runId ?? this.ciHomeworkRunId ?? 'current'
+      const effectiveRunId = runId ?? (analysisId === this.ciActiveAnalysisId ? this.ciHomeworkRunId : 'current') ?? 'current'
+      const resultGeneration = this.ciResultGeneration = (this.ciResultGeneration || 0) + 1
+      this.ciResultTarget = { analysis_id: analysisId, workspace: u, run_id: effectiveRunId }
+      const canApply = () => isCurrent() && resultGeneration === this.ciResultGeneration
       try {
         const payload = { username: u, analysis_id: analysisId }
         if (String(analysisId).startsWith('homework_') && effectiveRunId) {
           payload.run_id = effectiveRunId
         }
         const resp = await getCIResult(payload)
+        if (!canApply()) return false
         if (resp.error_num === 0) {
           this.ciActiveAnalysisId = analysisId
           this.ciActiveResult = resp
-          this.ciRunningTask = null
+          if (this.ciRunningTask?.analysis_type !== 'homework_grading' &&
+              (!this.ciRunningTask || this.ciRunningTask.completed)) this.ciRunningTask = null
           if (resp.analysis_type === 'homework_grading') {
             this.ciHomeworkRunId = resp.run_id || effectiveRunId || 'current'
             this.ciHomeworkAnalysisId = analysisId
-            await this._loadCIHomeworkVersions(analysisId, u)
+            await this._loadCIHomeworkVersions(analysisId, u, canApply)
+            if (!canApply()) return false
+            if (resp.task && !resp.task.completed) this._resumeCIGradingTask(resp.task, u)
           }
           if (resp.analysis_type !== 'homework_grading' && resp.analysis_type !== 'cross_subject') {
             await this._maybeConfirmCIReproduction(resp, u)
           }
-          return
+          return true
         }
-        this.ciActiveResult = null
-        this.showContinuousImagePanel = false
-        this.$message.error(resp.msg || '读取图片理解结果失败')
+        if (!String(analysisId).startsWith('homework_')) {
+          this.ciActiveResult = null
+          this.showContinuousImagePanel = false
+        }
+        if (!quiet) this.$message.error(resp.msg || '读取结果失败，已有画面已保留')
+        return false
       } catch (e) {
+        if (!canApply()) return false
         console.error('[CI] _loadCIResult error:', e)
-        this.ciActiveResult = null
-        this.showContinuousImagePanel = false
-        this.$message.error('读取图片理解结果失败：' + (e.message || e))
+        if (!String(analysisId).startsWith('homework_')) {
+          this.ciActiveResult = null
+          this.showContinuousImagePanel = false
+        }
+        if (!quiet) this.$message.error('读取结果失败：' + (e.message || e))
+        return false
       }
     },
 
-    async _loadCIHomeworkVersions(analysisId, username) {
+    async _loadCIHomeworkVersions(analysisId, username, isCurrent = () => true) {
       if (!analysisId) return
       const u = username || localStorage.getItem('userId')
       this.ciHomeworkVersionsLoading = true
       try {
         const resp = await listCIHomeworkVersions({ username: u, analysis_id: analysisId })
+        if (!isCurrent()) return
         if (resp.error_num === 0) {
           this.ciHomeworkVersions = Array.isArray(resp.versions) ? resp.versions : []
         }
       } catch (e) {
         console.error('[CI] _loadCIHomeworkVersions error:', e)
       } finally {
-        this.ciHomeworkVersionsLoading = false
+        if (isCurrent()) this.ciHomeworkVersionsLoading = false
       }
     },
 
@@ -11328,23 +12410,145 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
       }
     },
 
+    _rememberCIGradingTask() {
+      const task = this.ciRunningTask
+      if (task?.analysis_type !== 'homework_grading') return
+      try {
+        if (task.completed) {
+          sessionStorage.removeItem('nkcn.ci.gradingTask.v1')
+        } else {
+          sessionStorage.setItem('nkcn.ci.gradingTask.v1', JSON.stringify({
+            task_id: task.task_id, analysis_id: task.analysis_id, run_id: task.run_id,
+            workspace: task.workspace, task_kind: task.task_kind,
+            owner: localStorage.getItem('originRealName') || localStorage.getItem('realName')
+          }))
+        }
+      } catch (_) { /* 存储不可用不影响后台任务 */ }
+    },
+
+    _restoreCIGradingTask() {
+      try {
+        const hint = JSON.parse(sessionStorage.getItem('nkcn.ci.gradingTask.v1') || 'null')
+        const owner = localStorage.getItem('originRealName') || localStorage.getItem('realName')
+        if (!hint || !owner || hint.owner !== owner || !hint.workspace || !hint.task_id || !hint.analysis_id) return
+        this._resumeCIGradingTask({ ...hint, completed: false, current_section: '正在核实原任务状态' }, hint.workspace)
+      } catch (_) { /* 不信任无法读取的浏览器提示 */ }
+    },
+
+    _resumeCIGradingTask(task, workspace) {
+      if (!task?.task_id || task.completed) return
+      if (this.ciRunningTask && !this.ciRunningTask.completed) return
+      this.ciRunningTask = { ...task, workspace, analysis_type: 'homework_grading',
+        section: task.current_section || '正在恢复任务连接', item: 0, total: 0, completed: false,
+        error: '', connection_paused: false }
+      if (!this.ciActiveAnalysisId) this.ciActiveAnalysisId = task.analysis_id
+      this._showCIProgressNotification(['已有批改任务'])
+      this._startCIPoll(task.task_id, task.analysis_id, workspace)
+    },
+
+    _ciConnectionFailure(message, retryable = true) {
+      this.ciPollFailures = (this.ciPollFailures || 0) + 1
+      const paused = !retryable || this.ciPollFailures >= 5
+      this.ciRunningTask = { ...this.ciRunningTask, connection_paused: paused,
+        connection_error: paused ? `${message}；已暂停自动查询，可重新连接。` : `${message}；正在重试。` }
+      if (paused) this._stopCIPollTimer()
+    },
+
+    reconnectCIGradingTask() {
+      const task = this.ciRunningTask
+      if (!task?.task_id || task.completed) return
+      this.ciRunningTask = { ...task, connection_paused: false, connection_error: '', error: '' }
+      this._startCIPoll(task.task_id, task.analysis_id, task.workspace)
+    },
+
+    async _loadCIGradingTaskResult(task, workspace, isCurrent = () => true, force = false) {
+      const canShow = () => {
+        const target = this.ciResultTarget
+        const matchingTarget = !target || (target.analysis_id === task.analysis_id && target.workspace === workspace
+          && (!target.run_id || target.run_id === 'current'))
+        const matchingView = force || !this.ciActiveResult || (this.ciActiveAnalysisId === task.analysis_id
+          && (!this.ciActiveResult.manifest?.username || this.ciActiveResult.manifest.username === workspace)
+          && (!this.ciHomeworkRunId || this.ciHomeworkRunId === 'current'))
+        return isCurrent() && matchingTarget && matchingView
+      }
+      if (!canShow() || (this.ciSuppressOpenCIPanelOnComplete && !force)) return false
+      const retry = { task_id: task.task_id, analysis_id: task.analysis_id, workspace,
+        message: '后台处理已结束，正在读取结果。', loading: true, token: Symbol('grading-result') }
+      this.ciResultRetry = retry
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (!canShow()) {
+          if (this.ciResultRetry?.token === retry.token) this.ciResultRetry = null
+          return false
+        }
+        if (await this._loadCIResult(task.analysis_id, workspace, 'current', canShow, true)) {
+          this.ciResultRetry = null
+          this.showContinuousImagePanel = true
+          return true
+        }
+      }
+      if (canShow()) this.ciResultRetry = { ...retry, loading: false,
+        message: '后台处理已结束，结果暂未取回；已有画面保留，可重新加载。' }
+      else if (this.ciResultRetry?.token === retry.token) this.ciResultRetry = null
+      return false
+    },
+
+    reloadCIGradingResult() {
+      const task = this.ciResultRetry || this.ciRunningTask
+      if (!task?.analysis_id) return
+      this.ciResultTarget = { analysis_id: task.analysis_id, workspace: task.workspace, run_id: 'current' }
+      return this._loadCIGradingTaskResult(task, task.workspace, () => true, true)
+    },
+
     /** 开始轮询任务进度 */
     _startCIPoll(taskId, analysisId, username) {
       this.clearCIPollTimer()
-      this.ciPollTimer = setInterval(async () => {
-        await this._pollCIProgress(taskId, analysisId, username)
-      }, 2000)
+      this.ciPollFailures = 0
+      if (this.ciRunningTask?.analysis_type === 'homework_grading') {
+        this.ciRunningTask = { ...this.ciRunningTask, workspace: username || this.ciRunningTask.workspace,
+          connection_paused: false }
+        this._rememberCIGradingTask()
+      }
+      const generation = this.ciPollGeneration
+      const tick = async () => {
+        if (generation !== this.ciPollGeneration) return
+        this.ciPollTimer = null
+        await this._pollCIProgress(taskId, analysisId, username, generation)
+        if (generation === this.ciPollGeneration && this.ciRunningTask?.task_id === taskId
+            && !this.ciRunningTask.completed && !this.ciRunningTask.error && !this.ciRunningTask.connection_paused) {
+          const delay = this.ciRunningTask.analysis_type === 'homework_grading' && this.ciPollFailures
+            ? [2000, 4000, 8000, 15000][Math.min(this.ciPollFailures - 1, 3)] : 2000
+          this.ciPollTimer = setTimeout(tick, delay)
+        }
+      }
+      this.ciPollTimer = setTimeout(tick, 2000)
     },
 
-    async _pollCIProgress(taskId, analysisId, username) {
-      if (!taskId) return
+    async _pollCIProgress(taskId, analysisId, username, generation = this.ciPollGeneration) {
+      const isCurrent = () => generation === this.ciPollGeneration
+      if (!taskId || !isCurrent() || this.ciRunningTask?.task_id !== taskId
+          || this.ciRunningTask.completed || this.ciPollInFlightGeneration === generation) return
+      this.ciPollInFlightGeneration = generation
       try {
         const resp = await getCIProgress(taskId)
+        if (!isCurrent() || this.ciRunningTask?.task_id !== taskId) return
         if (resp.error_num !== 0) {
+          if (this.ciRunningTask.analysis_type === 'homework_grading') {
+            this._ciConnectionFailure(resp.msg || '进度查询暂不可用', resp.retryable !== false)
+            return
+          }
           this.ciRunningTask = { ...this.ciRunningTask, error: resp.msg || '任务查询失败', failure_stage: resp.failure_stage || 'recovery' }
-          this.clearCIPollTimer()
+          this._stopCIPollTimer()
           return
         }
+
+        if (this.ciRunningTask.analysis_type === 'homework_grading' && (
+          (resp.workspace && resp.workspace !== this.ciRunningTask.workspace)
+          || (resp.analysis_id && resp.analysis_id !== analysisId)
+          || (resp.run_id && this.ciRunningTask.run_id && resp.run_id !== this.ciRunningTask.run_id))) {
+          this._ciConnectionFailure('返回的任务与原材料版本不一致', false)
+          return
+        }
+        this.ciPollFailures = 0
 
         this.ciRunningTask = {
           ...(this.ciRunningTask?.task_id === taskId ? this.ciRunningTask : {}),
@@ -11358,11 +12562,29 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
           item: resp.current_item || 0,
           total: resp.total_items || 0,
           error: resp.error || '',
+          connection_error: '',
+          connection_paused: false,
           completed: resp.completed || false,
         }
 
+        if (this.ciRunningTask.analysis_type === 'homework_grading') {
+          this._rememberCIGradingTask()
+          if (resp.completed) {
+            this._stopCIPollTimer()
+            this.ciHomeworkRedBlueRetryLoading = false
+            const loaded = await this._loadCIGradingTaskResult(this.ciRunningTask, this.ciRunningTask.workspace, isCurrent)
+            this.refreshHomeworkResultCards(this.ciActiveResult?.manifest?.result_cards?.diagnosis_cid)
+            if (loaded && isCurrent() && this.ciHomeworkPendingPageView) {
+              const mode = this.ciHomeworkPendingPageView
+              this.ciHomeworkPendingPageView = ''
+              await this._openHomeworkPageViewMode(mode)
+            }
+            return
+          }
+        }
+
         if (resp.error) {
-          this.clearCIPollTimer()
+          this._stopCIPollTimer()
           this.ciHomeworkPendingPageView = ''
           if (resp.task_kind === 'homework_red_blue_review') {
             this.ciHomeworkRedBlueRetryLoading = false
@@ -11375,13 +12597,14 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         if (resp.completed) {
           const completedTaskKind = resp.task_kind || this.ciRunningTask?.task_kind || ''
           const completedUnitId = resp.unit_id || this.ciRunningTask?.unit_id || ''
-          this.clearCIPollTimer()
+          this._stopCIPollTimer()
           if (completedTaskKind === 'homework_red_blue_review') {
             this.ciHomeworkRedBlueRetryLoading = false
           }
           const u = username || localStorage.getItem('userId')
           if (!this.ciSuppressOpenCIPanelOnComplete) {
-            await this._loadCIResult(analysisId, u)
+            await this._loadCIResult(analysisId, u, undefined, isCurrent)
+            if (!isCurrent()) return
           }
           const sectionCount = Array.isArray(this.ciActiveResult?.m_layer?.sections)
             ? this.ciActiveResult.m_layer.sections.length
@@ -11396,6 +12619,7 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
             const files = this.ciActiveResult?.manifest?.selected_files || []
             if (files.length) {
               const qr = await queryCIAnalyses({ username: u, files, scene_name: this.sceneName })
+              if (!isCurrent()) return
               if (qr.error_num === 0) {
                 this.ciAvailableAnalyses = {
                   singles: (qr.singles || []).filter(r => r.status === 'completed' || r.status === 'partial'),
@@ -11409,6 +12633,7 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
               await this._openHomeworkPageViewMode(pendingPageView)
             }
             setTimeout(() => {
+              if (!isCurrent()) return
               this._closeCIProgressNotification()
               if (!pendingPageView) {
                 this.showContinuousImagePanel = true
@@ -11422,23 +12647,42 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
           }
         }
       } catch (e) {
+        if (!isCurrent()) return
         console.error('[CI] _pollCIProgress error:', e)
+        if (this.ciRunningTask?.analysis_type === 'homework_grading') {
+          this._ciConnectionFailure('进度连接暂不可用')
+          return
+        }
+        if (this.ciRunningTask?.task_id === taskId && !this.ciRunningTask.completed) {
+          this.ciRunningTask = { ...this.ciRunningTask, connection_error: '进度连接暂时中断，正在重试',
+            section: '进度连接暂时中断，正在重试' }
+        }
+      } finally {
+        if (this.ciPollInFlightGeneration === generation) this.ciPollInFlightGeneration = null
       }
     },
 
     clearCIPollTimer() {
-      if (this.ciPollTimer) {
-        clearInterval(this.ciPollTimer)
+      this.ciPollGeneration += 1
+      this._stopCIPollTimer()
+    },
+
+    _stopCIPollTimer() {
+      if (this.ciPollTimer !== null) {
+        clearTimeout(this.ciPollTimer)
         this.ciPollTimer = null
       }
     },
 
     /** 重置所有 CI 状态（打开新分析前 / 关闭面板时调用） */
     _resetCIState() {
+      const keepGradingTask = this.ciRunningTask?.analysis_type === 'homework_grading' && !this.ciRunningTask.completed
       this.ciActiveResult = null
       this.ciActiveAnalysisId = ''
+      this.ciResultTarget = null
+      this.ciResultGeneration += 1
       this.ciAvailableAnalyses = { singles: [], groups: [] }
-      this.ciRunningTask = null
+      if (!keepGradingTask) this.ciRunningTask = null
       this.ciHomeworkRunId = 'current'
       this.ciHomeworkAnalysisId = ''
       this.ciHomeworkVersions = []
@@ -11448,17 +12692,26 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
       this.ciHomeworkRedBlueRetryLoading = false
       this.ciHomeworkPendingPageView = ''
       this.ciSingleWorkAreaAutoOpenSignal = null
-      this.clearCIPollTimer()
-      this._closeCIProgressNotification()
+      if (!keepGradingTask) {
+        this.clearCIPollTimer()
+        this._closeCIProgressNotification()
+      }
     },
 
     /** 面板：关闭（不中断后台分析轮询） */
     handleCloseContinuousImagePanel() {
+      if (this.ciHomeworkVerifyAssist) {
+        this.handleCloseHomeworkVerifyAssist()
+        return
+      }
       this.showContinuousImagePanel = false
       this.ciHomeworkPageViewOnly = false
+      this.ciHomeworkVerifyAssist = false
       // 只重置面板展示状态，不要清理 poll timer、running task 和作业 analysis_id
       this.ciActiveResult = null
       this.ciActiveAnalysisId = ''
+      this.ciResultTarget = null
+      this.ciResultGeneration += 1
       this.ciHomeworkRunId = 'current'
       this.ciHomeworkVersions = []
       this.ciHomeworkKeyVersionLoading = false
@@ -11508,7 +12761,7 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
     async handleCIHomeworkSwitchVersion(runId) {
       const analysisId = this.ciActiveAnalysisId
       if (!analysisId) return
-      const username = localStorage.getItem('userId')
+      const username = this.ciActiveResult?.manifest?.username || localStorage.getItem('userId')
       this.ciHomeworkRunId = runId || 'current'
       await this._loadCIResult(analysisId, username, this.ciHomeworkRunId)
     },
@@ -11518,7 +12771,7 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
       const analysisId = this.ciActiveAnalysisId || this.ciHomeworkAnalysisId || this.ciActiveResult?.analysis_id || ''
       const runId = (payload?.runId || '').trim()
       if (!analysisId || !runId || runId === 'current') return
-      const username = localStorage.getItem('userId')
+      const username = this.ciActiveResult?.manifest?.username || localStorage.getItem('userId')
       this.ciHomeworkKeyVersionLoading = true
       try {
         const resp = await markCIHomeworkVersionKey({
@@ -11543,6 +12796,14 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
 
     /** 作业批改：仅重试当前版本红蓝卡标 */
     async handleCIHomeworkRedBlueRetry() {
+      if (this.ciRunningTask && !this.ciRunningTask.completed) {
+        this.$message.warning('请先确认当前任务已结束，再重新评分')
+        return
+      }
+      if (this.ciActiveResult?.available_actions?.retry_quality?.enabled === false) {
+        this.$message.warning(this.ciActiveResult.available_actions.retry_quality.reason)
+        return
+      }
       const analysisId = (
         this.ciActiveAnalysisId
         || this.ciHomeworkAnalysisId
@@ -11550,7 +12811,7 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         || ''
       ).trim()
       if (!analysisId || this.ciHomeworkRunId !== 'current') return
-      const username = localStorage.getItem('userId')
+      const username = this.ciActiveResult?.manifest?.username || localStorage.getItem('userId')
       this.ciHomeworkRedBlueRetryLoading = true
       try {
         const resp = await retryCIHomeworkRedBlue({
@@ -11564,6 +12825,7 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         }
         this.ciRunningTask = {
           task_id: resp.task_id,
+          run_id: resp.run_id,
           analysis_id: analysisId,
           analysis_type: 'homework_grading',
           task_kind: 'homework_red_blue_review',
@@ -11584,6 +12846,10 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
 
     /** 作业批改：迭代 */
     async handleCIHomeworkRerun(payload) {
+      if (this.ciRunningTask && !this.ciRunningTask.completed) {
+        this.$message.warning('请先确认当前任务已结束，再迭代或继续处理')
+        return
+      }
       const analysisId = (
         payload?.analysisId
         || this.ciActiveAnalysisId
@@ -11595,7 +12861,7 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         this.$message.error('无法确定作业分析 ID，请重新打开批改面板后再试')
         return
       }
-      const username = localStorage.getItem('userId')
+      const username = this.ciActiveResult?.manifest?.username || localStorage.getItem('userId')
       const files = (Array.isArray(payload?.files) && payload.files.length)
         ? payload.files
         : (this.ciActiveResult?.manifest?.selected_files || ['作业批改迭代'])
@@ -11606,7 +12872,26 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         ? payload.sessionIds.filter(Boolean)
         : []
       const resume = payload?.resume === true
+      const replacingSkills = Boolean(payload?.notebookSkillSelection)
       this.ciHomeworkRerunLoading = true
+      // 重选 Skill 时后端会同步精选+交叉精髓，接口返回前先给可见进度，避免误以为卡死
+      this.ciHomeworkRunId = 'current'
+      this.ciHomeworkAnalysisId = analysisId
+      this.ciActiveAnalysisId = analysisId
+      this.showContinuousImagePanel = true
+      this.ciRunningTask = {
+        task_id: '',
+        analysis_id: analysisId,
+        analysis_type: 'homework_grading',
+        section: replacingSkills
+          ? '正在精选并交叉理解本子 Skill（请稍候，约需数十秒到两分钟）'
+          : '正在启动迭代…',
+        item: 0,
+        total: 0,
+        error: '',
+        completed: false,
+      }
+      this._showCIProgressNotification(files)
       try {
         const resp = await rerunCIHomework({
           username,
@@ -11614,20 +12899,20 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
           scene_name: this.sceneName,
           rerun_stage: rerunStage,
           ...(payload?.fullRecompute ? { full_recompute: true } : {}),
+          ...(payload?.refreshConfiguration ? { refresh_configuration: true } : {}),
           ...(payload?.material || {}),
+          ...(payload?.notebookSkillSelection ? { notebook_skill_selection: payload.notebookSkillSelection } : {}),
           use_red_blue_feedback: payload?.useRedBlueFeedback === true,
           ...(payload?.preprocessMode ? { preprocess_mode: payload.preprocessMode } : {}),
           ...(sessionIds.length ? { session_ids: sessionIds } : {}),
           ...(resume ? { resume: true } : {}),
         })
         if (resp.error_num !== 0) {
+          this.ciRunningTask = null
+          this._closeCIProgressNotification()
           this.$message.error(resp.msg || '迭代失败')
           return
         }
-        this.ciHomeworkRunId = 'current'
-        this.ciHomeworkAnalysisId = analysisId
-        this.ciActiveAnalysisId = analysisId
-        this.showContinuousImagePanel = true
         this.ciActiveResult = null
         this.ciRunningTask = {
           ...resp,
@@ -11655,7 +12940,9 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         return resp
       } catch (e) {
         console.error('[CI] handleCIHomeworkRerun error:', e)
-        this.$message.error('启动迭代失败')
+        this.ciRunningTask = null
+        this._closeCIProgressNotification()
+        this.$message.error(e?.message || e?.response?.data?.msg || '启动迭代失败')
       } finally {
         this.ciHomeworkRerunLoading = false
       }
@@ -12184,6 +13471,21 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
 
 <!-- <style lang="scss" scoped> -->
 <style lang="scss">
+.ci-skill-start-dialog { max-width: calc(100vw - 24px); }
+.ci-task-recovery {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 11000;
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  padding: 12px;
+  background: #fff8e8;
+  border: 1px solid #e7c983;
+  border-radius: 8px;
+  box-shadow: 0 3px 12px #0002;
+  button { margin: 6px 8px 0 0; cursor: pointer; }
+}
 .feedback-entry-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px; }
 .el-header {
   padding: 0;

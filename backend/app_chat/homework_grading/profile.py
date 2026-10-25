@@ -6,6 +6,7 @@ stable_blind_spots / friction_zones / zpd_candidates / improved / erase_log。
 """
 
 from __future__ import annotations
+from .stage_dependencies import artifact_compatible
 
 import datetime as dt
 import glob
@@ -89,7 +90,7 @@ def build_student_profile(report_dir: str, subject: str, sample_id: str, *, feed
     sessions = _load_session_memories(report_dir, subject, sample_id)
     if feedback_runtime is not None:
         for item in sessions:
-            if item.get('feedback_execution', {}).get('config_fingerprint') != feedback_runtime.fingerprint:
+            if not artifact_compatible(item, feedback_runtime):
                 raise ValueError('规则画像的记忆配置不一致')
     if not sessions:
         return stamp_feedback({

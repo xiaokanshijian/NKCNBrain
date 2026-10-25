@@ -20,12 +20,15 @@ from django.contrib import admin
 from app1 import urls as app1_urls
 from app_chat import urls as chat_urls
 from zym import urls as zym_urls
-from app_seed import urls as seed_urls
+# from app_seed import urls as seed_urls
 from django.views.generic.base import TemplateView
 
 from app1 import views
 
+from app_chat.voice_session import voice_session
+
 urlpatterns = [
+    path('api/voice/session', voice_session),
     # path('admin/', admin.site.urls),
     # 访问xxx/login，执行此函数
     # path('login/', views.login),
@@ -33,7 +36,7 @@ urlpatterns = [
     re_path('api/', include(app1_urls)),
     re_path('api/', include(chat_urls)),
     re_path('api/',include(zym_urls)),
-    re_path('api/', include(seed_urls)),
+    # re_path('api/', include(seed_urls)),
     # 修改入口urls文件为前端
     # re_path(r'^$', TemplateView.as_view(template_name='index.html')),
 ]

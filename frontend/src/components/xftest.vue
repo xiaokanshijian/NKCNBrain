@@ -23,16 +23,13 @@
 </template>
 
 <script>
+import { requestVoiceSession } from '@/api/voiceSession'
 import 'recorder-core'
 import 'recorder-core/src/engine/mp3.js'
 import 'recorder-core/src/engine/mp3-engine.js'
 // import 'recorder-core/recorder.mp3.min.js'
 import 'recorder-core/src/extensions/waveview'
-import CryptoJS from 'crypto-js'
 
-const APPID = ''
-const API_SECRET = ''
-const API_KEY = ''
 
 export default {
     props: {
@@ -79,6 +76,7 @@ export default {
     },
     data() {
         return {
+            voiceAppId: '',
             isOpen: this.openStatus,
             isPlay: this.playStatus,
             isShowCtrlProcessWave: this.showCtrlProcessWaveStatus,
@@ -436,7 +434,11 @@ export default {
         connectWebSocket() {
             if (!this.isIdentify) return;
             // console.log("连接websocket")
-            return this.getWebSocketUrl().then(url => {
+            return this.getWebSocketUrl().catch(error => {
+                this.reclog(error.message || '语音连接失败', 1)
+                return null
+            }).then(url => {
+                if (!url) return
                 if (this.webSocket && this.webSocket.readyState === this.webSocket.OPEN) {
                     return
                 } else {
@@ -464,22 +466,9 @@ export default {
             })
         },
         getWebSocketUrl() {
-            return new Promise((resolve) => {
-                // 请求地址根据语种不同变化
-                var url = 'wss://iat-api.xfyun.cn/v2/iat'
-                var host = 'iat-api.xfyun.cn'
-                var apiKey = API_KEY
-                var apiSecret = API_SECRET
-                var date = new Date().toGMTString()
-                var algorithm = 'hmac-sha256'
-                var headers = 'host date request-line'
-                var signatureOrigin = `host: ${host}\ndate: ${date}\nGET /v2/iat HTTP/1.1`
-                var signatureSha = CryptoJS.HmacSHA256(signatureOrigin, apiSecret)
-                var signature = CryptoJS.enc.Base64.stringify(signatureSha)
-                var authorizationOrigin = `api_key="${apiKey}", algorithm="${algorithm}", headers="${headers}", signature="${signature}"`
-                var authorization = btoa(authorizationOrigin)
-                url = `${url}?authorization=${authorization}&date=${date}&host=${host}`
-                resolve(url)
+            return requestVoiceSession('iat').then(session => {
+                this.voiceAppId = session.app_id
+                return session.url
             })
         },
         // 向webSocket发送数据
@@ -496,7 +485,7 @@ export default {
             params =
             {
                 common: {
-                    app_id: APPID,
+                    app_id: this.voiceAppId,
                 },
                 business: {
                     language: 'zh_cn', //小语种可在控制台--语音听写（流式）--方言/语种处添加试用

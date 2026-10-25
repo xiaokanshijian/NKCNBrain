@@ -1,21 +1,21 @@
-import os
+import nkcn_public_config as _public_config
 from openai import OpenAI
 
 client = OpenAI(
     # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx"
-    api_key=os.environ.get("DASHSCOPE_API_KEY", ""),
+    api_key=_public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY'),
     base_url='https://dashscope.aliyuncs.com/compatible-mode/v1',
 )
 # client = OpenAI(
-#     api_key=os.environ.get("NKCN_LLM_API_KEY", ""),
-#     base_url='https://chat.cloudapi.vip/v1/',
+#     api_key='[redacted]',
+#     base_url='http://localhost:9999/v1/',
 #     default_headers={"x-foo": "true"},
 # )
 
 
 def make_image_text_requests(user_prompt, base64_image, system_prompt="You are a helpful assistant.", use_fixed_params=False, text_after_image=None):
     client = OpenAI(
-        api_key=os.environ.get("DASHSCOPE_API_KEY", ""),
+        api_key=_public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY'),
         base_url='https://dashscope.aliyuncs.com/compatible-mode/v1',
         default_headers={"x-foo": "true"},
     )

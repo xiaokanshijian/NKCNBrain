@@ -7,6 +7,7 @@
 """
 
 from __future__ import annotations
+from .stage_dependencies import artifact_compatible
 
 import datetime as dt
 from .feedback_runtime import runtime_attributes, stamp_feedback
@@ -173,6 +174,18 @@ def _display_text_style_issues(ontology: Dict[str, Any]) -> List[str]:
 
 
 def _slim_session(memory: Dict[str, Any]) -> Dict[str, Any]:
+    if memory.get('evidence_mode') == 'notes' or memory.get('material_type') == 'composition':
+        from .material_markings import open_units
+        units = open_units(memory, memory.get('material_type', 'notes'))
+        return {
+            'page_start': memory.get('page_start'), 'page_end': memory.get('page_end'),
+            'session_title': memory.get('session_title', ''),
+            'kp_observations': [
+                {'kp': q.get('knowledge_point', ''), 'verdict': q.get('verdict'),
+                 'evidence': [q['qid_global']]}
+                for q in units if q['diagnostic_eligible'] or q['observation_eligible']
+            ],
+        }
     kp_freq = memory.get('knowledge_point_frequency', []) or []
     kp_trend = memory.get('kp_trend', {}) or {}
     kp_importance = memory.get('kp_importance', {}) or {}
@@ -241,6 +254,12 @@ def assemble_evidence_pack(
         subject, grade, stage = runtime_attributes(feedback_runtime)
         sample_meta = dict(sample_meta, subject=subject, grade=grade, stage=stage)
     timeline = [_slim_session(m) for m in session_memories]
+    from .note_evidence import is_notes
+    notes = is_notes(feedback_runtime)
+    from .material_markings import open_material_runtime, open_units
+    opened = open_material_runtime(feedback_runtime)
+    observations = [q for m in session_memories for q in open_units(
+        m, feedback_runtime.context['material_type'])] if opened else []
     return {
         'sample_meta': {
             'subject': sample_meta.get('subject') or subject,
@@ -248,10 +267,12 @@ def assemble_evidence_pack(
             'stage': sample_meta.get('stage'),
             'sample_id': sample_id,
         },
-        'temporal_assumption': 'order_index ascending == chronological',
+        'temporal_assumption': 'document_order_only; no practice chronology' if opened else 'order_index ascending == chronological',
         'session_count': len(timeline),
         'session_timeline': timeline,
-        'rule_baseline_profile': _slim_profile_baseline(profile),
+        'rule_baseline_profile': _slim_profile_baseline(None if opened else profile),
+        **({'open_observations': observations, 'material_type': feedback_runtime.context['material_type']} if opened else {}),
+        **({'evidence_mode': 'notes', 'note_observations': observations} if notes else {}),
     }
 
 
@@ -301,38 +322,62 @@ def _call_l5(
         'response_format': {'type': 'json_object'},
         'extra_body': {'thinking': {'type': 'enabled'}, 'reasoning_effort': reasoning_effort},
     }
-    last_raw = ''
-    last_error: Exception | None = None
-    for attempt in range(2):
-        messages = list(base_messages)
-        if attempt == 1:
-            messages.append({
-                'role': 'user',
-                'content': '上次返回不是合法 JSON 对象，请严格输出 JSON 对象，不含 Markdown 围栏或额外文字。',
-            })
-        t0 = time.perf_counter()
-        response = client.chat.completions.create(messages=messages, **kwargs)
-        elapsed = time.perf_counter() - t0
-        message = response.choices[0].message
-        reasoning = getattr(message, 'reasoning_content', None) or ''
-        if reasoning and thinking_path:
-            try:
-                os.makedirs(os.path.dirname(thinking_path), exist_ok=True)
-                with open(thinking_path, 'w', encoding='utf-8') as f:
-                    f.write(reasoning)
-            except Exception:
-                traceback.print_exc()
-        last_raw = message.content or ''
-        try:
-            result = json.loads(_strip_json_text(last_raw))
-            logger.info('[L5] %s elapsed=%.0fs ok', subject, elapsed)
-            return result
-        except (json.JSONDecodeError, ValueError) as exc:
-            last_error = exc
-    raise ValueError(f'L5 ontology JSON 解析失败: {last_error}; raw_head={last_raw[:200]}')
+    from .model_output import request_json_object, validate_zones, object_list, optional_text_fields
+    response_path = ((thinking_path[:-len('.thinking.txt')] if thinking_path.endswith('.thinking.txt') else thinking_path)
+                     + '.responses.json') if thinking_path else ''
+    open_evidence = 'open_observations' in evidence_pack or evidence_pack.get('evidence_mode') == 'notes'
+
+    from .validation_issues import ValidationIssues, issue, raise_issues, ontology_repair_plan
+
+    def validate(result):
+        validate_zones(result.get('zones'))
+        optional_text_fields(result, ('evolution_narrative',))
+        for trajectory in object_list(result.get('mastery_trajectory') or [], 'mastery_trajectory'):
+            optional_text_fields(trajectory, ('trend',))
+            for point in object_list(trajectory.get('timeline') or [], 'timeline'):
+                optional_text_fields(point, ('state',))
+        issues = []
+        if open_evidence:
+            from .note_evidence import validate_note_ontology, normalize_annotation_context
+            observations = evidence_pack.get('open_observations', evidence_pack.get('note_observations', []))
+            for check in (normalize_annotation_context, validate_note_ontology):
+                try:
+                    check(result, observations)
+                except ValidationIssues as exc:
+                    issues.extend(exc.issues)
+        else:
+            valid_ids = _valid_qids_from_pack(evidence_pack)
+            for bucket, entries in result['zones'].items():
+                for index, entry in enumerate(entries):
+                    refs = list(entry.get('evidence') or []) + list(entry.get('content_context_evidence') or [])
+                    refs += [ref for group in entry.get('error_clusters') or [] for ref in group.get('evidence') or []]
+                    if any(ref not in valid_ids for ref in refs):
+                        issues.append(issue(ValueError('诊断引用不存在的单元'), f'/zones/{bucket}/{index}'))
+        raise_issues(issues)
+        return result
+
+    def partial(data, error):
+        from .partial_feedback import partial_ontology
+        return partial_ontology(data, error, validate)
+
+    def retry_hint(error):
+        hint = ('请按输入单元的diagnostic_eligible与observation_eligible核对证据类型，'
+                '主要标注只能引用observation_eligible=true；同页已确认回答另列content_context_evidence，'
+                '没有标注依据则改用content评价。不得升级待确认状态或只删除引用而保留无据结论。'
+                if open_evidence else '')
+        return f'上次输出未满足协议：{error}。' + hint + '请修正后输出完整JSON对象，不含Markdown围栏。'
+
+    return request_json_object(
+        lambda current: client.chat.completions.create(messages=current, **kwargs), base_messages,
+        parser=lambda raw: json.loads(_strip_json_text(raw)), validate=validate,
+        audit_path=response_path, stage='整篇诊断', retry_prompt=retry_hint, thinking_path=thinking_path,
+        repair_plan=ontology_repair_plan, on_exhausted=partial)
 
 
 def _valid_qids_from_pack(pack: Dict[str, Any]) -> set:
+    if 'open_observations' in pack:
+        return {q['qid_global'] for q in pack['open_observations'] if q.get('qid_global')
+                and (q.get('diagnostic_eligible') or q.get('observation_eligible'))}
     out: set = set()
     for s in pack.get('session_timeline', []) or []:
         for obs in s.get('kp_observations', []) or []:
@@ -355,6 +400,8 @@ def _sanitize_ontology_evidence(ontology: Dict[str, Any], evidence_pack: Dict[st
                 entry['curriculum_id'] = ''
                 entry['evidence'] = []
                 entry['error_clusters'] = []
+                if 'content_context_evidence' in entry:
+                    entry['content_context_evidence'] = []
                 entry.setdefault('fallback', 'no_observed')
                 continue
 
@@ -362,6 +409,8 @@ def _sanitize_ontology_evidence(ontology: Dict[str, Any], evidence_pack: Dict[st
                 entry['evidence'] = [
                     q for q in (entry.get('evidence') or []) if q in valid_qids
                 ]
+            if 'content_context_evidence' in entry:
+                entry['content_context_evidence'] = [q for q in entry['content_context_evidence'] if q in valid_qids]
             for cluster in entry.get('error_clusters', []) or []:
                 cluster['evidence'] = [
                     q for q in (cluster.get('evidence') or []) if q in valid_qids
@@ -378,7 +427,7 @@ def _validate_schema(ontology: Dict[str, Any], evidence_pack: Dict[str, Any]) ->
     zones = ontology.get('zones') or {}
     for bucket in ('blind_spot', 'friction_zone', 'zpd'):
         for entry in zones.get(bucket, []) or []:
-            ev_list: List[str] = list(entry.get('evidence') or [])
+            ev_list: List[str] = list(entry.get('evidence') or []) + list(entry.get('content_context_evidence') or [])
             for ec in entry.get('error_clusters', []) or []:
                 ev_list.extend(ec.get('evidence', []) or [])
             for q in ev_list:
@@ -505,6 +554,11 @@ def _ensure_non_empty(ontology: Dict[str, Any], evidence_pack: Dict[str, Any], *
 def _runtime_ontology(ontology, pack, runtime):
     """三区保留结构，结论必须有现有题号证据；无观察不伪造拓展结论。"""
     valid = _valid_qids_from_pack(pack)
+    if 'open_observations' in pack or pack.get('evidence_mode') == 'notes':
+        from .note_evidence import validate_note_ontology, normalize_annotation_context
+        observations = pack.get('open_observations', pack.get('note_observations', []))
+        normalize_annotation_context(ontology, observations)
+        validate_note_ontology(ontology, observations)
     zones = ontology.setdefault('zones', {})
     for bucket in ('blind_spot', 'friction_zone', 'zpd'):
         kept = []
@@ -543,13 +597,14 @@ def build_ontology(
     model: str = '',
     reasoning_effort: str = 'high',
     iteration_guidance: str = '',
+    pass1_dir: str = '',
 *, feedback_runtime=None) -> Optional[Dict[str, Any]]:
-    """构建 L5 数字孪生体；失败时返回 None，不阻塞主流水线。"""
+    """构建诊断；冻结运行失败时返回显式failed，旧链路仍返回None。"""
     if feedback_runtime is not None:
         subject, grade, stage = runtime_attributes(feedback_runtime)
         sample_meta = dict(sample_meta, subject=subject, grade=grade, stage=stage)
         for item in session_memories:
-            if item.get('feedback_execution', {}).get('config_fingerprint') != feedback_runtime.fingerprint:
+            if not artifact_compatible(item, feedback_runtime):
                 raise ValueError('诊断记忆配置不一致')
     if not session_memories and feedback_runtime is not None:
         result = _runtime_ontology({'status': 'insufficient_evidence'}, {}, feedback_runtime)
@@ -560,6 +615,39 @@ def build_ontology(
         return None
     try:
         pack = assemble_evidence_pack(subject, sample_id, sample_meta, session_memories, profile, **({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
+        # 注入逐题白灰黑交叉可信度，供 L5 按分层取证/措辞
+        try:
+            from .wgb_trust import build_wgb_trust_summary
+            mt = 'homework'
+            if feedback_runtime is not None:
+                mt = str((feedback_runtime.context or {}).get('material_type') or 'homework')
+            p1 = pass1_dir or ''
+            if not p1 and base_dir:
+                for cand in (
+                    os.path.join(base_dir, 'pass1_json'),
+                    os.path.join(os.path.dirname(base_dir), 'pass1_json'),
+                ):
+                    if os.path.isdir(cand):
+                        p1 = cand
+                        break
+            trust = build_wgb_trust_summary(p1, subject, material_type=mt) if p1 else {}
+            if trust:
+                pack['wgb_trust'] = {
+                    'total_units': trust.get('total_units'),
+                    'tier_counts': trust.get('tier_counts'),
+                    'cross_counts': trust.get('cross_counts'),
+                    'critical': (trust.get('critical') or [])[:40],
+                    'careful': (trust.get('careful') or [])[:40],
+                    'need_verify': (trust.get('need_verify') or [])[:60],
+                    'by_qid': trust.get('by_qid') or {},
+                    'material_type': trust.get('material_type') or mt,
+                    'unit_word': trust.get('unit_word'),
+                    'protocol_hint': trust.get('protocol_hint'),
+                    'confident_count': trust.get('confident_count'),
+                    'normal_count': trust.get('normal_count'),
+                }
+        except Exception as exc:
+            logger.warning('[L5] wgb_trust 注入失败（不阻断）: %s', exc)
         evidence_path = os.path.join(base_dir, 'student_ontology_evidence.json')
         safe_json_dump(evidence_path, stamp_feedback(pack, feedback_runtime, 'ontology_evidence'))
 
@@ -586,6 +674,9 @@ def build_ontology(
             from .feedback_model import model_spec
             ontology['built_by'] = 'ontology_builder/' + model_spec(feedback_runtime, 'deepseek')['model']
         ontology = _sanitize_ontology_evidence(ontology, pack)
+        if pack.get('wgb_trust'):
+            # 持久化到 ontology，供 Pass2 / 诊断卡 / 独立界面读取
+            ontology['wgb_trust'] = pack['wgb_trust']
 
         warns = _validate_schema(ontology, pack)
         if warns:
@@ -612,7 +703,7 @@ def build_ontology(
         return ontology
     except Exception as exc:
         traceback.print_exc()
-        logger.warning('[L5] 构建失败回退: %s', exc)
+        logger.warning('[L5] 诊断失败%s: %s', '，将保存失败状态' if feedback_runtime is not None else '，返回旧链路兜底', exc)
         if feedback_runtime is not None:
             result = _runtime_ontology({'status': 'failed', 'error': str(exc)}, {}, feedback_runtime)
             safe_json_dump(os.path.join(base_dir, 'student_ontology.json'), result)

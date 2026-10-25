@@ -18,6 +18,10 @@ from app_chat import views_semantic_reorganize
 from app_chat import views_task_cluster
 from app_chat import views_scene_cluster_semantic
 from app_chat import views_notebook_memory
+from app_chat import views_skills
+from app_chat import views_feedback_rules
+from app_chat import views_cross_reorganize_skills
+from app_chat import views_knowledge_conflict
 from app_chat.feedback_material_settings import material_settings
 
 urlpatterns = [
@@ -103,6 +107,7 @@ urlpatterns = [
     re_path('card_html_group_feedback$', views_card_html.card_html_group_feedback),
     re_path('card_html_iterate$', views_card_html.card_html_iterate),
     re_path('card_html_revert$', views_card_html.card_html_revert),
+    re_path('card_get_html_generating_status', views_card_html.card_get_html_generating_status),
 
     re_path('card_generate_four_color_images', views_card_image.card_generate_four_color_images),
     re_path('card_get_image_generating_status', views_card_image.card_get_image_generating_status),
@@ -304,9 +309,30 @@ urlpatterns = [
     re_path('notebook_memory_autodream$', views_notebook_memory.notebook_memory_autodream),
     re_path('notebook_memory_status$', views_notebook_memory.notebook_memory_status),
 
+    # Skills
+    re_path('skill_list$', views_skills.skill_list),
+    re_path('skill_get$', views_skills.skill_get),
+    re_path('skill_save$', views_skills.skill_save),
+    re_path('skill_set_enabled$', views_skills.skill_set_enabled),
+    re_path('skill_for_file$', views_skills.skill_for_file),
+    re_path('import_skill_zip$', views_skills.import_skill_zip_api),
+    re_path('skill_status$', views_skills.skill_status),
+    re_path('skill_regenerate$', views_skills.skill_regenerate),
+
+    re_path('cross_reorganize_skills_start$', views_cross_reorganize_skills.cross_reorganize_skills_start),
+    re_path('cross_reorganize_skills_status$', views_cross_reorganize_skills.cross_reorganize_skills_status),
+    re_path('cross_reorganize_index$', views_cross_reorganize_skills.cross_reorganize_index),
+    re_path('cross_reorganize_skill_get$', views_cross_reorganize_skills.cross_reorganize_skill_get),
+
+    re_path('knowledge_conflict_start$', views_knowledge_conflict.knowledge_conflict_start),
+    re_path('knowledge_conflict_status$', views_knowledge_conflict.knowledge_conflict_status),
+    re_path('knowledge_conflict_get$', views_knowledge_conflict.knowledge_conflict_get),
+    re_path('knowledge_conflict_feedback$', views_knowledge_conflict.knowledge_conflict_feedback),
+
     # 新架构 CI 接口
     re_path('ci/query$', views_continuous_image.ci_query),
     re_path('ci/material-settings$', material_settings),
+    re_path('ci/feedback-rules$', views_feedback_rules.feedback_rules),
     re_path('ci/start$', views_continuous_image.ci_start),
     re_path(r'^ci/progress/(?P<task_id>[a-zA-Z0-9-_]+)/$', views_continuous_image.ci_progress),
     re_path('ci/result$', views_continuous_image.ci_result),
@@ -317,6 +343,12 @@ urlpatterns = [
     re_path('ci/homework/version_key$', views_continuous_image.ci_homework_version_key),
     re_path('ci/homework/rerun$', views_continuous_image.ci_homework_rerun),
     re_path('ci/homework/red_blue/retry$', views_continuous_image.ci_homework_red_blue_retry),
+    re_path('ci/homework/pin_result_cards$', views_continuous_image.ci_homework_pin_result_cards),
+    re_path('ci/homework/pin_result_cards_status$', views_continuous_image.ci_homework_pin_result_cards_status),
+    re_path('ci/homework/verify_save$', views_continuous_image.ci_homework_verify_save),
+    re_path('ci/homework/verify_list$', views_continuous_image.ci_homework_verify_list),
+    re_path('ci/homework/verify_iterate$', views_continuous_image.ci_homework_verify_iterate),
+    re_path('ci/homework/verify_iterate_status$', views_continuous_image.ci_homework_verify_iterate_status),
     re_path('ci/sketch_r/quickstart$', views_continuous_image.ci_sketch_r_quickstart),
     re_path('ci/reproduction/start$', views_continuous_image.ci_reproduction_start),
     re_path('ci/reproduction/update_context$', views_continuous_image.ci_reproduction_update_context),
@@ -350,14 +382,4 @@ urlpatterns = [
     re_path('ci/single/refine_image_understanding_preview_from_d_lite$', views_continuous_image.ci_single_refine_image_understanding_preview_from_d_lite),
     re_path('ci/single/d_lite_image_understanding_preview_cache$', views_continuous_image.ci_single_d_lite_image_understanding_preview_cache),
     re_path('ci/grade_understanding$', views_continuous_image.ci_grade_understanding),
-
-    # 私货
-    re_path('analyze_thinking_state$', views.analyze_thinking_state),
-    re_path('generate_context_navigation$', views.generate_context_navigation),
-    re_path('get_action_suggestions$', views.get_action_suggestions),
-    re_path('get_real_chat_history$', views.get_real_chat_history),
-
-    re_path('analyze_thought_network$', views.analyze_thought_network),
-    re_path('propagate_thought_signals$', views.propagate_thought_signals),
-    re_path('generate_thought_insights$', views.generate_thought_insights),
 ]

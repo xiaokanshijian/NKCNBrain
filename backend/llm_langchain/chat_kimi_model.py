@@ -1,17 +1,18 @@
+import nkcn_public_config as _public_config
 import os
 
 from langchain_community.chat_models.openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, AIMessage
 from langchain_core.prompts import HumanMessagePromptTemplate, MessagesPlaceholder, SystemMessagePromptTemplate
 
-os.environ["http_proxy"] = "http://localhost:7890"
-os.environ["https_proxy"] = "http://localhost:7890"
+# os.environ["http_proxy"] = "http://localhost:7890"
+# os.environ["https_proxy"] = "http://localhost:7890"
 
-# os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "")   # openai old
-os.environ["OPENAI_API_KEY"] = os.environ.get("KIMI_API_KEY", "")   # openai new
-OPEN_AI_KEY = os.environ.get("KIMI_API_KEY", "")
+# os.environ["OPENAI_API_KEY"] = "[redacted]"   # openai old
+os.environ.setdefault("OPENAI_API_KEY", _public_config.secret('KIMI_API_KEY'))   # openai new
+OPEN_AI_KEY = _public_config.secret('KIMI_API_KEY')
 
-# OPEN_AI_KEY = os.environ.get("OPENAI_API_KEY", "")
+# OPEN_AI_KEY = "[redacted]"
 base_url = "https://api.moonshot.cn/v1"
 
 chat_model = ChatOpenAI(temperature=0.1,

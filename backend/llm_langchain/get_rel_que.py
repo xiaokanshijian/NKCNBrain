@@ -1,3 +1,4 @@
+import nkcn_public_config as _public_config
 import random
 import re
 from langchain_core.messages import SystemMessage, AIMessage, HumanMessage
@@ -565,15 +566,15 @@ def get_depth_suggestion_from_small_model(question, answer, question_chain, opti
 def get_small_model_server_url(username):
     """
     根据username从全局变量获取小模型ID，返回对应的服务器URL
-    3007 -> 192.0.2.1
-    3001-3006 -> 192.0.2.1
+    3007 -> 127.0.0.1
+    3001-3006 -> 127.0.0.1
     """
     from app_chat.global_state import GLOBAL_STATE
     model_id = GLOBAL_STATE.user_little_model_id.get(username, "3003")
     if str(model_id) == "3007":
-        return "http://192.0.2.1:8000"
+        return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
     else:
-        return "http://192.0.2.1:8000"
+        return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
 
 
 def get_depth_suggestion(input_text, user_name, task_type="qa"):
@@ -600,7 +601,7 @@ def get_depth_suggestion(input_text, user_name, task_type="qa"):
         # 从全局变量获取小模型ID
         server_url = get_small_model_server_url(user_name)
         # 使用curl命令调用中转服务器的深度建议接口
-        # command = f'curl -X POST -H "Content-Type: application/json" -d \'{json_data}\' http://192.0.2.1:8000/get_depth_suggestion'
+        # command = f'curl -X POST -H "Content-Type: application/json" -d \'{json_data}\' http://localhost:8000/get_depth_suggestion'
         command = f'curl -X POST -H "Content-Type: application/json" -d \'{json_data}\' {server_url}/get_depth_suggestion'
         result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 text=True)

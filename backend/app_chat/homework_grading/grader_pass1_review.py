@@ -1,3 +1,4 @@
+from .stage_dependencies import artifact_compatible
 from .feedback_model import model_spec
 from .feedback_runtime import frozen_environment
 """Pass1 per-page self-review with Gemini vision.
@@ -8,6 +9,7 @@ Writes *.review.json and applies conservative corrections to page JSON.
 """
 
 import hashlib
+import copy
 from .feedback_runtime import runtime_attributes, stamp_feedback
 
 import json
@@ -16,9 +18,10 @@ import os
 import re
 import sys
 import tempfile
-from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, wait
+from .execution_control import ThreadPoolExecutor
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from pypinyin import Style, pinyin
 
@@ -197,8 +200,14 @@ def pass1_review_parallelism(workers: int = 5, candidate_count: int = 1, *, feed
 
 
 def _is_gemini_quota_error(error: Any) -> bool:
-    text = str(error or '').lower()
-    return any(pattern in text for pattern in _GEMINI_QUOTA_PATTERNS)
+    seen = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        text = str(error).lower()
+        if any(pattern in text for pattern in _GEMINI_QUOTA_PATTERNS):
+            return True
+        error = getattr(error, '__cause__', None)
+    return False
 
 
 def _review_json_path(page_json_path: str) -> str:
@@ -1862,8 +1871,9 @@ def _needs_focused_chinese_visual_review(question: Dict[str, Any]) -> bool:
 def _page_needs_review(page_data: Dict[str, Any], subject: str, *, feedback_runtime=None) -> bool:
     if feedback_runtime is not None:
         subject = feedback_runtime.context['subject_code']
-    if feedback_runtime is not None and not feedback_runtime.has_specialized(subject):
-        return _page_has_reviewable_verdict(page_data)
+    from .evidence_contract import required_review_units
+    if feedback_runtime is not None and required_review_units(page_data):
+        return True
     scope = pass1_review_scope(**({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
     if scope == 'all':
         return True
@@ -1957,6 +1967,10 @@ def _build_review_snapshot(page_data: Dict[str, Any], subject: str = '') -> Dict
                 question.get('final_unit_requirement') or 'optional'
             ).strip(),
         }
+        for field in ('note_role', 'material_check', 'assessment_status', 'assessment_reason',
+                      'printed_text_marked', 'handwritten_text_marked', 'annotation_links'):
+            if field in question:
+                entry[field] = copy.deepcopy(question[field])
         focus = _question_review_focus(question, subject)
         if focus:
             entry['review_focus'] = focus
@@ -1998,54 +2012,27 @@ def _call_review_llm(
         messages = copy.deepcopy(messages)
         if messages and '【本轮实际材料】' not in str(messages[0].get('content', '')):
             messages[0]['content'] += context_block(feedback_runtime) + reference_block(feedback_runtime) + KERNEL_CONTRACT
-    last_raw = ''
-    last_error: Optional[Exception] = None
+        from .notebook_skills import prompt_block
+        if messages and '[NKCN_NOTEBOOK_SKILL ' not in str(messages[0].get('content', '')):
+            messages[0]['content'] += prompt_block(feedback_runtime, 'review')
+    from .model_output import request_json_object, object_list
 
-    for attempt in range(REVIEW_MAX_ATTEMPTS):
-        call_messages = messages
-        if attempt > 0:
-            call_messages = messages + [
-                {'role': 'assistant', 'content': last_raw or '{}'},
-                {'role': 'user', 'content': _retry_hint(last_error)},
-            ]
-        try:
-            response = _call_homework_gemini_json(call_messages, **({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
-        except Exception as exc:
-            last_error = exc
-            logger.warning('Pass1 自检 Gemini 失败 attempt=%s/%s: %s', attempt + 1, REVIEW_MAX_ATTEMPTS, exc)
-            continue
-
-        choices = getattr(response, 'choices', None) or []
-        if not choices:
-            last_error = ValueError('Gemini 返回空 choices')
-            continue
-
-        message = choices[0].message
-        last_raw = message.content or ''
-        try:
-            parser = raw_parser or _loads_json_with_retry_text
-            result = parser(last_raw)
-        except json.JSONDecodeError as exc:
-            last_error = exc
-            continue
-
-        if not isinstance(result, dict):
-            last_error = ValueError('返回不是 JSON 对象')
-            continue
-        if require_items and not isinstance(result.get('items'), list):
-            last_error = ValueError('缺少 items 数组')
-            continue
+    def validate(result):
+        if require_items:
+            object_list(result.get('items'), 'items')
         if result_validator is not None:
-            validation_error = str(result_validator(result) or '').strip()
-            if validation_error:
-                last_error = ValueError(validation_error)
-                continue
+            error = result_validator(result)
+            if error:
+                raise ValueError(error)
         return result
 
-    if error_dump_path and last_raw:
-        _write_text(error_dump_path, last_raw)
-    detail = f'{last_error}; raw={last_raw[:200]!r}' if last_raw else str(last_error)
-    raise ValueError(f'Pass1 自检在 {REVIEW_MAX_ATTEMPTS} 次尝试后仍失败: {detail}')
+    return request_json_object(
+        lambda current: _call_homework_gemini_json(current,
+            **({'feedback_runtime': feedback_runtime} if feedback_runtime is not None else {})),
+        messages, parser=raw_parser or _loads_json_with_retry_text, validate=validate,
+        audit_path=error_dump_path + '.responses.json' if error_dump_path else None,
+        stage='页面复核', attempts=REVIEW_MAX_ATTEMPTS, retry_prompt=_retry_hint,
+        error_path=error_dump_path, retry_call_errors=True)
 
 
 def _normalize_review_items(raw_items: Any, expected_ids: List[str]) -> List[Dict[str, Any]]:
@@ -2086,6 +2073,9 @@ def _normalize_review_items(raw_items: Any, expected_ids: List[str]) -> List[Dic
                 clean_fix['correct_answer'] = fix.get('correct_answer')
             if 'error_type' in fix:
                 clean_fix['error_type'] = str(fix.get('error_type') or '')
+            for field in ('printed_text_marked', 'handwritten_text_marked', 'annotation_links', 'understanding'):
+                if field in fix:
+                    clean_fix[field] = copy.deepcopy(fix[field])
             if clean_fix:
                 entry['fix'] = clean_fix
         normalized.append(entry)
@@ -2104,6 +2094,112 @@ def _sync_error_type_after_review(question: Dict[str, Any], fix: Dict[str, Any])
         return
     if verdict == 'partial' and any(token in error for token in ('未作答', '漏题')):
         question['error_type'] = ''
+
+
+def _is_cross_page_boundary_only_error(error_type: Any) -> bool:
+    text = re.sub(r'\s+', '', str(error_type or ''))
+    if '跨页' not in text:
+        return False
+    return any(token in text for token in (
+        '截断', '信息不足', '不完整', '无法评估全文', '无法评价全文',
+        '全文结构', '字数达标', '全文字数',
+    ))
+
+
+def _adjacent_page_exists(page_data: Dict[str, Any], available_pages: Set[int]) -> bool:
+    try:
+        page_num = int(page_data.get('page'))
+    except (TypeError, ValueError):
+        return False
+    boundary = page_data.get('boundary') or {}
+    return bool(
+        (boundary.get('continues_from_prev') and page_num - 1 in available_pages)
+        or (boundary.get('continues_to_next') and page_num + 1 in available_pages)
+    )
+
+
+def _reconcile_open_material_boundary_errors(
+    json_paths: List[str],
+    *,
+    feedback_runtime=None,
+) -> int:
+    """相邻页已在本轮时，移除把单页边界误当内容错误的复核残留。"""
+    if feedback_runtime is None:
+        return 0
+    from .feedback_material_kinds import is_open_material
+    if (feedback_runtime.context or {}).get('material_type') == 'notes':
+        # 混排笔记的相邻PDF页不一定同源；不得因为存在邻页就把待确认提升成正确。
+        return 0
+    if not is_open_material((feedback_runtime.context or {}).get('material_type')):
+        return 0
+    available_pages = {
+        parse_page_num(os.path.basename(path))
+        for path in json_paths
+        if parse_page_num(os.path.basename(path)) > 0
+    }
+    reconciled = 0
+    for json_path in json_paths:
+        page_data = safe_json_load(json_path)
+        if not _adjacent_page_exists(page_data, available_pages):
+            continue
+        changed_items: Dict[str, Dict[str, Any]] = {}
+        for question in page_data.get('questions') or []:
+            if not isinstance(question, dict) or not question.get('cross_page'):
+                continue
+            old_error = str(question.get('error_type') or '').strip()
+            verdict = str(question.get('verdict') or '').strip()
+            has_local_content = bool(
+                str(question.get('student_answer') or '').strip()
+                or str(question.get('understanding') or '').strip()
+            )
+            if (
+                not has_local_content
+                or verdict not in ('correct', 'partial', 'uncertain')
+                or not _is_cross_page_boundary_only_error(old_error)
+            ):
+                continue
+            question_id = str(question.get('id') or '').strip()
+            new_verdict = 'uncertain'
+            question['material_check'] = {'status': 'unresolved', 'blocks_assessment': True,
+                                          'reason': '相邻页存在，全文要求与内容仍需核对', 'evidence': []}
+            question['verdict'] = new_verdict
+            question['error_type'] = ''
+            audit = {
+                'reason': 'adjacent_page_present',
+                'previous_verdict': verdict,
+                'previous_error_type': old_error,
+                'verdict': new_verdict,
+                'error_type': '',
+            }
+            question['boundary_review_reconciliation'] = audit
+            if isinstance(question.get('self_review'), dict):
+                question['self_review']['boundary_reconciliation'] = audit
+            if question_id:
+                changed_items[question_id] = audit
+            reconciled += 1
+        if not changed_items:
+            continue
+        safe_json_dump(json_path, stamp_feedback(page_data, feedback_runtime, 'review'))
+        review_path = _review_json_path(json_path)
+        if not os.path.isfile(review_path):
+            continue
+        review = safe_json_load(review_path)
+        for item in review.get('items') or []:
+            if not isinstance(item, dict):
+                continue
+            audit = changed_items.get(str(item.get('id') or '').strip())
+            if not audit:
+                continue
+            fix = item.get('fix') if isinstance(item.get('fix'), dict) else {}
+            item['fix'] = {**fix, 'verdict': audit['verdict'], 'error_type': ''}
+            item['boundary_reconciliation'] = audit
+        review.setdefault('stats', {})['boundary_error_reconciled'] = len(changed_items)
+        review['post_review_signature'] = _review_snapshot_signature(
+            page_data,
+            feedback_runtime.context['subject_code'],
+        )
+        safe_json_dump(review_path, stamp_feedback(review, feedback_runtime, 'review'))
+    return reconciled
 
 
 def _apply_review_item(question: Dict[str, Any], item: Dict[str, Any]) -> bool:
@@ -3151,6 +3247,10 @@ def _load_reusable_review_report(
     subject: str,
     *, feedback_runtime=None,
 ) -> Optional[Dict[str, Any]]:
+    from .execution_control import current_execution
+    if current_execution() is not None:
+        # 受控运行使用完整图片/请求/代码校验的模型检查点，不仅凭旧复核文件存在复用。
+        return None
     if feedback_runtime is not None:
         subject = feedback_runtime.context['subject_code']
     if not pass1_review_reuse_existing(**({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {})):
@@ -3161,7 +3261,7 @@ def _load_reusable_review_report(
     report = safe_json_load(review_path)
     if not isinstance(report, dict):
         return None
-    if feedback_runtime is not None and report.get('feedback_execution', {}).get('config_fingerprint') != feedback_runtime.fingerprint:
+    if feedback_runtime is not None and not artifact_compatible(report, feedback_runtime):
         return None
     if report.get('skipped') or report.get('error') or report.get('focused_error') or report.get('quota_limited'):
         return None
@@ -3200,15 +3300,22 @@ def _run_review_candidate(
         **({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
     except Exception as exc:
         logger.exception('Pass1 自检单页失败')
-        return stamp_feedback({
+        from .execution_control import budget_diagnostics
+        budget = budget_diagnostics(exc)
+        result = stamp_feedback({
             'page': parse_page_num(os.path.basename(json_path)),
             'review_path': _review_json_path(json_path),
             'skipped': False,
-            'error': str(exc) or 'page_review_failed',
+            'error': str(exc) if budget else '逐页复核失败：' + type(exc).__name__,
+            'error_kind': type(exc).__name__,
+            'budget': budget,
             'quota_limited': _is_gemini_quota_error(exc),
             'issues': 0,
             'applied': 0,
         }, feedback_runtime, 'review')
+        # 失败也保存逐页回执；读取不必依赖进程日志，失败回执不能被当作成功复用。
+        safe_json_dump(_review_json_path(json_path), result)
+        return result
 
 
 def _run_review_candidates(
@@ -3385,13 +3492,30 @@ def apply_review_to_page(page_data: Dict[str, Any], review_report: Dict[str, Any
         if isinstance(q, dict) and str(q.get('id') or '').strip()
     }
     applied = 0
+    from .note_evidence import is_notes, reconcile_note_review
+    from .material_markings import MARKING_FIELDS, normalize_markings, open_material_runtime
+    notes = is_notes(feedback_runtime)
     for item in review_report.get('items') or []:
         if not isinstance(item, dict):
             continue
         question = by_id.get(str(item.get('id') or '').strip())
         if not question:
             continue
-        if _apply_review_item(question, item):
+        before = {key: copy.deepcopy(question.get(key)) for key in (
+            'student_answer', 'verdict', 'correct_answer', 'error_type', 'understanding')}
+        item_applied = _apply_review_item(question, item)
+        if notes:
+            fix = item.get('fix') if item.get('ok') is False and isinstance(item.get('fix'), dict) else {}
+            reconcile_note_review(question, before, fix, item.get('reason'))
+            item_applied = item_applied or any(question.get(k) != v for k, v in before.items())
+        if open_material_runtime(feedback_runtime):
+            fix = item.get('fix') if item.get('ok') is False and isinstance(item.get('fix'), dict) else {}
+            for field in (*MARKING_FIELDS, 'understanding'):
+                if field in fix and (field != 'understanding' or isinstance(fix[field], str)):
+                    question[field] = copy.deepcopy(fix[field])
+                    item_applied = True
+            normalize_markings(question)
+        if item_applied:
             applied += 1
     stats = review_report.setdefault('stats', {})
     stats['applied'] = applied
@@ -3609,7 +3733,7 @@ def _review_one_page(
     if feedback_runtime is not None:
         _subject, grade, stage = runtime_attributes(feedback_runtime)
     page_data = safe_json_load(page_json_path)
-    if feedback_runtime is not None and page_data.get('feedback_execution', {}).get('config_fingerprint') != feedback_runtime.fingerprint:
+    if feedback_runtime is not None and not artifact_compatible(page_data, feedback_runtime):
         raise ValueError('复核输入与本轮配置不一致')
     page_num = int(page_data.get('page') or parse_page_num(os.path.basename(page_json_path)) or 0)
     review_path = _review_json_path(page_json_path)
@@ -3619,7 +3743,8 @@ def _review_one_page(
         page_num,
         source_document_sha256,
     **({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
-    if allowlist_match:
+    from .evidence_contract import required_review_units
+    if allowlist_match and not required_review_units(page_data):
         report = _write_skipped_review(
             page_num,
             review_path,
@@ -3687,9 +3812,15 @@ def review_pass1_dir(
         subject = feedback_runtime.context['subject_code']
     if feedback_runtime is not None:
         _subject, grade, stage = runtime_attributes(feedback_runtime)
+    from .evidence_contract import required_review_units, unit_coverage
+    expected_numbers = {p['page'] for p in pages}
+    required = [u for path in sorted_json_pages(pass1_dir)
+                for page_data in [safe_json_load(path)] if page_data.get('page') in expected_numbers
+                for u in required_review_units(page_data)]
     if not pass1_self_review_enabled(**({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {})):
         return stamp_feedback({
             'enabled': False,
+            'required_units': unit_coverage(required, []),
             'skipped': True,
             'model': (model_spec(feedback_runtime, 'review')['model'] if feedback_runtime is not None else homework_review_gemini_model()),
             'scope': pass1_review_scope(**({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {})),
@@ -3734,7 +3865,7 @@ def review_pass1_dir(
     for json_path in json_paths:
         page_num = parse_page_num(os.path.basename(json_path))
         page_data = safe_json_load(json_path)
-        if feedback_runtime is not None and page_data.get('feedback_execution', {}).get('config_fingerprint') != feedback_runtime.fingerprint:
+        if feedback_runtime is not None and not artifact_compatible(page_data, feedback_runtime):
             raise ValueError('复核输入与本轮配置不一致')
         review_path = _review_json_path(json_path)
         allowlist_match = _self_review_allowlist_match(
@@ -3743,7 +3874,8 @@ def review_pass1_dir(
             page_num,
             source_document_sha256,
         **({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
-        if allowlist_match:
+        from .evidence_contract import required_review_units
+        if allowlist_match and not required_review_units(page_data):
             skipped_results.append({
                 'page': page_num,
                 'review_path': review_path,
@@ -3796,6 +3928,11 @@ def review_pass1_dir(
             **({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
         )
 
+    boundary_error_reconciled = _reconcile_open_material_boundary_errors(
+        json_paths,
+        **({'feedback_runtime': feedback_runtime} if feedback_runtime is not None else {}),
+    )
+
     pages_skipped = sum(1 for r in results if r.get('skipped'))
     pages_reused = sum(1 for r in results if r.get('reused'))
     pages_reviewed = sum(1 for r in results if not r.get('skipped') and not r.get('error'))
@@ -3821,6 +3958,10 @@ def review_pass1_dir(
         'pages_skipped': pages_skipped,
         'issues_found': issues_found,
         'corrections_applied': corrections_applied,
+        'boundary_error_reconciled': boundary_error_reconciled,
         'errors': len(errors),
+        'failures': [{key: r[key] for key in ('page', 'error', 'error_kind', 'budget') if key in r}
+                     for r in errors],
         'details': results,
+        'required_units': unit_coverage(required, results),
     }, feedback_runtime, 'review')

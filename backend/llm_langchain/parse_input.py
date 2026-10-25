@@ -1,6 +1,7 @@
+import nkcn_public_config as _public_config
 # 需要确定输入的格式，可以有字符串，可以有文档，文档也需要区分其类别进行处理，如果可以得到文档document类型则无所谓，目前先使用text进行示例
 import json
-from threading import Thread, RLock
+from threading import Event, Thread, RLock
 from concurrent.futures import ThreadPoolExecutor
 import subprocess
 
@@ -28,16 +29,16 @@ import chardet
 import time
 import chromadb
 
-# os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "")   # openai old
+# os.environ["OPENAI_API_KEY"] = "[redacted]"   # openai old
 
-os.environ["OPENAI_API_KEY"] = os.environ.get("NKCN_LLM_API_KEY", "")  # openai new
-# OPEN_AI_KEY = os.environ.get("OPENAI_API_KEY", "")
-# OPEN_AI_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPEN_AI_KEY = os.environ.get("NKCN_LLM_API_KEY", "")
-DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
-# os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "")
-# OPEN_AI_KEY = os.environ.get("OPENAI_API_KEY", "")
-base_url = "https://ai98.vip/v1"
+os.environ.setdefault("OPENAI_API_KEY", _public_config.secret('OPENAI_API_KEY'))  # openai new
+# OPEN_AI_KEY = "[redacted]"
+# OPEN_AI_KEY = "[redacted]"
+OPEN_AI_KEY = _public_config.secret('OPENAI_API_KEY')
+DASHSCOPE_API_KEY = _public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY')
+# os.environ["OPENAI_API_KEY"] = "[redacted]"
+# OPEN_AI_KEY = "[redacted]"
+base_url = _public_config.endpoint('NKCN_LEGACY_GATEWAY_V1_URL', 'http://localhost:9999/v1')
 
 # 使用的embedding模型的路径
 EMBEDDING_MODEL_NAME = r"E:\LM2\instructor-large"
@@ -63,7 +64,7 @@ rel_fun = ["Docx2txtLoader", "PyMuPDFLoader", "TextLoader"]
 #     """
 #     try:
 #         # 通过中转服务器调用8卡服务器
-#         api_url = "http://192.0.2.1:8000/assess_document_confidence"
+#         api_url = "http://localhost:8000/assess_document_confidence"
 #
 #         # 准备请求数据
 #         data = {
@@ -114,13 +115,13 @@ def assess_document_confidence(user_name, document_content):
             from app_chat.global_state import GLOBAL_STATE
             model_id = GLOBAL_STATE.user_little_model_id.get(username, "3003")
             if str(model_id) == "3007":
-                return "http://192.0.2.1:8000"
+                return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
             else:
-                return "http://192.0.2.1:8000"
+                return _public_config.endpoint('NKCN_SERVICE_8000_URL', 'http://localhost:8000')
 
         server_url = get_small_model_server_url(user_name)
         # 使用curl命令调用中转服务器API
-        # command = f'curl -X POST -H "Content-Type: application/json" -d \'{json_data}\' http://192.0.2.1:8000/assess_document_confidence'
+        # command = f'curl -X POST -H "Content-Type: application/json" -d \'{json_data}\' http://localhost:8000/assess_document_confidence'
         command = f'curl -X POST -H "Content-Type: application/json" -d \'{json_data}\' {server_url}/assess_document_confidence'
         result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 text=True)
@@ -166,7 +167,7 @@ def assess_document_confidence(user_name, document_content):
 #             return OpenAIEmbeddings(
 #                 model="text-embedding-3-large",
 #                 openai_api_key=OPEN_AI_KEY,
-#                 openai_api_base='https://chat.cloudapi.vip/v1/',
+#                 openai_api_base='http://localhost:9999/v1/',
 #                 default_headers={"x-foo": "true"},
 #                 request_timeout=120,  # 增加超时时间
 #                 max_retries=3,  # 设置重试次数
@@ -197,14 +198,14 @@ def create_embeddings_with_retry():
             # 🔥 使用复用的OpenAI客户端
             client = get_embedding_client(
                 api_key=OPEN_AI_KEY,
-                base_url='https://chat.cloudapi.vip/v1/'
+                base_url=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/')
             )
 
             return OpenAIEmbeddings(
                 model="text-embedding-3-large",
                 # model="text-embedding-3-large-X",
                 openai_api_key=OPEN_AI_KEY,
-                openai_api_base='https://chat.cloudapi.vip/v1/',
+                openai_api_base=_public_config.endpoint('NKCN_MODEL_GATEWAY_V1_URL', 'http://localhost:9999/v1/'),
                 default_headers={"x-foo": "true"},
                 request_timeout=120,  # 增加超时时间
                 max_retries=3,  # 设置重试次数
@@ -232,6 +233,81 @@ embeddings = create_embeddings_with_retry()
 # )
 
 lock = {}
+_meta_lock = {}
+_meta_guard = RLock()
+# 同一本子并发 load_user：后来的请求挂到这次加载上，而不是 25 秒后报错
+_load_done = {}
+_load_done_guard = RLock()
+
+
+def _memory_lock(user_name):
+    with _meta_guard:
+        if user_name not in _meta_lock:
+            _meta_lock[user_name] = RLock()
+        return _meta_lock[user_name]
+
+
+def _user_lock(user_name):
+    if user_name not in lock:
+        lock[user_name] = RLock()
+    return lock[user_name]
+
+
+def _force_new_user_lock(user_name, progress_id=None, reason=''):
+    old = lock.get(user_name)
+    lock[user_name] = RLock()
+    print(
+        f"[{progress_id}] 强制换锁 user={user_name} reason={reason} "
+        f"old_id={id(old) if old is not None else None}"
+    )
+    return lock[user_name]
+
+
+def _vector_ready(user_name):
+    mem = global_var.store_memory.get(user_name) or {}
+    return mem.get('vector_store') is not None
+
+
+def _write_progress(progress_id, **fields):
+    """热重载后创建进度的进程和灌向量的进程可能不是同一个；没有内存记录也要写上（并落盘）。"""
+    if not progress_id:
+        return
+    from zym.views import progress_data
+    if hasattr(progress_data, 'ensure'):
+        progress_data.ensure(progress_id, **fields)
+        return
+    if progress_id not in progress_data:
+        progress_data[progress_id] = {'status': 'started', 'progress': 0, 'message': '准备加载用户数据...'}
+    for key, value in fields.items():
+        progress_data[progress_id][key] = value
+
+
+def _mark_progress_done(progress_id, message='加载完成'):
+    _write_progress(progress_id, progress=100, status='completed', message=message)
+
+
+def _wait_for_inflight_load(user_name, progress_id, seconds=180):
+    """锁被占用时跟随正在进行的加载，而不是卡在 0% 连试 5 次后失败。"""
+    from zym.views import progress_data
+    deadline = time.time() + seconds
+    attempt = 0
+    while time.time() < deadline:
+        if _vector_ready(user_name):
+            _mark_progress_done(progress_id)
+            return True
+        with _load_done_guard:
+            event = _load_done.get(user_name)
+        if event is None:
+            return False
+        if event.is_set():
+            if _vector_ready(user_name):
+                _mark_progress_done(progress_id)
+                return True
+            return False
+        attempt += 1
+        _write_progress(progress_id, progress=min(12, 4 + attempt // 3), message='本子正在加载，请稍候…')
+        event.wait(timeout=2)
+    return False
 
 
 # 共享 Chroma 数据探测缓存：避免 load_user 频繁触发磁盘/锁等待
@@ -976,7 +1052,7 @@ def process_document_pre_summary(realName, usr_name, docs_name):
 ..."""
 
         # 调用deepseek-chat API
-        API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+        API_KEY = _public_config.secret('DEEPSEEK_API_KEY')
         client = OpenAI(
             api_key=API_KEY,
             base_url="https://api.deepseek.com",
@@ -1165,7 +1241,7 @@ def process_pre_image_summary(usr_name, docs_name, pre_image_origin_path):
 **特别强调**：每段摘要必须显式保留关键的数据性、规律性、结论性信息，要具体而有综合价值。不能只是泛泛描述"图片展示了xxx"，而要明确指出图片中的具体数据、规律、结论等有价值的信息点。"""
 
         # 调用deepseek-chat API
-        API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+        API_KEY = _public_config.secret('DEEPSEEK_API_KEY')
         client = OpenAI(
             api_key=API_KEY,
             base_url="https://api.deepseek.com",
@@ -1266,31 +1342,40 @@ def process_documents_pre_summary_batch(realName, book_name, usr_name, doc_list)
         print(f"[批量文档预处理] 没有需要处理的文档")
         return
 
-    print(f"[批量文档预处理] 开始处理 {len(to_process)} 个文档")
+    print(f"[批量文档预处理] 开始处理 {len(to_process)} 个文档（每文档：PreSummary → Skill）")
 
     def process_single_doc(doc_name):
-        """处理单个文档"""
+        """处理单个文档：先 PreSummary，再触发 Skill。"""
         doc_key = f"{usr_name}_{doc_name}"
+        presummary_ok = False
         try:
             # 先将状态设为false（如果还没有）
             update_document_pre_summary_status(realName, book_name, doc_name, False)
 
-            # 处理文档
+            print(f"[批量文档预处理] 开始 PreSummary: {doc_name}")
             success, error_msg = process_document_pre_summary(realName, usr_name, doc_name)
 
             if success:
-                # 更新状态为已完成
                 update_document_pre_summary_status(realName, book_name, doc_name, True)
-                print(f"[批量文档预处理] ✅ 成功处理文档: {doc_name}")
+                presummary_ok = True
+                print(f"[批量文档预处理] ✅ PreSummary 完成: {doc_name}")
             else:
-                # 保持状态为未处理（False）
-                print(f"[批量文档预处理] ❌ 处理文档失败: {doc_name}, 错误: {error_msg}")
+                print(f"[批量文档预处理] ❌ PreSummary 失败，仍将生成 Skill: {doc_name}, 错误: {error_msg}")
 
         except Exception as e:
-            print(f"[批量文档预处理] ❌ 处理文档异常: {doc_name}, 错误: {str(e)}")
-            # 保持状态为未处理
+            print(f"[批量文档预处理] ❌ PreSummary 异常，仍将生成 Skill: {doc_name}, 错误: {str(e)}")
         finally:
-            # 从正在处理集合中移除
+            # PreSummary 结束后再生成 Skill（与新上传路径一致）
+            try:
+                from app_chat import skills_store as skills_store
+                from app_chat.skill_generate import spawn_document_skill_async
+                if skills_store.find_skill_by_source_doc(usr_name, doc_name):
+                    print(f"[批量文档预处理] 已有 Skill，跳过生成: {doc_name}")
+                else:
+                    print(f"[批量文档预处理] 触发 Skill 生成: {doc_name} (presummary_ok={presummary_ok})")
+                    spawn_document_skill_async(realName, usr_name, doc_name)
+            except Exception as _sk_e:
+                print(f"[批量文档预处理] Skill 启动失败: {doc_name}, {_sk_e}")
             with _pre_summary_processing_lock:
                 _pre_summary_processing_set.discard(doc_key)
 
@@ -2181,35 +2266,53 @@ def delete_notebook_vectors_simple(usr_name, book_name):
 # 现在就采取较小粒度并且大数量文档输入！
 @async_thread
 def load_user(user_name, progress_id=None):
-    # 只创建锁，如果它不存在
-    if user_name not in lock:
-        lock[user_name] = RLock()
+    _user_lock(user_name)
 
-    # 尝试获取锁
     acquired = False
+    load_event = None
     from zym.views import progress_data
     try:
-        # acquired = lock[user_name].acquire(blocking=False)  # 非阻塞获取
-        acquired = False
-        for attempt in range(5):
-            acquired = lock[user_name].acquire(blocking=False)  # 非阻塞获取
-            if acquired:
-                print(f"[{progress_id}] 第{attempt + 1}次尝试成功获取锁: {user_name}")
-                break
-            else:
-                print(f"[{progress_id}] 第{attempt + 1}次尝试获取锁失败: {user_name}")
-                if progress_id:
-                    progress_data[progress_id]['message'] = f'等待其他加载完成... (尝试 {attempt + 1}/5)'
-                if attempt < 4:  # 不是最后一次尝试
-                    time.sleep(5)
+        if _vector_ready(user_name):
+            _mark_progress_done(progress_id)
+            print(f"[{progress_id}] 本子已在内存中，跳过重复加载: {user_name}")
+            return
 
+        _write_progress(progress_id, progress=8, message='初始化数据库连接...')
+        print(f"[{progress_id}] load_user 开始 user={user_name}")
+
+        acquired = lock[user_name].acquire(blocking=False)
         if not acquired:
-            # 无法获取锁，更新进度状态
-            if progress_id:
-                progress_data[progress_id]['status'] = 'error'
-                progress_data[progress_id]['message'] = '另一个加载过程正在进行，请稍等'
-            print(f"[{progress_id}] 无法获取用户 {user_name} 的锁，可能有其他进程正在处理，经过5次尝试后放弃")
-            return  # 这行很关键
+            with _load_done_guard:
+                inflight = _load_done.get(user_name)
+            if inflight is not None:
+                print(f"[{progress_id}] 锁被占用，跟随已有加载: {user_name}")
+                if _wait_for_inflight_load(user_name, progress_id):
+                    print(f"[{progress_id}] 已复用进行中的加载: {user_name}")
+                    return
+            # 没有正在灌向量的人却拿不到锁 = 泄漏的 threading.RLock（异常未 release），
+            # 不是热重载文件锁。换一把继续，避免卡在 8% 直到放弃。
+            print(f"[{progress_id}] 锁被占用但无进行中加载，视为泄漏并换锁: {user_name}")
+            _force_new_user_lock(user_name, progress_id, reason='no_inflight')
+            acquired = lock[user_name].acquire(timeout=5)
+            if not acquired:
+                if _vector_ready(user_name):
+                    _mark_progress_done(progress_id)
+                    return
+                _write_progress(
+                    progress_id,
+                    status='error',
+                    message='本子仍在加载，请稍后再打开',
+                )
+                print(f"[{progress_id}] 无法获取用户 {user_name} 的锁，放弃")
+                return
+
+        if _vector_ready(user_name):
+            _mark_progress_done(progress_id)
+            return
+
+        load_event = Event()
+        with _load_done_guard:
+            _load_done[user_name] = load_event
 
         # memory_usage = psutil.virtual_memory().percent
         # cpu_usage = psutil.cpu_percent()
@@ -2406,7 +2509,18 @@ def load_user(user_name, progress_id=None):
                 print(f"[{progress_id}] 跳过pre_summary目录")
                 continue
 
-            if os.path.isdir(file_path) and f != "cardImage" and f != "pre_summary" and not f.endswith("_ocr"):
+            if os.path.isdir(file_path) and f == "skills":
+                total_files = total_files - 1
+                print(f"[{progress_id}] 跳过skills目录")
+                continue
+
+            if os.path.isfile(file_path) and f.lower().endswith(".zip"):
+                # Skill 包 zip 不向量化
+                total_files = total_files - 1
+                print(f"[{progress_id}] 跳过 Skill 包 zip: {f}")
+                continue
+
+            if os.path.isdir(file_path) and f != "cardImage" and f != "pre_summary" and f != "skills" and not f.endswith("_ocr"):
                 total_files = total_files - 1
 
                 # 连续图片理解等系统目录不参与图片base64恢复
@@ -2610,9 +2724,12 @@ def load_user(user_name, progress_id=None):
                 processed_files += 1
 
         global_var.set_user_vector(user_name, vector_store)
-        global_var.set_user_prompt(user_name)
+        mem = global_var.store_memory.get(user_name) or {}
+        if not mem.get('prompt'):
+            global_var.set_user_prompt(user_name)
+        if 'params' not in mem:
+            global_var.set_user_params(user_name)
         global_var.set_user_model(user_name, 0)
-        global_var.set_user_params(user_name)
 
         if progress_id:
             # 最终完成
@@ -2621,43 +2738,50 @@ def load_user(user_name, progress_id=None):
             progress_data[progress_id]['message'] = '加载完成'
         print('[parse_input]load_user:', error_file)
     finally:
-        # 只有成功获取了锁才释放
+        if load_event is not None:
+            load_event.set()
+            with _load_done_guard:
+                if _load_done.get(user_name) is load_event:
+                    _load_done.pop(user_name, None)
         if acquired:
             lock[user_name].release()
             print(f"[{progress_id}] 成功释放用户 {user_name} 的锁")
 
 
 def get_docs_by_user_doc(user_name, docs_name):
-    lock[user_name].acquire()
-    texts = []
-    images_all = []
-    # print(global_var.store_memory)
-    for doc_name in docs_name:
-        str_doc = ""
-        if doc_name.endswith('txt') or doc_name.endswith('pdf'):
-            for doc in global_var.store_memory[user_name]["split_docs"][doc_name]:
-                str_doc += doc.page_content
-        texts.append(str_doc)
-        images = []
-        if doc_name.endswith('pdf') or doc_name.endswith('png') or doc_name.endswith('jpg') or doc_name.endswith('jpeg'):
-            # 检查是否有图片数据
-            # if "images" in global_var.store_memory[user_name] and doc_name in global_var.store_memory[user_name]["images"]:
-            #     for image in global_var.store_memory[user_name]["images"][doc_name]:
-            #         images.append(image)
-            # if global_var.store_memory[user_name]["params"]["image"] < len(images):
-            #     images = images[:global_var.store_memory[user_name]["params"]["image"]]
-            if "images" in global_var.store_memory[user_name] and doc_name in global_var.store_memory[user_name]["images"]:
-                for image in global_var.store_memory[user_name]["images"][doc_name]:
-                    images.append(image)
-                # 限制图片数量
-                if global_var.store_memory[user_name]["params"]["image"] < len(images):
-                    images = images[:global_var.store_memory[user_name]["params"]["image"]]
-            else:
-                # 如果没有图片数据，返回空数组（用于两段式处理）
-                print(f"[get_docs_by_user_doc] 文档 {doc_name} 暂无图片数据")
-        images_all.append(images)
-    lock[user_name].release()
-    return texts, images_all
+    held = _user_lock(user_name)
+    held.acquire()
+    try:
+        texts = []
+        images_all = []
+        # print(global_var.store_memory)
+        for doc_name in docs_name:
+            str_doc = ""
+            if doc_name.endswith('txt') or doc_name.endswith('pdf'):
+                for doc in global_var.store_memory[user_name]["split_docs"][doc_name]:
+                    str_doc += doc.page_content
+            texts.append(str_doc)
+            images = []
+            if doc_name.endswith('pdf') or doc_name.endswith('png') or doc_name.endswith('jpg') or doc_name.endswith('jpeg'):
+                # 检查是否有图片数据
+                # if "images" in global_var.store_memory[user_name] and doc_name in global_var.store_memory[user_name]["images"]:
+                #     for image in global_var.store_memory[user_name]["images"][doc_name]:
+                #         images.append(image)
+                # if global_var.store_memory[user_name]["params"]["image"] < len(images):
+                #     images = images[:global_var.store_memory[user_name]["params"]["image"]]
+                if "images" in global_var.store_memory[user_name] and doc_name in global_var.store_memory[user_name]["images"]:
+                    for image in global_var.store_memory[user_name]["images"][doc_name]:
+                        images.append(image)
+                    # 限制图片数量
+                    if global_var.store_memory[user_name]["params"]["image"] < len(images):
+                        images = images[:global_var.store_memory[user_name]["params"]["image"]]
+                else:
+                    # 如果没有图片数据，返回空数组（用于两段式处理）
+                    print(f"[get_docs_by_user_doc] 文档 {doc_name} 暂无图片数据")
+            images_all.append(images)
+        return texts, images_all
+    finally:
+        held.release()
 
 
 def update_pdf_image_sum(user_name, doc_name, seq, merge_content="", imgtext=""):
@@ -2840,9 +2964,12 @@ def get_pdf_image_sum(user_name, doc_name, seq):
                 {"seq": {"$eq": seq + 1}}
             ]
         }
-        lock[user_name].acquire()
-        docs = global_var.store_memory[user_name]["vector_store"].get(where=filter_k)
-        lock[user_name].release()
+        held = _user_lock(user_name)
+        held.acquire()
+        try:
+            docs = global_var.store_memory[user_name]["vector_store"].get(where=filter_k)
+        finally:
+            held.release()
 
         # 检查是否获取到有效数据
         if docs and docs.get("documents") and len(docs["documents"]) > 0:
@@ -2857,7 +2984,6 @@ def get_pdf_image_sum(user_name, doc_name, seq):
 
     except Exception as e:
         print(f"[图片文本获取] 从向量库获取失败: {e}")
-        lock[user_name].release()  # 确保锁被释放
 
     # 如果向量库中没有或为空，从global_var中获取数据（实时更新）
     try:
@@ -2878,33 +3004,36 @@ def get_pdf_image_sum(user_name, doc_name, seq):
 
 # 返回根据用户指定的一系列文档的分割后的所有文档的列表
 def get_split_by_user_docs(user_name, docs_name):
-    lock[user_name].acquire()
-    docs = []
-    for doc_name in docs_name:
-        # docs.extend(global_var.store_memory[user_name]["split_docs"][doc_name])
-        split_docs = None
-        try:
-            split_docs = global_var.get_user_split(user_name, doc_name)
-        except Exception:
+    held = _user_lock(user_name)
+    held.acquire()
+    try:
+        docs = []
+        for doc_name in docs_name:
+            # docs.extend(global_var.store_memory[user_name]["split_docs"][doc_name])
             split_docs = None
-        if split_docs is None:
-            split_docs = []
-
-        # 🔥 如果split_docs为空或内容很少，且是扫描件PDF，尝试从OCR结果文件加载
-        if (not split_docs or len(split_docs) == 0 or all(not doc.page_content.strip() for doc in split_docs)):
             try:
-                file_path = util.construct_file_path(user_name, doc_name)
-                if file_path.endswith("pdf"):
-                    ocr_split_docs = _try_load_split_docs_from_ocr_raw(user_name, doc_name, file_path)
-                    if ocr_split_docs:
-                        split_docs = ocr_split_docs
-                        global_var.set_user_split(user_name, doc_name, split_docs)
-            except Exception as e:
-                print(f"[get_split_by_user_docs] 从OCR结果文件加载失败: {e}")
+                split_docs = global_var.get_user_split(user_name, doc_name)
+            except Exception:
+                split_docs = None
+            if split_docs is None:
+                split_docs = []
 
-        docs.extend(split_docs)
-    lock[user_name].release()
-    return docs
+            # 🔥 如果split_docs为空或内容很少，且是扫描件PDF，尝试从OCR结果文件加载
+            if (not split_docs or len(split_docs) == 0 or all(not doc.page_content.strip() for doc in split_docs)):
+                try:
+                    file_path = util.construct_file_path(user_name, doc_name)
+                    if file_path.endswith("pdf"):
+                        ocr_split_docs = _try_load_split_docs_from_ocr_raw(user_name, doc_name, file_path)
+                        if ocr_split_docs:
+                            split_docs = ocr_split_docs
+                            global_var.set_user_split(user_name, doc_name, split_docs)
+                except Exception as e:
+                    print(f"[get_split_by_user_docs] 从OCR结果文件加载失败: {e}")
+
+            docs.extend(split_docs)
+        return docs
+    finally:
+        held.release()
 
 
 def get_vector_by_user(user_name):
@@ -2915,35 +3044,48 @@ def get_vector_by_user(user_name):
 
 
 def set_user_prompt(user_name, prompt):
-    lock[user_name].acquire()
-    global_var.set_user_prompt(user_name, prompt)
-    lock[user_name].release()
+    held = _memory_lock(user_name)
+    held.acquire()
+    try:
+        global_var.set_user_prompt(user_name, prompt)
+    finally:
+        held.release()
 
 
 def set_user_model(user_name, model_num):
-    lock[user_name].acquire()
-    global_var.set_user_model(user_name, model_num)
-    lock[user_name].release()
+    held = _user_lock(user_name)
+    held.acquire()
+    try:
+        global_var.set_user_model(user_name, model_num)
+    finally:
+        held.release()
 
 
 def get_user_model(user_name):
-    lock[user_name].acquire()
-    out = global_var.store_memory[user_name]["model_num"]
-    lock[user_name].release()
-    return out
+    held = _user_lock(user_name)
+    held.acquire()
+    try:
+        return global_var.store_memory[user_name]["model_num"]
+    finally:
+        held.release()
 
 
 def get_user_params(user_name):
-    lock[user_name].acquire()
-    out = global_var.store_memory[user_name]["params"]
-    lock[user_name].release()
-    return out
+    held = _user_lock(user_name)
+    held.acquire()
+    try:
+        return global_var.store_memory[user_name]["params"]
+    finally:
+        held.release()
 
 
 def set_user_params(user_name, params):
-    lock[user_name].acquire()
-    global_var.set_user_params(user_name, params)
-    lock[user_name].release()
+    held = _memory_lock(user_name)
+    held.acquire()
+    try:
+        global_var.set_user_params(user_name, params)
+    finally:
+        held.release()
 
 
 def get_list_by_scene_name(scene_name):

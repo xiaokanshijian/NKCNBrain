@@ -33,7 +33,7 @@ def grade_cross_page_group(
     group: List[int],
     boundaries: Dict[int, Dict[str, Any]],
     pending_questions: Optional[List[Dict[str, Any]]] = None,
-*, feedback_runtime=None) -> Dict[str, Any]:
+*, feedback_runtime=None, audit_path=None) -> Dict[str, Any]:
     if feedback_runtime is not None:
         subject = feedback_runtime.context['subject_code']
     context_notes = []
@@ -50,9 +50,20 @@ def grade_cross_page_group(
         {'type': 'image_url', 'image_url': {'url': image_to_data_uri(image_path)}}
         for image_path in image_paths
     ]
+    from .note_evidence import is_notes
+    user_text = (
+        '核对候选笔记页是否同源同题；不能由候选页码推定作答连续。'
+        '逐一返回requires_material_check=true单元的核对状态；本页独立题标not_required，'
+        '依赖材料却无法对应时标unresolved，不能用空数组代替核对结果。'
+        '材料来源可在本页或非相邻页；本页来源使用not_required并给出材料证据。'
+        '每项材料证据须包含qid_global、material_label、逐字quote和relation；明确材料数量，不能伪造引文。\n'
+        + json.dumps({'image_pdf_pages': group, 'visible_units': pending_questions or []}, ensure_ascii=False)
+        if is_notes(feedback_runtime) or any(q.get('requires_material_check') for q in pending_questions or []) else
+        cross_page_user_prompt(group, context_notes, pending_questions=pending_questions)
+    )
     content.append({
         'type': 'text',
-        'text': cross_page_user_prompt(group, context_notes, pending_questions=pending_questions),
+        'text': user_text,
     })
     extra_body = _cross_page_extra_body(subject, **({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
     messages = [
@@ -60,31 +71,16 @@ def grade_cross_page_group(
         {'role': 'user', 'content': content},
     ]
 
-    last_raw = ''
-    for attempt in range(2):
-        if attempt == 1:
-            retry_content = list(content)
-            retry_content[-1] = {
-                'type': 'text',
-                'text': cross_page_user_prompt(group, context_notes, pending_questions=pending_questions)
-                + '\n\n上次返回不是合法 JSON，请严格输出 JSON 对象。',
-            }
-            messages = [
-                {'role': 'system', 'content': (system_prompt(feedback_runtime, 'cross_page') if feedback_runtime is not None else CROSS_PAGE_SYSTEM)},
-                {'role': 'user', 'content': retry_content},
-            ]
-        response = _call_qwen_json(
-            messages,
-            extra_body,
-            temperature=None if subject == 'math' else 0.1,
-        **({"feedback_runtime": feedback_runtime} if feedback_runtime is not None else {}))
-        last_raw = response.choices[0].message.content or ''
-        try:
-            result = _loads_json_with_retry_text(last_raw)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(result.get('corrections'), list):
-            result['corrections'] = []
+    from .model_output import request_json_object, object_list
+
+    def validate(result):
+        object_list(result.get('corrections'), 'corrections')
         result['cross_page_group'] = result.get('cross_page_group') or group
-        return stamp_feedback(result, feedback_runtime, "cross_page")
-    raise ValueError(f'Pass 1.5 跨页修补返回无法解析为 JSON: {last_raw[:200]}')
+        return stamp_feedback(result, feedback_runtime, 'cross_page')
+
+    return request_json_object(
+        lambda current: _call_qwen_json(current, extra_body,
+            temperature=None if subject == 'math' else 0.1,
+            **({'feedback_runtime': feedback_runtime} if feedback_runtime is not None else {})),
+        messages, parser=_loads_json_with_retry_text, validate=validate,
+        audit_path=audit_path, stage='跨页核对')

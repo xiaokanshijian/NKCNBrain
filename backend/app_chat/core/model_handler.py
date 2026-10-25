@@ -8,7 +8,7 @@ from app_chat.global_state import GLOBAL_STATE
 from app_chat.core.construct import construct_data
 from app_chat.config.config_manager import config_manager
 
-from llm_langchain import global_var, util
+from llm_langchain import global_var, util, normal_qa_new
 
 from openai import OpenAI, AsyncOpenAI
 
@@ -435,7 +435,7 @@ class ModelHandler:
             api_key = cur_config.get("anthropic_api_key", cur_config.get("openai_api_key"))
             base_url = cur_config.get("anthropic_api_base", cur_config.get("openai_api_base"))
 
-            print("[INFO] Anthropic API_KEY:", "set" if api_key else "missing")
+            print("[INFO] Anthropic credential configured:", bool(api_key))
             print("[INFO] Anthropic BASE_URL:", base_url)
 
             # 返回AnthropicModel实例，包含原生客户端
@@ -445,7 +445,7 @@ class ModelHandler:
             api_key = cur_config.get("openai_api_key")
             base_url = cur_config.get("openai_api_base")
 
-            print("[INFO] API_KEY:", "set" if api_key else "missing")
+            print("[INFO] Model credential configured:", bool(api_key))
             print("[INFO] BASE_URL:", base_url)
 
             return OpenAI(
@@ -571,7 +571,7 @@ class ModelHandler:
             #     cleaned_messages = clean_messages(messages)
 
             # 🔥 检测base_url，判断是否需要使用异步客户端
-            # 某些渠道（如https://www.dmxapi.cn/v1）在同步客户端+to_thread+stream模式下会超时
+            # 某些渠道（如http://localhost:9999/v1）在同步客户端+to_thread+stream模式下会超时
             base_url = cur_config.get("openai_api_base", "")
             use_async_client = ".dmxapi." in base_url
 
@@ -725,6 +725,20 @@ class ModelHandler:
                             f"decision={_socratic.get('decision')} forced={_socratic.get('forced_by_streak')}",
                             flush=True,
                         )
+
+                    # NKCN Skill 注入（优先本轮 params；组本不回退共享键）
+                    try:
+                        from app_chat.skill_router import apply_skills_to_system_prompt, pull_skill_injection
+                        _inj = pull_skill_injection(
+                            chat_with_files_params,
+                            username,
+                            constructed_data.get('writer'),
+                        )
+                        if _inj:
+                            useSystemPrompt = apply_skills_to_system_prompt(useSystemPrompt, _inj)
+                            print(f"[INFO] {self.model_name} 已注入 NKCN_ACTIVE_SKILLS", flush=True)
+                    except Exception as _sk_inj_e:
+                        print(f"[WARN] Skill 注入失败: {_sk_inj_e}", flush=True)
 
                     # 构造消息
                     if constructed_data["info_list"]:
@@ -935,7 +949,21 @@ class ModelHandler:
             # 有文件的情况
             else:
                 constructed_params = chat_with_files_params[username]
-                print(self.model_name, " 勾选文件，发送消息: ", constructed_params["question_with_history"])
+                # print(self.model_name, " 勾选文件，发送消息: ", constructed_params["question_with_history"])
+                # chat_sendParams 阶段写入的 question_with_history 不含 construct_data 内 NK2026 Gxx 等后处理；
+                # 须以本轮 constructed_data["message"] 为准，并按当前模型拼接历史（与 construct_data 一致）。
+                _msg_full = constructed_data["message"]
+                if constructed_data["history"]:
+                    effective_question = normal_qa_new.get_model_specific_histories2(
+                        constructed_data["writer"],
+                        _msg_full,
+                        self.model_name,
+                        constructed_data["rounds"],
+                    )
+                else:
+                    effective_question = _msg_full
+                _q_preview = effective_question[:500] + ("..." if len(effective_question) > 500 else "")
+                print(self.model_name, " 勾选文件，发送消息(含后处理提问前500字): ", _q_preview)
 
                 # 系统提示处理
                 # qa_prompt = global_var.store_memory[constructed_data['writer']]["prompt"]["LUI2"]["qa"]
@@ -973,10 +1001,9 @@ class ModelHandler:
                     bound_message=_bound_msg,
                     prefer_mode=str(data.get('mode') or 'normal'),
                 )
-                question_with_hist = constructed_params["question_with_history"][self.model_name]
                 if _socratic.get('should_counter_ask') and _socratic.get('instruction'):
                     qa_prompt = apply_socratic_to_system_prompt(qa_prompt, _socratic)
-                    question_with_hist = apply_socratic_to_user_text(question_with_hist, _socratic)
+                    effective_question = apply_socratic_to_user_text(effective_question, _socratic)
                     print(
                         f"[INFO] {self.model_name} 启用语义反问模式(有文档) window={_req_window} "
                         f"decision={_socratic.get('decision')} analysis={_socratic.get('analysis')}",
@@ -989,13 +1016,29 @@ class ModelHandler:
                         flush=True,
                     )
 
+                try:
+                    from app_chat.skill_router import apply_skills_to_system_prompt, pull_skill_injection
+                    # 优先用本轮已取出的 constructed_params，避免组本并发串键
+                    _inj = pull_skill_injection(
+                        chat_with_files_params,
+                        username,
+                        constructed_data.get('writer'),
+                        params_hint=constructed_params,
+                    )
+                    if _inj:
+                        qa_prompt = apply_skills_to_system_prompt(qa_prompt, _inj)
+                        print(f"[INFO] {self.model_name} 已注入 NKCN_ACTIVE_SKILLS(有文档)", flush=True)
+                except Exception as _sk_inj_e:
+                    print(f"[WARN] Skill 注入失败(有文档): {_sk_inj_e}", flush=True)
+
                 # 处理图像输入
                 cur_config = config_manager.get_model_config(self.model_name)
                 images_store = constructed_params["images_store"] if cur_config.is_allow_img() else []
 
                 chain_input = {
                     "text": constructed_params["text"],
-                    "question": user_prompt + question_with_hist,
+                    # "question": user_prompt + constructed_params["question_with_history"][self.model_name],
+                    "question": user_prompt + effective_question,
                     "images_store": images_store,
                     "qa_prompt": qa_prompt
                 }
@@ -2596,8 +2639,24 @@ class ModelHandler:
         # 有文件的情况 - 简化处理，直接调用原有逻辑
         else:
             constructed_params = chat_with_files_params[username]
-            # 重做时强制使用原始问题，不使用缓存的 question_with_history（可能包含综述前缀）
-            print(self.model_name, " 重做第二次迭代 - 勾选文件，使用原始问题: ", constructed_data["question"])
+            # # 重做时强制使用原始问题，不使用缓存的 question_with_history（可能包含综述前缀）
+            # print(self.model_name, " 重做第二次迭代 - 勾选文件，使用原始问题: ", constructed_data["question"])
+            # 与首答一致：以 constructed_data["message"]（含 NK2026 Gxx 等后处理）为准再拼历史
+            _msg_full_redo = constructed_data["message"]
+            if constructed_data["history"]:
+                effective_question_redo = normal_qa_new.get_model_specific_histories2(
+                    constructed_data["writer"],
+                    _msg_full_redo,
+                    self.model_name,
+                    constructed_data["rounds"],
+                )
+            else:
+                effective_question_redo = _msg_full_redo
+            print(
+                self.model_name,
+                " 重做第二次迭代 - 勾选文件，含后处理提问前500字: ",
+                effective_question_redo[:500] + ("..." if len(effective_question_redo) > 500 else ""),
+            )
 
             # 系统提示处理
             # qa_prompt = global_var.store_memory[constructed_data['writer']]["prompt"]["LUI2"]["qa"]
@@ -2627,10 +2686,9 @@ class ModelHandler:
                 bound_message=_bound_msg,
                 prefer_mode='iteration',
             )
-            question_for_model = constructed_data["question"]
             if _socratic.get('should_counter_ask') and _socratic.get('instruction'):
                 qa_prompt = apply_socratic_to_system_prompt(qa_prompt, _socratic)
-                question_for_model = apply_socratic_to_user_text(question_for_model, _socratic)
+                effective_question_redo = apply_socratic_to_user_text(effective_question_redo, _socratic)
                 print(
                     f"[INFO] 重做第二次迭代 - 启用语义反问加深模式(有文档) window={_req_window} "
                     f"analysis={_socratic.get('analysis')}",
@@ -2644,7 +2702,8 @@ class ModelHandler:
             chain_input = {
                 "text": constructed_params["text"],
                 # "question": user_prompt + constructed_params["question_with_history"][self.model_name],
-                "question": user_prompt + question_for_model,  # 使用原始问题，不是 question_with_history
+                # "question": user_prompt + constructed_data["question"],  # 使用原始问题，不是 question_with_history
+                "question": user_prompt + effective_question_redo,
                 "images_store": images_store,
                 "qa_prompt": qa_prompt
             }

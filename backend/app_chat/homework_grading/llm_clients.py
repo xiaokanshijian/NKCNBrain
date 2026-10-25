@@ -1,4 +1,5 @@
 """Model clients and shared LLM response parsing helpers."""
+import nkcn_public_config as _public_config
 
 import json
 import os
@@ -8,12 +9,12 @@ from openai import OpenAI
 
 
 # 与 llm_langchain/parse_input.py、chat_qwq_model.py 及 ci/_llm.py 保持一致
-_HOMEWORK_QWEN_API_KEY_DEFAULT = os.environ.get("DASHSCOPE_API_KEY", "")
+_HOMEWORK_QWEN_API_KEY_DEFAULT = _public_config.secret('NKCN_LLM_DASHSCOPE_API_KEY')
 _HOMEWORK_QWEN_BASE_URL_DEFAULT = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
 
 
 def _resolve_qwen_api_key() -> str:
-    """作业 Pass1 Qwen key：从环境变量读取，不再使用仓库内硬编码密钥。"""
+    """作业 Pass1 Qwen key：环境变量可覆盖，默认使用项目内写死的 DashScope key。"""
     api_key = (
         os.environ.get('DASHSCOPE_API_KEY')
         or os.environ.get('DEEPSEEK_API_KEY_ALI')
@@ -73,8 +74,8 @@ def _is_moonshot_fixed_sampling_model(name: str) -> bool:
     return False
 
 
-_HOMEWORK_GEMINI_BASE_URL_DEFAULT = 'https://www.dmxapi.cn/v1'
-_HOMEWORK_GEMINI_API_KEY_DEFAULT = os.environ.get("DMX_API_KEY", "")
+_HOMEWORK_GEMINI_BASE_URL_DEFAULT = _public_config.endpoint('NKCN_REVIEW_GATEWAY_V1_URL', 'http://localhost:9999/v1')
+_HOMEWORK_GEMINI_API_KEY_DEFAULT = _public_config.secret('NKCN_LLM_DMXAPI_API_KEY')
 _HOMEWORK_MOONSHOT_BASE_URL_DEFAULT = 'https://api.moonshot.cn/v1'
 
 
@@ -181,7 +182,9 @@ def _call_homework_gemini_json(
         create_kwargs['temperature'] = temperature
     try:
         return client.chat.completions.create(**create_kwargs)
-    except Exception:
+    except Exception as exc:
+        if not _is_response_format_error(exc):
+            raise
         create_kwargs.pop('response_format', None)
         return client.chat.completions.create(**create_kwargs)
 
@@ -226,6 +229,8 @@ def _homework_red_blue_client() -> OpenAI:
 
 
 def _is_response_format_error(exc: Exception) -> bool:
+    if getattr(exc, 'status_code', None) not in (None, 400, 422):
+        return False
     text = str(exc or '').lower()
     return any(token in text for token in (
         'response_format',
@@ -356,8 +361,8 @@ def _call_qwen_json(
 
     try:
         return client.chat.completions.create(**create_kwargs)
-    except Exception:
-        if not use_response_format:
+    except Exception as exc:
+        if not use_response_format or not _is_response_format_error(exc):
             raise
         create_kwargs.pop('response_format', None)
         return client.chat.completions.create(**create_kwargs)

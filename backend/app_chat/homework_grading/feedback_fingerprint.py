@@ -92,6 +92,8 @@ def fingerprint_payload(context, *, skills, curriculum, references, model_config
             raise ValueError('必须明确传入模型、预处理及检索配置')
         _validate_execution_config(value)
         config[name] = {key: copy.deepcopy(item) for key, item in value.items() if key not in _AUDIT_KEYS}
+        if name == 'model_config' and value.get('dependency_schema') == 'grading-stage-dependencies-v1':
+            config[name].pop('consumer_code_hashes', None)
         if not config[name]:
             raise ValueError('运行配置不能只有展示或审计字段')
     semantic = {key: data.get(key) for key in CONTEXT_KEYS}
@@ -107,6 +109,9 @@ def fingerprint_payload(context, *, skills, curriculum, references, model_config
               'curriculum': curriculum_data,
               'references': {'status': references['status'], 'reference_text': references['reference_text'], 'documents': documents},
               **config}
+    if 'notebook_skills' in references:
+        from .notebook_skills import validate_bundle
+        result['references']['notebook_skills'] = copy.deepcopy(validate_bundle(references['notebook_skills']))
     canonical_json(result)
     return result
 
