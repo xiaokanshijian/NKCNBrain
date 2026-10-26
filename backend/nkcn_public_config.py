@@ -21,7 +21,7 @@ def endpoint(name, default):
 
 def redact(value):
     if isinstance(value, dict):
-        return {k: ("[redacted]" if re.search(r"(?i)(api.?key|secret|password|token)", k)
+        return {k: ("[redacted]" if re.search(r"(?i)(api.?key|sec.?key|secret|password|token)", k)
                     else redact(v)) for k, v in value.items()}
     if isinstance(value, list):
         return [redact(v) for v in value]
@@ -31,7 +31,7 @@ def validate_public_config(value):
     """Persist references, never credentials, in tracked model definitions."""
     if isinstance(value, dict):
         for key, item in value.items():
-            if re.search(r"(?i)(api.?key|api.?secret|secret.?key|password|access.?token)", key):
+            if re.search(r"(?i)(api.?key|sec.?key|app.?secret|client.?secret|access.?key.?secret|api.?secret|secret.?key|password|access.?token)", key):
                 if isinstance(item, str) and item and not re.fullmatch(r"env:[A-Z_][A-Z0-9_]*", item):
                     raise ValueError(f"{key} must use an env:VARIABLE reference")
             validate_public_config(item)

@@ -10,6 +10,12 @@
 - `docs/configuration-map.json`：凭据环境变量与使用文件的对应关系。
 - `tools/check_public_release.py`：只读发布检查工具。
 
+## 2026-10-26 本地补修（尚未发布）
+
+复核确认旧扫描遗漏了百度文档翻译 seckey；当前工作树已修复，但远端两个提交尚未补清。
+详情见 [漏检核实与补修记录](docs/baidu-audit-followup.md)。
+使用百度文档翻译时，只在后端配置新的 BAIDU_TRANS_APPID / BAIDU_TRANS_SECKEY。
+
 ## 配置和启动
 
 前端使用 Node.js 18.20.6、npm 10.8.2。后端以 requirements.txt 为依赖声明。
@@ -68,6 +74,7 @@
 
 ```text
 python tools/check_public_release.py
+python tools/check_public_release.py --history
 cd backend
 python -B -m unittest tests.test_public_release -v
 python -B -m django test tests.test_login_voice --settings=tests.session_test_settings

@@ -170,5 +170,11 @@
   ],
   "VOLCANO_TTS_APP_ID": [
     "backend/app_chat/volcanotts.py"
+  ],
+  "BAIDU_TRANS_APPID": [
+    "backend/app_chat/baidu_trans_doc.py"
+  ],
+  "BAIDU_TRANS_SECKEY": [
+    "backend/app_chat/baidu_trans_doc.py"
   ]
 }

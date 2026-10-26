@@ -1,3 +1,4 @@
+from nkcn_public_config import secret
 import base64
 import hashlib
 import hmac
@@ -21,10 +22,16 @@ except ImportError:
 
 class Translate:
     def __init__(self):
-        self.appid = ''
-        self.seckey = ''
+        self.appid = secret("BAIDU_TRANS_APPID")
+        self.seckey = secret("BAIDU_TRANS_SECKEY")
+
+    def _require_credentials(self):
+        # Missing optional translation configuration must not break Django startup.
+        if not self.appid or not self.seckey:
+            raise ValueError("Baidu document translation requires BAIDU_TRANS_APPID and BAIDU_TRANS_SECKEY")
 
     def create_quote_job(self, from_lang, to_lang, extend, file_name, file_path):
+        self._require_credentials()
         url = 'https://fanyi-api.baidu.com/transapi/doctrans/createjob/quote'
         with open(file_path, 'rb') as f:
             content = base64.b64encode(f.read()).decode('utf-8')
@@ -44,6 +51,7 @@ class Translate:
         return response.text
 
     def query_quote(self, file_id):
+        self._require_credentials()
         url = 'https://fanyi-api.baidu.com/transapi/doctrans/query/quote'
         input_data = {'fileId': file_id}
         timestamp = int(time.time())
@@ -53,6 +61,7 @@ class Translate:
         return response.text
 
     def create_trans_job(self, from_lang, to_lang, extend, file_name, file_path, output=''):
+        self._require_credentials()
         url = 'https://fanyi-api.baidu.com/transapi/doctrans/createjob/trans'
         with open(file_path, 'rb') as f:
             content = base64.b64encode(f.read()).decode('utf-8')
@@ -75,6 +84,7 @@ class Translate:
         return response.text
 
     def query_trans(self, request_id):
+        self._require_credentials()
         url = 'https://fanyi-api.baidu.com/transapi/doctrans/query/trans'
         input_data = {'requestId': request_id}
         timestamp = int(time.time())
@@ -84,6 +94,7 @@ class Translate:
         return response.text
 
     def create_sign(self, timestamp, input_data):
+        self._require_credentials()
         query_str = json.dumps(input_data)
         sign_str = '{}{}{}'.format(self.appid, timestamp, query_str)
         sign = base64.b64encode(hmac.new(self.seckey.encode('utf-8'), sign_str.encode('utf-8'), digestmod=hashlib.sha256).digest())
