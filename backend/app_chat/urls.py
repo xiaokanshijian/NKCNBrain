@@ -349,6 +349,7 @@ urlpatterns = [
     re_path('ci/homework/red_blue/retry$', views_continuous_image.ci_homework_red_blue_retry),
     re_path('ci/homework/pin_result_cards$', views_continuous_image.ci_homework_pin_result_cards),
     re_path('ci/homework/pin_result_cards_status$', views_continuous_image.ci_homework_pin_result_cards_status),
+    re_path('ci/homework/class_multi_plan$', views_continuous_image.ci_homework_class_multi_plan),
     re_path('ci/homework/verify_save$', views_continuous_image.ci_homework_verify_save),
     re_path('ci/homework/verify_list$', views_continuous_image.ci_homework_verify_list),
     re_path('ci/homework/verify_iterate$', views_continuous_image.ci_homework_verify_iterate),

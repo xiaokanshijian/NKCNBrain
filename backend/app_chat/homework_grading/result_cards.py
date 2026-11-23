@@ -217,38 +217,42 @@ def pin_grading_result_cards(paths: Dict[str, str], manifest: Dict[str, Any], *,
         report_dir=report_dir,
         sample_id=sample_id,
     )
-    body = build_diagnosis_card_body(
-        filename=filename, report=report, ontology=ontology, memory=memory,
-        skill_titles=titles, material_label=material_label, cross_essence=essence,
-    )
+    class_multi = manifest.get('class_multi') if isinstance(manifest.get('class_multi'), dict) else {}
+    is_class_multi = bool(class_multi.get('student_count') or (gc_early or {}).get('class_multi'))
     effect = None
-    if titles:
-        try:
-            from .skill_effect import judge_notebook_skill_effect
-            effect = judge_notebook_skill_effect(
-                username=username, card_text=body, skill_titles=titles,
-                feedback_runtime=feedback_runtime,
-            )
-            if effect.get('level'):
-                body = build_diagnosis_card_body(
-                    filename=filename, report=report, ontology=ontology, memory=memory,
-                    skill_titles=titles, effect=effect, material_label=material_label,
-                    cross_essence=essence,
-                )
-        except Exception as exc:
-            debug_log(f'[result_cards] 作用档判定失败: {exc}', extra_dir=extra_dir)
-            effect = {'level': '', 'reason': str(exc)[:160], 'source': 'failed'}
-    if titles and not (effect or {}).get('level'):
-        manifest.setdefault('warnings', [])
-        w = '本子方法作用档未写出（小模型与兜底均未成功），批改结果已保留。'
-        if w not in manifest['warnings']:
-            manifest['warnings'].append(w)
-        debug_log(f'[result_cards] 作用档未写出 titles={titles} source={(effect or {}).get("source")}', extra_dir=extra_dir)
-    elif titles:
-        debug_log(
-            f"[result_cards] 作用档={effect.get('level')} source={effect.get('source')} titles={titles}",
-            extra_dir=extra_dir,
+    body = ''
+    if not is_class_multi:
+        body = build_diagnosis_card_body(
+            filename=filename, report=report, ontology=ontology, memory=memory,
+            skill_titles=titles, material_label=material_label, cross_essence=essence,
         )
+        if titles:
+            try:
+                from .skill_effect import judge_notebook_skill_effect
+                effect = judge_notebook_skill_effect(
+                    username=username, card_text=body, skill_titles=titles,
+                    feedback_runtime=feedback_runtime,
+                )
+                if effect.get('level'):
+                    body = build_diagnosis_card_body(
+                        filename=filename, report=report, ontology=ontology, memory=memory,
+                        skill_titles=titles, effect=effect, material_label=material_label,
+                        cross_essence=essence,
+                    )
+            except Exception as exc:
+                debug_log(f'[result_cards] 作用档判定失败: {exc}', extra_dir=extra_dir)
+                effect = {'level': '', 'reason': str(exc)[:160], 'source': 'failed'}
+        if titles and not (effect or {}).get('level'):
+            manifest.setdefault('warnings', [])
+            w = '本子方法作用档未写出（小模型与兜底均未成功），批改结果已保留。'
+            if w not in manifest['warnings']:
+                manifest['warnings'].append(w)
+            debug_log(f'[result_cards] 作用档未写出 titles={titles} source={(effect or {}).get("source")}', extra_dir=extra_dir)
+        elif titles:
+            debug_log(
+                f"[result_cards] 作用档={effect.get('level')} source={effect.get('source')} titles={titles}",
+                extra_dir=extra_dir,
+            )
     assigned_pages = None
     gc = manifest.get('grading_config') if isinstance(manifest.get('grading_config'), dict) else {}
     if gc.get('assigned_pages'):
@@ -261,28 +265,82 @@ def pin_grading_result_cards(paths: Dict[str, str], manifest: Dict[str, Any], *,
         or (manifest.get('feedback_context') or {}).get('material_type')
         or 'homework'
     )
-    excerpt = build_excerpt_card_body(
-        report,
-        ontology,
-        pass1_dir=paths.get('pass1_json') or '',
-        subject=subject or str(ctx.get('subject_code') or 'chinese'),
-        assigned_pages=assigned_pages,
-        filename=filename,
-        material_type=material_type,
-        feedback_context=ctx if isinstance(ctx, dict) else None,
-    )
-    diag_cid = _upsert_card(
-        username, scene_name, sub_scene_name, body,
-        marker=f'批改·诊断|{analysis_id}|{run_id}',
-        title_hint='诊断',
-        filename=filename,
-    )
+    excerpt = ''
+    if is_class_multi:
+        # 多人：只用解释精要卡，正文含总览/各生/班级/逐页留存（与 HTML 同口径），过长分页；不出诊断卡
+        bundle_path = os.path.join(report_dir, 'class_multi', 'class_assignment_bundle.json')
+        md_path = os.path.join(report_dir, 'class_multi', 'excerpt_card.md')
+        if os.path.isfile(md_path):
+            try:
+                with open(md_path, 'r', encoding='utf-8') as fh:
+                    excerpt = fh.read()
+            except OSError:
+                excerpt = ''
+        # 旧版正文无分页/无总览时，按 bundle+pass1 重生成（与 HTML 对齐）
+        if (not excerpt) or ('---NKCN_CARD_PAGE---' not in excerpt) or ('总览：三步骤' not in excerpt):
+            bundle = _load_json(bundle_path) if os.path.isfile(bundle_path) else {}
+            if isinstance(bundle, dict) and bundle:
+                try:
+                    from .class_multi_grading import build_class_excerpt_card_markdown
+                    rebuilt = build_class_excerpt_card_markdown(
+                        filename=str(bundle.get('filename') or filename or ''),
+                        class_map=bundle.get('class_map') or class_multi or {},
+                        student_reports=bundle.get('student_reports') or [],
+                        class_report=bundle.get('class_report') or {},
+                        material_label=str(bundle.get('material_label') or ''),
+                        pass1_dir=str(bundle.get('pass1_json') or paths.get('pass1_json') or ''),
+                        subject=str(bundle.get('subject') or subject or 'math'),
+                        material_type=str(bundle.get('material_type') or material_type or 'homework'),
+                    )
+                    if rebuilt.strip():
+                        excerpt = rebuilt
+                        try:
+                            with open(md_path, 'w', encoding='utf-8') as fh:
+                                fh.write(excerpt)
+                            bundle['excerpt_markdown'] = excerpt
+                            safe_json_dump(bundle_path, bundle)
+                        except Exception:
+                            pass
+                except Exception as exc:
+                    debug_log(f'[result_cards] 多人卡正文重建失败: {exc}', extra_dir=extra_dir)
+        if not excerpt and os.path.isfile(bundle_path):
+            bundle = _load_json(bundle_path)
+            excerpt = str(bundle.get('excerpt_markdown') or '')
+        if not excerpt:
+            excerpt = (
+                f"# 班级多人批改·解释精要\n\n材料：{filename}\n\n"
+                f"班级：{class_multi.get('class_id')} 第{class_multi.get('homework_index')}次；"
+                f"人数 {class_multi.get('student_count')}；每生 {class_multi.get('pages_per_assignment')} 页。\n\n"
+                "班级报告尚未生成完整正文，请打开逐页批改图核验；核验后可迭代更新本卡。\n"
+            )
+        if titles and essence:
+            excerpt = f"{excerpt.rstrip()}\n\n## 本子方法\n选用：{'、'.join(titles)}\n交叉要点：{essence}\n"
+        debug_log('[result_cards] 班级多人模式：仅钉解释精要卡，跳过诊断卡', extra_dir=extra_dir)
+    else:
+        excerpt = build_excerpt_card_body(
+            report,
+            ontology,
+            pass1_dir=paths.get('pass1_json') or '',
+            subject=subject or str(ctx.get('subject_code') or 'chinese'),
+            assigned_pages=assigned_pages,
+            filename=filename,
+            material_type=material_type,
+            feedback_context=ctx if isinstance(ctx, dict) else None,
+        )
+    diag_cid = None
+    if body and not is_class_multi:
+        diag_cid = _upsert_card(
+            username, scene_name, sub_scene_name, body,
+            marker=f'批改·诊断|{analysis_id}|{run_id}',
+            title_hint='诊断',
+            filename=filename,
+        )
     excerpt_cid = None
     if excerpt:
         excerpt_cid = _upsert_card(
             username, scene_name, sub_scene_name, excerpt,
             marker=f'批改·解释精要|{analysis_id}|{run_id}',
-            title_hint='解释精要',
+            title_hint='解释精要' if not is_class_multi else '班级多人·解释精要',
             filename=filename,
         )
     media_jobs = []
@@ -303,7 +361,7 @@ def pin_grading_result_cards(paths: Dict[str, str], manifest: Dict[str, Any], *,
             debug_log(f'[result_cards] 登记 HTML 队列失败 cid={cid}: {exc}', extra_dir=extra_dir)
         threading.Thread(
             target=_generate_media,
-            args=(username, cid, analysis_id, run_id, extra_dir, kind),
+            args=(username, cid, analysis_id, run_id, extra_dir, kind, bool(is_class_multi and kind == 'excerpt')),
             daemon=True,
         ).start()
     pinned = dict(manifest.get('result_cards') or {})
@@ -311,6 +369,7 @@ def pin_grading_result_cards(paths: Dict[str, str], manifest: Dict[str, Any], *,
         'analysis_id': analysis_id, 'run_id': run_id,
         'diagnosis_cid': diag_cid, 'excerpt_cid': excerpt_cid,
         'skill_effect': effect or {},
+        'class_multi': bool(is_class_multi),
     })
     manifest['result_cards'] = pinned
     debug_log(
@@ -393,6 +452,13 @@ def json_preview(value: Any, limit: int) -> str:
     return text[:limit]
 
 
+def _fit_mysql_utf8(text: str) -> str:
+    """卡片 content 列按每字最多 3 字节存储。补充平面里的生僻字去掉，避免整张卡插不进去。"""
+    if not text:
+        return text
+    return ''.join(ch for ch in text if ord(ch) <= 0xFFFF)
+
+
 def _upsert_card(username, scene_name, sub_scene_name, content, *, marker, title_hint, filename):
     from app_chat.models import Card
     from app_chat.views import (
@@ -403,7 +469,7 @@ def _upsert_card(username, scene_name, sub_scene_name, content, *, marker, title
         start_fill_card_semantic_keywords_background,
     )
 
-    stamped = remove_emojis(f'<!--nkcn_grading_card:{marker}-->\n' + content)
+    stamped = _fit_mysql_utf8(remove_emojis(f'<!--nkcn_grading_card:{marker}-->\n' + content))
     existing = Card.objects.filter(username=username, content__contains=f'<!--nkcn_grading_card:{marker}-->').order_by('-cid').first()
     subSceneOrder, name_list, index = 'S0:', [], None
     if scene_name:
@@ -452,10 +518,11 @@ def _generate_media(
     run_id: str = '',
     extra_dir: str = '',
     card_kind: str = 'diagnosis',
+    grading_class_multi: bool = False,
 ) -> None:
     debug_log(
         f'[result_cards] 开始生图/HTML cid={cid} kind={card_kind} '
-        f'analysis_id={analysis_id} run_id={run_id}',
+        f'analysis_id={analysis_id} run_id={run_id} class_multi={grading_class_multi}',
         extra_dir=extra_dir,
     )
     try:
@@ -477,6 +544,7 @@ def _generate_media(
             extra={
                 'grading_result': True,
                 'grading_excerpt': card_kind == 'excerpt',
+                'grading_class_multi': bool(grading_class_multi),
                 'analysis_id': analysis_id,
                 'run_id': run_id,
             },

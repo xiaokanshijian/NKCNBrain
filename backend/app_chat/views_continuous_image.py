@@ -987,6 +987,29 @@ def ci_homework_pin_result_cards_status(request):
 
 @csrf_exempt
 @ci_access
+def ci_homework_class_multi_plan(request):
+    """开改弹窗：查询当前 PDF 是否班级多人，以及同班同科其它次第与材料设置一致性。"""
+    if request.method != 'POST':
+        return JsonResponse({'error_num': 1, 'msg': '仅支持POST'})
+    try:
+        data = json.loads(request.body)
+        username = str(data.get('username') or '').strip()
+        filename = str(data.get('filename') or data.get('file') or '').strip()
+        if not username or not filename:
+            return JsonResponse({'error_num': 1, 'msg': '缺少 username 或 filename'})
+        from app_chat.homework_grading.class_multi_grading import plan_class_multi_grading
+        plan = plan_class_multi_grading(username, filename)
+        # 先走标准 json 再包一层，避免个别字段（tuple/自定义对象）导致整单失败
+        safe_plan = json.loads(json.dumps(plan, ensure_ascii=False, default=str))
+        return JsonResponse({'error_num': 0, 'msg': 'success', **safe_plan})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error_num': 1, 'msg': f'班级多人计划查询失败: {e}'})
+
+
+@csrf_exempt
+@ci_access
 def ci_homework_verify_save(request):
     """解释精要/核实闭环：保存单条人工核验结果（不立刻重批）。"""
     if request.method != 'POST':

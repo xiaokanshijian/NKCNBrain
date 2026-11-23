@@ -106,6 +106,23 @@ HOMEWORK_STAGES_ORDER = (
 
 DEFAULT_PASS1_PARALLELISM = 5
 
+# 批改阶段内子步骤顺序（续跑从中断步起，此前已落盘产物直接复用）
+_GRADING_SUBSTAGES = (
+    'cross_page',
+    'review',
+    'verification',
+    'memory',
+    'ontology',
+    'report',
+    'hallucination',
+    'render',
+    'output_validation',
+    'quality',
+    'verify_suggest',
+    'class_multi',
+    'result_cards',
+)
+
 
 def normalize_homework_target_stage(stage: Optional[str]) -> str:
     text = (stage or HOMEWORK_STAGE_GRADING).strip().lower()
@@ -214,6 +231,139 @@ def load_homework_clean_pages(paths: Dict[str, str]) -> List[Dict[str, Any]]:
     return pages
 
 
+def _page_layout_artifacts_ready(paths: Dict[str, str], page: Dict[str, Any]) -> bool:
+    return (
+        os.path.isfile(_page_detect_path(paths, page))
+        and os.path.isfile(_question_json_path(paths['pass1_json'], page['clean_abs_path']))
+    )
+
+
+def _page_understanding_artifacts_ready(paths: Dict[str, str], page: Dict[str, Any]) -> bool:
+    return (
+        os.path.isfile(_page_grade_path(paths, page))
+        and os.path.isfile(_question_json_path(paths['pass1_json'], page['clean_abs_path']))
+    )
+
+
+def _apply_class_multi_execution_budget(class_map: Optional[Dict[str, Any]]) -> None:
+    if not isinstance(class_map, dict) or not class_map.get('student_count'):
+        return
+    try:
+        from .execution_control import current_execution
+        ex = current_execution()
+        if ex is not None:
+            ex.apply_class_multi_budget(class_map.get('student_count'))
+    except Exception:
+        pass
+
+
+def _ensure_class_multi_context(
+    manifest: Dict[str, Any],
+    session_map: Optional[Dict[str, Any]],
+    paths: Dict[str, str],
+    subject: str,
+    sample_id: str,
+) -> Optional[Dict[str, Any]]:
+    """续跑时保证 manifest.class_multi 与 sessions 一致，避免退化为单人跨页。"""
+    class_map = manifest.get('class_multi') if isinstance(manifest.get('class_multi'), dict) else None
+    if class_map and class_map.get('student_count'):
+        _apply_class_multi_execution_budget(class_map)
+        return class_map
+    if isinstance(session_map, dict) and isinstance(session_map.get('class_multi'), dict):
+        class_map = session_map.get('class_multi')
+        if class_map and class_map.get('student_count'):
+            manifest['class_multi'] = class_map
+            safe_json_dump(paths['manifest'], manifest)
+            print(
+                f'[class-multi] 续跑从 sessions 回填 class={class_map.get("class_id")} '
+                f'n={class_map.get("student_count")}',
+                flush=True,
+            )
+            _apply_class_multi_execution_budget(class_map)
+            return class_map
+    sessions_path = os.path.join(paths.get('pass2_report') or '', f'{subject}_{sample_id}_sessions.json')
+    if os.path.isfile(sessions_path):
+        data = safe_json_load(sessions_path)
+        if isinstance(data, dict) and isinstance(data.get('class_multi'), dict):
+            class_map = data.get('class_multi')
+            if class_map and class_map.get('student_count'):
+                manifest['class_multi'] = class_map
+                safe_json_dump(paths['manifest'], manifest)
+                print(
+                    f'[class-multi] 续跑从磁盘 sessions 回填 class={class_map.get("class_id")}',
+                    flush=True,
+                )
+                _apply_class_multi_execution_budget(class_map)
+                return class_map
+    return None
+
+
+def _ontology_usable_for_pass2(ontology_path: str) -> bool:
+    """失败/跳过占位的 ontology 不能直接喂 Pass2。"""
+    if not ontology_path or not os.path.isfile(ontology_path):
+        return False
+    try:
+        data = safe_json_load(ontology_path)
+    except Exception:
+        return False
+    if not isinstance(data, dict) or not data:
+        return False
+    status = str(data.get('status') or '').strip().lower()
+    if status in ('failed', 'insufficient_evidence', 'skipped'):
+        return False
+    return True
+
+
+def _grading_resume_cursor(manifest: Dict[str, Any], paths: Dict[str, str], subject: str, sample_id: str) -> str:
+    """返回批改子步骤续跑起点（含该步本身须重做）。"""
+    if manifest.get('report_only_rerun'):
+        return 'memory'
+    if not manifest.get('checkpoint_resume'):
+        return 'cross_page'
+    raw = str(
+        manifest.get('resume_from_processing_stage')
+        or manifest.get('resume_from_failure_stage')
+        or ''
+    ).strip()
+    aliases = {
+        'grading': 'cross_page',
+        'pass2': 'report',
+        'pass1_5': 'cross_page',
+        'analyze_pass2': 'report',
+    }
+    raw = aliases.get(raw, raw)
+    report_path = os.path.join(paths.get('pass2_report') or '', f'{subject}_{sample_id}_report.json')
+    ontology_path = os.path.join(paths.get('base') or '', 'student_ontology.json')
+    bundle_path = os.path.join(paths.get('pass2_report') or '', 'class_multi', 'class_assignment_bundle.json')
+    if raw in _GRADING_SUBSTAGES:
+        # 停在 report 但本体已失败：必须退回 ontology 重做，否则会再次「前序诊断失败」
+        if raw == 'report' and not _ontology_usable_for_pass2(ontology_path):
+            return 'ontology'
+        return raw
+    # 无明确中断步：按产物推断「第一个缺失」
+    if not os.path.isfile(report_path):
+        if _ontology_usable_for_pass2(ontology_path):
+            return 'report'
+        mem = os.path.join(paths.get('pass2_report') or '', f'{subject}_{sample_id}_memory.json')
+        if os.path.isfile(mem):
+            return 'ontology'
+        return 'cross_page'
+    class_map = manifest.get('class_multi') if isinstance(manifest.get('class_multi'), dict) else None
+    if class_map and class_map.get('student_count') and not os.path.isfile(bundle_path):
+        return 'class_multi'
+    if not (manifest.get('result_cards') or {}).get('excerpt_cid'):
+        return 'result_cards'
+    return 'result_cards'
+
+
+def _grading_substage_due(cursor: str, name: str) -> bool:
+    if name not in _GRADING_SUBSTAGES:
+        return True
+    if cursor not in _GRADING_SUBSTAGES:
+        return True
+    return _GRADING_SUBSTAGES.index(name) >= _GRADING_SUBSTAGES.index(cursor)
+
+
 def infer_homework_stage_status(
     paths: Dict[str, str],
     pages: List[Dict[str, Any]],
@@ -224,8 +374,7 @@ def infer_homework_stage_status(
         return stages
 
     layout_ready = all(
-        os.path.isfile(_page_detect_path(paths, page))
-        and os.path.isfile(_question_json_path(paths['pass1_json'], page['clean_abs_path']))
+        _page_layout_artifacts_ready(paths, page)
         and os.path.isfile(_page_layout_png_path(paths, page))
         for page in pages
     )
@@ -233,8 +382,7 @@ def infer_homework_stage_status(
         stages[HOMEWORK_STAGE_LAYOUT] = 'done'
 
     understanding_ready = all(
-        os.path.isfile(_page_grade_path(paths, page))
-        and os.path.isfile(_question_json_path(paths['pass1_json'], page['clean_abs_path']))
+        _page_understanding_artifacts_ready(paths, page)
         and os.path.isfile(_page_understanding_png_path(paths, page))
         for page in pages
     )
@@ -448,12 +596,21 @@ def _run_detect_all_pages(
     scope_page_nums: Optional[set[int]] = None,
     iteration_guidance: str = '',
     feedback_runtime=None,
+    reuse_existing_pages: bool = False,
 ) -> None:
     target_pages = [page for page in pages if scope_page_nums is None or page['page'] in scope_page_nums]
-    if not target_pages:
+    # 仅 checkpoint 续跑时跳过已落盘页；普通重跑必须重做，否则会误用旧产物
+    if reuse_existing_pages:
+        pending_pages = [p for p in target_pages if not _page_layout_artifacts_ready(paths, p)]
+        skipped_n = len(target_pages) - len(pending_pages)
+        if skipped_n:
+            print(f'[pass1-resume] 版面检测跳过已完成 {skipped_n}/{len(target_pages)} 页', flush=True)
+    else:
+        pending_pages = target_pages
+    if not pending_pages:
         return
     _update_task(task_id, current_section='逐页版面检测')
-    with ThreadPoolExecutor(max_workers=min(pass1_workers, len(target_pages))) as executor:
+    with ThreadPoolExecutor(max_workers=min(pass1_workers, len(pending_pages))) as executor:
         futures = [
             executor.submit(
                 _detect_page_job,
@@ -465,7 +622,7 @@ def _run_detect_all_pages(
                 iteration_guidance,
                 feedback_runtime,
             )
-            for page in target_pages
+            for page in pending_pages
         ]
         for future in as_completed(futures):
             future.result()
@@ -545,8 +702,15 @@ def _run_pass1_grade_all_pages(
     source_document_sha256: str = '',
     iteration_guidance: str = '',
     feedback_runtime=None,
+    reuse_existing_pages: bool = False,
 ) -> int:
     target_page_nums = set(scope_page_nums) if scope_page_nums is not None else {item['page'] for item in pages}
+
+    def _need_grade(item: Dict[str, Any]) -> bool:
+        if not reuse_existing_pages:
+            return True
+        return not _page_understanding_artifacts_ready(paths, item)
+
     if session_map and session_map.get('sessions'):
         sessions = sorted(session_map['sessions'], key=lambda item: item.get('order_index', 0))
         total_sessions = len(sessions)
@@ -565,7 +729,12 @@ def _run_pass1_grade_all_pages(
                 session_covered.update(range(start, end + 1))
         completed_page_nums: set = set()
 
-        uncovered = [item for item in pages if item['page'] not in session_covered and item['page'] in target_page_nums]
+        uncovered = [
+            item for item in pages
+            if item['page'] not in session_covered
+            and item['page'] in target_page_nums
+            and _need_grade(item)
+        ]
         if uncovered:
             with ThreadPoolExecutor(max_workers=min(pass1_workers, len(uncovered))) as executor:
                 future_to_page = {
@@ -609,7 +778,15 @@ def _run_pass1_grade_all_pages(
                 all_session_pages = [pages_by_num[pn] for pn in page_nums if pn in pages_by_num]
             else:
                 all_session_pages = [pages_by_num[pn] for pn in range(start, end + 1) if pn in pages_by_num]
-            session_pages = [item for item in all_session_pages if item['page'] in target_page_nums]
+            session_pages = [
+                item for item in all_session_pages
+                if item['page'] in target_page_nums and _need_grade(item)
+            ]
+            # 续跑：已完成页仍计入 prior，保证后续篇上下文与一次跑通一致
+            if reuse_existing_pages:
+                for item in all_session_pages:
+                    if item['page'] in target_page_nums and not _need_grade(item):
+                        completed_page_nums.add(item['page'])
             if not session_pages:
                 for item in all_session_pages:
                     completed_page_nums.add(item['page'])
@@ -654,7 +831,18 @@ def _run_pass1_grade_all_pages(
         return completed_item
 
     completed_pages_count = 0
-    target_pages = [item for item in pages if item['page'] in target_page_nums]
+    target_pages = [
+        item for item in pages
+        if item['page'] in target_page_nums and _need_grade(item)
+    ]
+    if reuse_existing_pages:
+        already = sum(
+            1 for item in pages
+            if item['page'] in target_page_nums and not _need_grade(item)
+        )
+        if already:
+            print(f'[pass1-resume] 理解/批改跳过已完成 {already} 页', flush=True)
+            completed_item += already
     if not target_pages:
         return completed_item
     with ThreadPoolExecutor(max_workers=min(pass1_workers, len(target_pages))) as executor:
@@ -1390,6 +1578,16 @@ def execute_staged_homework_grading(
         else:
             scope_page_nums = set(_assigned)
         manifest['grading_config'] = session_map.get('grading_config') or {}
+        if session_map.get('class_multi') or (session_map.get('grading_config') or {}).get('class_multi'):
+            manifest['class_multi'] = session_map.get('class_multi') or {}
+            print(
+                f'[class-multi] 启用班级多人 class={manifest["class_multi"].get("class_id")} '
+                f'n={manifest["class_multi"].get("student_count")} '
+                f'pages_per={manifest["class_multi"].get("pages_per_assignment")} '
+                f'hw={manifest["class_multi"].get("homework_index")}',
+                flush=True,
+            )
+            _apply_class_multi_execution_budget(manifest['class_multi'])
         safe_json_dump(paths['manifest'], manifest)
         print(
             f'[grading-config] 已应用配置卡 filename={filename} '
@@ -1442,6 +1640,8 @@ def execute_staged_homework_grading(
     scoped_pages = [page for page in pages if scope_page_nums is None or page['page'] in scope_page_nums]
     if not scoped_pages:
         raise ValueError('没有可执行迭代的篇目页面')
+    # 续跑：回填班级多人映射（与单人同一套 resume，但必须保住 class_multi）
+    _ensure_class_multi_context(manifest, session_map, paths, subject, sample_id)
     from .feedback_observation import update_runtime_observation
     update_runtime_observation(task_id, paths, manifest, pdf_path, feedback_runtime, len(pages))
 
@@ -1464,6 +1664,14 @@ def execute_staged_homework_grading(
         scope_page_nums,
         **runtime_kwargs,
     )
+    try:
+        from .semantic_feedback_brief import semantic_grading_guidance
+
+        semantic_guidance = semantic_grading_guidance(username)
+        if semantic_guidance:
+            grading_iteration_guidance = (grading_iteration_guidance or "") + semantic_guidance
+    except Exception as exc:
+        print(f"[grading] semantic guidance skip: {exc}", flush=True)
 
     if pass1_two_stage_enabled(**runtime_kwargs):
         fixed_crossout_summary = prepare_fixed_sample_crossout_images(
@@ -1486,7 +1694,8 @@ def execute_staged_homework_grading(
     manifest['fixed_sample_crossout_repair'] = fixed_crossout_summary
     safe_json_dump(paths['manifest'], manifest)
 
-    stages_to_run = _stages_needed_for_target(paths, pages, manifest, resolved_target)
+    # 阶段完成判定只看本轮布置/篇目页，避免未布置页挡住续跑
+    stages_to_run = _stages_needed_for_target(paths, scoped_pages, manifest, resolved_target)
     if feedback_runtime is not None:
         from .execution_checkpoints import receipt_matches, record_stage_receipt
         ordered = [HOMEWORK_STAGE_LAYOUT, HOMEWORK_STAGE_UNDERSTANDING, HOMEWORK_STAGE_GRADING]
@@ -1494,6 +1703,8 @@ def execute_staged_homework_grading(
         invalid = next((i for i, name in enumerate(needed) if not receipt_matches(paths, manifest, name)), None)
         if invalid is not None:
             stages_to_run = [name for name in needed if name in stages_to_run or name in needed[invalid:]]
+    if manifest.get('report_only_rerun'):
+        stages_to_run = [HOMEWORK_STAGE_GRADING]
     from .stage_dependencies import enabled as scoped_dependencies
     if resolved_target == 'grading' and not stages_to_run and scoped_dependencies(feedback_runtime):
         from .artifact_transaction import candidate_transaction
@@ -1519,6 +1730,35 @@ def execute_staged_homework_grading(
         from .completion import finish_delivery
         report = safe_json_load(os.path.join(paths['pass2_report'], f'{subject}_{sample_id}_report.json'))
         finish_delivery(manifest, report)
+        # 短路路径也须补齐班级多人报告/钉卡（与完整 grading 尾段一致）
+        try:
+            class_map_sc = _ensure_class_multi_context(manifest, session_map, paths, subject, sample_id)
+            if class_map_sc and class_map_sc.get('student_count'):
+                from .class_multi_grading import finalize_class_multi_outputs
+                from .explanation_layers import material_portrait_label
+                prior_path = os.path.join(paths.get('pass2_report') or '', 'class_multi', 'class_student_memories.json')
+                prior_mem = safe_json_load(prior_path) if os.path.isfile(prior_path) else None
+                finalize_class_multi_outputs(
+                    paths=paths,
+                    manifest=manifest,
+                    class_map=class_map_sc,
+                    subject=subject,
+                    subject_label=SUBJECT_LABELS.get(subject, subject),
+                    material_label=material_portrait_label(
+                        (feedback_runtime.context if feedback_runtime is not None else None)
+                        or manifest.get('feedback_context')
+                        or {},
+                        filename,
+                    ),
+                    prior_student_memories=prior_mem if isinstance(prior_mem, dict) else None,
+                )
+        except Exception:
+            traceback.print_exc()
+        try:
+            from .result_cards import pin_grading_result_cards
+            pin_grading_result_cards(paths, manifest, feedback_runtime=feedback_runtime)
+        except Exception:
+            traceback.print_exc()
         manifest['output_validation'] = {'status': 'passed', 'target_stage': 'grading'}
         manifest['updated_at'] = datetime.datetime.now().isoformat()
         safe_json_dump(paths['manifest'], manifest)
@@ -1535,19 +1775,71 @@ def execute_staged_homework_grading(
         safe_json_dump(paths['manifest'], manifest)
         _update_task(task_id, current_item=1, total_items=total_steps, current_section='准备逐页版面检测')
         if pass1_two_stage_enabled(**runtime_kwargs):
+            class_map = (
+                manifest.get('class_multi')
+                if isinstance(manifest.get('class_multi'), dict)
+                else None
+            ) or _ensure_class_multi_context(manifest, session_map, paths, subject, sample_id)
+            layout_scope = scope_page_nums
+            if class_map and class_map.get('template_pages'):
+                # 班级多人：印刷版面相同，仅对第一位学生页做无损版面，再复刻到其余学生
+                template_pages = {int(p) for p in (class_map.get('template_pages') or [])}
+                if scope_page_nums is not None:
+                    layout_scope = set(scope_page_nums) & template_pages
+                else:
+                    layout_scope = template_pages
+                print(
+                    f'[class-multi] 无损版面仅检测模板生页 {sorted(layout_scope)}，随后复刻',
+                    flush=True,
+                )
+            _resume_reuse = bool(manifest.get('checkpoint_resume'))
             _run_detect_all_pages(
                 task_id, pages, paths, subject, grade, stage, pass1_workers,
-                scope_page_nums=scope_page_nums,
+                scope_page_nums=layout_scope,
                 iteration_guidance=layout_iteration_guidance,
+                reuse_existing_pages=_resume_reuse,
                 **runtime_kwargs,
             )
-            _merge_all_pages_from_detect(paths, scoped_pages, subject)
+            if class_map and class_map.get('template_pages'):
+                from .class_multi_grading import replicate_layout_from_template
+                missing_repl = [
+                    p for p in scoped_pages
+                    if int(p['page']) not in template_pages
+                    and not _page_layout_artifacts_ready(paths, p)
+                ]
+                # 续跑且全部已齐才跳过；非续跑或有缺页则复刻（幂等覆盖）
+                if _resume_reuse and not missing_repl and all(
+                    _page_layout_artifacts_ready(paths, p) for p in scoped_pages
+                ):
+                    print('[class-multi] 续跑：版面复刻产物已齐全，跳过复刻', flush=True)
+                else:
+                    _update_task(task_id, current_section='复刻班级多人版面结构')
+                    repl = replicate_layout_from_template(
+                        paths=paths,
+                        pages=pages,
+                        class_map=class_map,
+                        subject=subject,
+                        page_detect_path_fn=_page_detect_path,
+                        question_json_path_fn=_question_json_path,
+                        merge_detect_only_fn=_merge_detect_only_for_page,
+                    )
+                    manifest.setdefault('class_multi', {})['layout_replication'] = repl
+                    safe_json_dump(paths['manifest'], manifest)
+                    print(
+                        f'[class-multi] 版面复刻 {repl.get("replicated_count")} 页 '
+                        f'missing={len(repl.get("missing") or [])}',
+                        flush=True,
+                    )
+                _merge_all_pages_from_detect(paths, scoped_pages, subject)
+            else:
+                _merge_all_pages_from_detect(paths, scoped_pages, subject)
         else:
             completed_item = _run_pass1_grade_all_pages(
                 task_id, pages, paths, subject, grade, stage, pass1_workers, session_map, total_steps, completed_item,
                 scope_page_nums=scope_page_nums,
                 source_document_sha256=source_document_sha256,
                 iteration_guidance=understanding_iteration_guidance,
+                reuse_existing_pages=bool(manifest.get('checkpoint_resume')),
                 **runtime_kwargs,
             )
         if u1_shadow_enabled(subject, **runtime_kwargs) and pass1_two_stage_enabled(**runtime_kwargs):
@@ -1586,6 +1878,7 @@ def execute_staged_homework_grading(
             scope_page_nums=scope_page_nums,
             source_document_sha256=source_document_sha256,
             iteration_guidance=understanding_iteration_guidance,
+            reuse_existing_pages=bool(manifest.get('checkpoint_resume')),
             **runtime_kwargs,
         )
         if u1_shadow_enabled(subject, **runtime_kwargs):
@@ -1594,6 +1887,25 @@ def execute_staged_homework_grading(
                 pages, paths, subject, pass1_workers, scope_page_nums=scope_page_nums,
                 **runtime_kwargs,
             )
+        # 班级多人：Pass1 后尽量从卷面抽姓名，后续渲染标签/报告用真名
+        try:
+            class_map_names = _ensure_class_multi_context(manifest, session_map, paths, subject, sample_id)
+            if class_map_names and class_map_names.get('student_count'):
+                from .class_multi_grading import (
+                    enrich_class_map_student_names,
+                    apply_enriched_names_to_session_map,
+                )
+                class_map_names = enrich_class_map_student_names(
+                    paths=paths, class_map=class_map_names, use_vision_fallback=True,
+                )
+                manifest['class_multi'] = class_map_names
+                if isinstance(session_map, dict):
+                    session_map = apply_enriched_names_to_session_map(session_map, class_map_names)
+                    sessions_json_path = os.path.join(paths.get('base') or '', 'sessions.json')
+                    if sessions_json_path:
+                        safe_json_dump(sessions_json_path, session_map)
+        except Exception:
+            traceback.print_exc()
         _update_task(task_id, current_section='渲染无损理解')
         _render_pages(paths, pages, modes=('understanding',), session_map=session_map, scope_page_nums=scope_page_nums)
         manifest['stages'][HOMEWORK_STAGE_UNDERSTANDING] = 'done'
@@ -1617,26 +1929,50 @@ def execute_staged_homework_grading(
         manifest['stages'][HOMEWORK_STAGE_GRADING] = 'running'
         manifest['processing_stage'] = 'grading'
         safe_json_dump(paths['manifest'], manifest)
+        _ensure_class_multi_context(manifest, session_map, paths, subject, sample_id)
+        grading_cursor = _grading_resume_cursor(manifest, paths, subject, sample_id)
+        print(
+            f'[grading-resume] checkpoint={bool(manifest.get("checkpoint_resume"))} '
+            f'cursor={grading_cursor} from={manifest.get("resume_from_processing_stage")}',
+            flush=True,
+        )
 
-        stage_status = infer_homework_stage_status(paths, pages, manifest)
-        if stage_status.get(HOMEWORK_STAGE_UNDERSTANDING) != 'done':
+        stage_status = infer_homework_stage_status(paths, scoped_pages, manifest)
+        if stage_status.get(HOMEWORK_STAGE_UNDERSTANDING) != 'done' and not manifest.get('report_only_rerun'):
             _update_task(task_id, current_section='准备逐页批改')
             completed_item = _run_pass1_grade_all_pages(
                 task_id, pages, paths, subject, grade, stage, pass1_workers, session_map, total_steps, completed_item,
                 scope_page_nums=scope_page_nums,
                 source_document_sha256=source_document_sha256,
                 iteration_guidance=understanding_iteration_guidance,
+                reuse_existing_pages=bool(manifest.get('checkpoint_resume')),
                 **runtime_kwargs,
             )
 
-        if feedback_runtime is not None:
-            mark_stage(paths, manifest, 'cross_page')
-        _update_task(task_id, current_item=len(scoped_pages) + 1, total_items=total_steps, current_section='补全跨页题目')
         pass1_5_is_enabled = pass1_5_enabled(**runtime_kwargs)
-        cross_page_corrections = resolve_cross_pages(
-            paths['pass1_json'], paths['clean'], subject, sample_id, scope_page_nums=scope_page_nums,
-            **runtime_kwargs,
-        )
+        class_map_xp = manifest.get('class_multi') if isinstance(manifest.get('class_multi'), dict) else None
+        if _grading_substage_due(grading_cursor, 'cross_page'):
+            if feedback_runtime is not None:
+                mark_stage(paths, manifest, 'cross_page')
+            _update_task(task_id, current_item=len(scoped_pages) + 1, total_items=total_steps, current_section='补全跨页题目')
+            if class_map_xp and class_map_xp.get('student_boundary_pairs'):
+                from .class_multi_grading import clear_cross_student_boundaries, student_page_runs
+                cleared = clear_cross_student_boundaries(
+                    paths['pass1_json'], class_map_xp.get('student_boundary_pairs') or [],
+                )
+                print(f'[class-multi] 已断开跨学生边界页 {cleared} 处', flush=True)
+                page_run_sets = student_page_runs(class_map_xp)
+            else:
+                page_run_sets = None
+            cross_page_corrections = resolve_cross_pages(
+                paths['pass1_json'], paths['clean'], subject, sample_id, scope_page_nums=scope_page_nums,
+                page_run_sets=page_run_sets,
+                **runtime_kwargs,
+            )
+        else:
+            print('[grading-resume] 跳过 cross_page（沿用已落盘跨页结果）', flush=True)
+            cross_page_corrections = list((manifest.get('pass1_5') or {}).get('corrections') or [])
+            page_run_sets = None
         _reapply_slot_presence_guards_for_pages(
             pages,
             paths,
@@ -1678,75 +2014,85 @@ def execute_staged_homework_grading(
                 if link_status in ('disabled', 'unresolved_no_source_match', 'completed_with_warnings'):
                     manifest.setdefault('warnings', []).append('笔记跨页关联未完全确认，相关单元保留待确认状态。')
 
-        if feedback_runtime is not None:
-            mark_stage(paths, manifest, 'review')
-        _update_task(task_id, current_item=len(scoped_pages) + 2, total_items=total_steps, current_section='逐页复核批改结果')
-        review_stats = review_pass1_dir(
-            paths['pass1_json'], scoped_pages, subject, grade=grade, stage=stage, workers=pass1_workers,
-            source_document_sha256=source_document_sha256,
-            **runtime_kwargs,
-        )
-        from .completion import review_coverage
-        coverage = review_coverage([p['page'] for p in scoped_pages], review_stats.get('details', []))
-        previous_coverage = (manifest.get('pass1_review') or {}).get('coverage') or {}
-        outside = {p['page'] for p in pages} - set(coverage['expected_pages'])
-        # 配置卡未布置页本轮故意不批，不得并入 expected/incomplete
-        _gc_cov = (manifest.get('grading_config') or {}) if isinstance(manifest, dict) else {}
-        _unassigned_cov = {int(p) for p in (_gc_cov.get('unassigned_pages') or [])}
-        if _unassigned_cov:
-            outside -= _unassigned_cov
-        if outside:
-            completed = set(coverage['completed_pages']) | (set(previous_coverage.get('completed_pages', [])) & outside)
-            skipped = set(coverage['policy_skipped_pages']) | (set(previous_coverage.get('policy_skipped_pages', [])) & outside)
-            expected_union = ({p['page'] for p in pages} - _unassigned_cov) if _unassigned_cov else {p['page'] for p in pages}
-            coverage.update(expected_pages=sorted(expected_union),
-                            completed_pages=sorted(completed), policy_skipped_pages=sorted(skipped),
-                            incomplete_pages=sorted(expected_union - completed))
-        manifest['pass1_review'] = {
-            'coverage': coverage,
-            'reviewed_pages': sorted(set(
-                d['page'] for d in review_stats.get('details', [])
-                if not d.get('skipped') and not d.get('error') and not d.get('quota_limited')) |
-                (set((manifest.get('pass1_review') or {}).get('reviewed_pages', [])) & outside)),
-            'required_units': review_stats.get('required_units', []) + [
-                u for u in (manifest.get('pass1_review') or {}).get('required_units', [])
-                if int(u['qid_global'].split(':')[0][1:]) in outside],
-            'enabled': review_stats.get('enabled', True),
-            'model': review_stats.get('model', ''),
-            'scope': review_stats.get('scope', ''),
-            'workers': review_stats.get('workers', 0),
-            'reuse_existing': review_stats.get('reuse_existing', True),
-            'pages_reused': review_stats.get('pages_reused', 0),
-            'stop_on_quota': review_stats.get('stop_on_quota', True),
-            'quota_limited': review_stats.get('quota_limited', False),
-            'pages_reviewed': review_stats.get('pages_reviewed', 0),
-            'pages_skipped': review_stats.get('pages_skipped', 0),
-            'issues_found': review_stats.get('issues_found', 0),
-            'corrections_applied': review_stats.get('corrections_applied', 0),
-            'errors': review_stats.get('errors', 0),
-            'failures': review_stats.get('failures', []),
-        }
+        if _grading_substage_due(grading_cursor, 'review'):
+            if feedback_runtime is not None:
+                mark_stage(paths, manifest, 'review')
+            _update_task(task_id, current_item=len(scoped_pages) + 2, total_items=total_steps, current_section='逐页复核批改结果')
+            review_stats = review_pass1_dir(
+                paths['pass1_json'], scoped_pages, subject, grade=grade, stage=stage, workers=pass1_workers,
+                source_document_sha256=source_document_sha256,
+                **runtime_kwargs,
+            )
+            from .completion import review_coverage
+            coverage = review_coverage([p['page'] for p in scoped_pages], review_stats.get('details', []))
+            previous_coverage = (manifest.get('pass1_review') or {}).get('coverage') or {}
+            outside = {p['page'] for p in pages} - set(coverage['expected_pages'])
+            # 配置卡未布置页本轮故意不批，不得并入 expected/incomplete
+            _gc_cov = (manifest.get('grading_config') or {}) if isinstance(manifest, dict) else {}
+            _unassigned_cov = {int(p) for p in (_gc_cov.get('unassigned_pages') or [])}
+            if _unassigned_cov:
+                outside -= _unassigned_cov
+            if outside:
+                completed = set(coverage['completed_pages']) | (set(previous_coverage.get('completed_pages', [])) & outside)
+                skipped = set(coverage['policy_skipped_pages']) | (set(previous_coverage.get('policy_skipped_pages', [])) & outside)
+                expected_union = ({p['page'] for p in pages} - _unassigned_cov) if _unassigned_cov else {p['page'] for p in pages}
+                coverage.update(expected_pages=sorted(expected_union),
+                                completed_pages=sorted(completed), policy_skipped_pages=sorted(skipped),
+                                incomplete_pages=sorted(expected_union - completed))
+            manifest['pass1_review'] = {
+                'coverage': coverage,
+                'reviewed_pages': sorted(set(
+                    d['page'] for d in review_stats.get('details', [])
+                    if not d.get('skipped') and not d.get('error') and not d.get('quota_limited')) |
+                    (set((manifest.get('pass1_review') or {}).get('reviewed_pages', [])) & outside)),
+                'required_units': review_stats.get('required_units', []) + [
+                    u for u in (manifest.get('pass1_review') or {}).get('required_units', [])
+                    if int(u['qid_global'].split(':')[0][1:]) in outside],
+                'enabled': review_stats.get('enabled', True),
+                'model': review_stats.get('model', ''),
+                'scope': review_stats.get('scope', ''),
+                'workers': review_stats.get('workers', 0),
+                'reuse_existing': review_stats.get('reuse_existing', True),
+                'pages_reused': review_stats.get('pages_reused', 0),
+                'stop_on_quota': review_stats.get('stop_on_quota', True),
+                'quota_limited': review_stats.get('quota_limited', False),
+                'pages_reviewed': review_stats.get('pages_reviewed', 0),
+                'pages_skipped': review_stats.get('pages_skipped', 0),
+                'issues_found': review_stats.get('issues_found', 0),
+                'corrections_applied': review_stats.get('corrections_applied', 0),
+                'errors': review_stats.get('errors', 0),
+                'failures': review_stats.get('failures', []),
+            }
+        else:
+            print('[grading-resume] 跳过 review（沿用已落盘复核）', flush=True)
 
-        if feedback_runtime is not None:
-            mark_stage(paths, manifest, 'verification')
-        _update_task(task_id, current_item=len(scoped_pages) + 3, total_items=total_steps, current_section='复核学科规则')
-        verification_path = os.path.join(paths['pass2_report'], f'{subject}_{sample_id}_verification.json')
-        verification_report = verify_pass1_dir(
-            subject,
-            paths['pass1_json'],
-            verification_path,
-            apply=True,
-            page_nums=scope_page_nums,
-            source_document_sha256=source_document_sha256,
-            **runtime_kwargs,
-        )
-        manifest['verification'] = {'total_discrepancies': verification_report.get('total_discrepancies', 0)}
+        if _grading_substage_due(grading_cursor, 'verification'):
+            if feedback_runtime is not None:
+                mark_stage(paths, manifest, 'verification')
+            _update_task(task_id, current_item=len(scoped_pages) + 3, total_items=total_steps, current_section='复核学科规则')
+            verification_path = os.path.join(paths['pass2_report'], f'{subject}_{sample_id}_verification.json')
+            verification_report = verify_pass1_dir(
+                subject,
+                paths['pass1_json'],
+                verification_path,
+                apply=True,
+                page_nums=scope_page_nums,
+                source_document_sha256=source_document_sha256,
+                **runtime_kwargs,
+            )
+            manifest['verification'] = {'total_discrepancies': verification_report.get('total_discrepancies', 0)}
 
-        answer_statement_path = os.path.join(paths['pass2_report'], f'{subject}_{sample_id}_answer_statement_verification.json')
-        answer_statement_report = verify_answer_statements(
-            subject, paths['pass1_json'], answer_statement_path, apply=True, page_nums=scope_page_nums,
-            **runtime_kwargs,
-        )
+            answer_statement_path = os.path.join(paths['pass2_report'], f'{subject}_{sample_id}_answer_statement_verification.json')
+            answer_statement_report = verify_answer_statements(
+                subject, paths['pass1_json'], answer_statement_path, apply=True, page_nums=scope_page_nums,
+                **runtime_kwargs,
+            )
+        else:
+            print('[grading-resume] 跳过 verification（沿用已落盘规则复核）', flush=True)
+            answer_statement_report = {
+                'total_discrepancies': (manifest.get('answer_statement_verification') or {}).get('total_discrepancies', 0),
+                'corrections_applied': (manifest.get('answer_statement_verification') or {}).get('corrections_applied', 0),
+            }
         slot_presence_restored_after_review = _reapply_slot_presence_guards_for_pages(
             pages,
             paths,
@@ -1794,76 +2140,104 @@ def execute_staged_homework_grading(
             'restored_after_review': fixed_math_sample_restored_after_review,
         }
 
-        if feedback_runtime is not None:
-            mark_stage(paths, manifest, 'memory')
-        _update_task(task_id, current_item=len(scoped_pages) + 4, total_items=total_steps, current_section='汇总错题线索')
-        from .note_evidence import is_notes, normalize_note_dir
-        from .material_markings import normalize_markings_dir, open_material_runtime, open_units
-        normalize_markings_dir(paths['pass1_json'], feedback_runtime=feedback_runtime, page_nums=scope_page_nums)
-        if is_notes(feedback_runtime):
-            normalize_note_dir(paths['pass1_json'], feedback_runtime=feedback_runtime, page_nums=scope_page_nums)
-        memory = build_memory(paths['pass1_json'], subject, sample_id, **runtime_kwargs)
-        save_memory(memory, paths['pass2_report'], subject, sample_id)
-        try:
-            session_memories = build_all_session_memories(
-                paths['pass1_json'], paths['pass2_report'], subject, sample_id, sessions_json_path=sessions_json_path,
-                **runtime_kwargs,
-            )
-        except Exception as exc:
-            manifest['session_memory'] = {'status': 'failed', 'error': str(exc)}
-            safe_json_dump(paths['manifest'], manifest)
-            # 必要记忆失败不能伪装成无材料，保留实际阶段供恢复。
-            raise
-        manifest['session_memory'] = {'status': 'ready'}
-        try:
-            profile = build_student_profile(paths['pass2_report'], subject, sample_id, **runtime_kwargs)
-            manifest['rule_profile'] = {'status': 'ready'}
-        except Exception as exc:
-            manifest['rule_profile'] = {'status': 'failed', 'error': str(exc)}
-            manifest['warnings'] = list(dict.fromkeys(manifest.get('warnings', []) + [
-                '规则基线未生成，本次诊断仅使用已保存的材料证据。']))
-            _update_task(task_id, warnings=manifest['warnings'])
-            profile = None
-        manifest['session_count'] = len(session_memories)
-
-        if feedback_runtime is not None:
-            mark_stage(paths, manifest, 'ontology')
-        _update_task(task_id, current_section='生成整篇学习诊断')
-        sample_meta = load_sample_meta(paths['base']) or {'subject': subject, 'grade': grade, 'stage': stage_of_grade(grade)}
-        ontology = build_ontology(
-            subject=subject,
-            sample_id=sample_id,
-            base_dir=paths['base'],
-            report_dir=paths['pass2_report'],
-            sample_meta=sample_meta,
-            session_memories=session_memories,
-            profile=profile,
-            iteration_guidance=grading_iteration_guidance,
-            pass1_dir=paths.get('pass1_json') or '',
-            **runtime_kwargs,
-        )
-        manifest['ontology'] = {
-            'built': bool(ontology),
-            'fallback_used': bool(ontology.get('fallback_used')) if ontology else False,
-            'built_by': ontology.get('built_by') if ontology else '',
-        }
-
-        if feedback_runtime is not None:
-            mark_stage(paths, manifest, 'report')
-        _update_task(task_id, current_item=len(scoped_pages) + 5, total_items=total_steps, current_section='整理问题与提升建议')
+        memory_path = os.path.join(paths['pass2_report'], f'{subject}_{sample_id}_memory.json')
+        ontology_path = os.path.join(paths['base'], 'student_ontology.json')
         report_path = os.path.join(paths['pass2_report'], f'{subject}_{sample_id}_report.json')
         thinking_path = os.path.join(paths['pass2_report'], f'{subject}_{sample_id}.thinking.txt')
-        analyze_pass2(
-            memory,
-            subject,
-            sample_id,
-            report_path,
-            thinking_path,
-            profile=None,
-            ontology=ontology,
-            iteration_guidance=grading_iteration_guidance,
-            **runtime_kwargs,
-        )
+
+        if _grading_substage_due(grading_cursor, 'memory'):
+            if feedback_runtime is not None:
+                mark_stage(paths, manifest, 'memory')
+            _update_task(task_id, current_item=len(scoped_pages) + 4, total_items=total_steps, current_section='汇总错题线索')
+            from .note_evidence import is_notes, normalize_note_dir
+            from .material_markings import normalize_markings_dir, open_material_runtime, open_units
+            normalize_markings_dir(paths['pass1_json'], feedback_runtime=feedback_runtime, page_nums=scope_page_nums)
+            if is_notes(feedback_runtime):
+                normalize_note_dir(paths['pass1_json'], feedback_runtime=feedback_runtime, page_nums=scope_page_nums)
+            memory = build_memory(paths['pass1_json'], subject, sample_id, **runtime_kwargs)
+            save_memory(memory, paths['pass2_report'], subject, sample_id)
+            try:
+                session_memories = build_all_session_memories(
+                    paths['pass1_json'], paths['pass2_report'], subject, sample_id, sessions_json_path=sessions_json_path,
+                    **runtime_kwargs,
+                )
+            except Exception as exc:
+                manifest['session_memory'] = {'status': 'failed', 'error': str(exc)}
+                safe_json_dump(paths['manifest'], manifest)
+                # 必要记忆失败不能伪装成无材料，保留实际阶段供恢复。
+                raise
+            manifest['session_memory'] = {'status': 'ready'}
+            try:
+                profile = build_student_profile(paths['pass2_report'], subject, sample_id, **runtime_kwargs)
+                manifest['rule_profile'] = {'status': 'ready'}
+            except Exception as exc:
+                manifest['rule_profile'] = {'status': 'failed', 'error': str(exc)}
+                manifest['warnings'] = list(dict.fromkeys(manifest.get('warnings', []) + [
+                    '规则基线未生成，本次诊断仅使用已保存的材料证据。']))
+                _update_task(task_id, warnings=manifest['warnings'])
+                profile = None
+            manifest['session_count'] = len(session_memories)
+        else:
+            print('[grading-resume] 跳过 memory（加载已落盘记忆）', flush=True)
+            memory = safe_json_load(memory_path) if os.path.isfile(memory_path) else {}
+            session_memories = []
+            profile = None
+            try:
+                session_memories = build_all_session_memories(
+                    paths['pass1_json'], paths['pass2_report'], subject, sample_id, sessions_json_path=sessions_json_path,
+                    **runtime_kwargs,
+                )
+            except Exception:
+                session_memories = []
+            try:
+                profile = build_student_profile(paths['pass2_report'], subject, sample_id, **runtime_kwargs)
+            except Exception:
+                profile = None
+            manifest['session_count'] = len(session_memories or [])
+
+        if _grading_substage_due(grading_cursor, 'ontology'):
+            if feedback_runtime is not None:
+                mark_stage(paths, manifest, 'ontology')
+            _update_task(task_id, current_section='生成整篇学习诊断')
+            sample_meta = load_sample_meta(paths['base']) or {'subject': subject, 'grade': grade, 'stage': stage_of_grade(grade)}
+            ontology = build_ontology(
+                subject=subject,
+                sample_id=sample_id,
+                base_dir=paths['base'],
+                report_dir=paths['pass2_report'],
+                sample_meta=sample_meta,
+                session_memories=session_memories,
+                profile=profile,
+                iteration_guidance=grading_iteration_guidance,
+                pass1_dir=paths.get('pass1_json') or '',
+                **runtime_kwargs,
+            )
+            manifest['ontology'] = {
+                'built': bool(ontology),
+                'fallback_used': bool(ontology.get('fallback_used')) if ontology else False,
+                'built_by': ontology.get('built_by') if ontology else '',
+            }
+        else:
+            print('[grading-resume] 跳过 ontology（加载已落盘本体）', flush=True)
+            ontology = safe_json_load(ontology_path) if os.path.isfile(ontology_path) else {}
+
+        if _grading_substage_due(grading_cursor, 'report'):
+            if feedback_runtime is not None:
+                mark_stage(paths, manifest, 'report')
+            _update_task(task_id, current_item=len(scoped_pages) + 5, total_items=total_steps, current_section='整理问题与提升建议')
+            analyze_pass2(
+                memory,
+                subject,
+                sample_id,
+                report_path,
+                thinking_path,
+                profile=None,
+                ontology=ontology,
+                iteration_guidance=grading_iteration_guidance,
+                **runtime_kwargs,
+            )
+        else:
+            print('[grading-resume] 跳过 report/pass2（沿用已落盘整体报告）', flush=True)
         # 配置卡：在报告正文侧写入「未布置页」说明（不打分、不进三区）
         try:
             _gc = (manifest.get('grading_config') or {}) if isinstance(manifest, dict) else {}
@@ -1887,201 +2261,222 @@ def execute_staged_homework_grading(
         except Exception as _un_exc:
             print(f'[grading-config] 写入未布置页说明失败: {_un_exc}')
 
-        if feedback_runtime is not None:
-            mark_stage(paths, manifest, 'hallucination')
-        _update_task(task_id, current_item=len(scoped_pages) + 6, total_items=total_steps, current_section='复核批改结果')
         hallucination_path = os.path.join(paths['pass2_report'], f'{subject}_{sample_id}_hallucination.json')
-        ontology_path = os.path.join(paths['base'], 'student_ontology.json')
         from .artifact_transaction import candidate_transaction
-
-        def finalize_candidate(paths, rebuilt=False):
-            from .evidence_contract import semantic_facts, validate_final_evidence
-            def read_pages():
-                return [safe_json_load(p) for p in sorted_json_pages(paths['pass1_json'])]
-            before_facts = semantic_facts(read_pages())
-            report_path = os.path.join(paths['pass2_report'], f'{subject}_{sample_id}_report.json')
-            ontology_path = os.path.join(paths['base'], 'student_ontology.json')
-            hallucination_path = os.path.join(paths['pass2_report'], f'{subject}_{sample_id}_hallucination.json')
-            candidate_sessions = (os.path.join(paths['pass2_report'], os.path.basename(sessions_json_path))
-                                  if sessions_json_path else None)
-            candidate_stats = {key: {} for key in ('slot_presence_guard', 'fixed_english_choice_guard',
-                                                  'fixed_english_page15_guard', 'fixed_math_sample_guard')}
-            hallucination_report = run_hallucination_filter(
-                subject, paths['pass1_json'], report_path, hallucination_path,
-                ontology_path=ontology_path if os.path.exists(ontology_path) else None,
-                stage=stage, page_nums=scope_page_nums,
-                **runtime_kwargs,
-            )
-
-            candidate_stats['slot_presence_guard']['restored_after_hallucination'] = (
-                _reapply_slot_presence_guards_for_pages(
-                    pages,
-                    paths,
-                    subject,
-                    scope_page_nums=scope_page_nums,
-                    source_document_sha256=source_document_sha256,
+        # sample_meta 在 hallucination 重建路径可能用到，避免跳过 ontology 后 NameError
+        sample_meta = load_sample_meta(paths['base']) or {
+            'subject': subject, 'grade': grade, 'stage': stage_of_grade(grade),
+        }
+        # hallucination/render/quality 绑在同一大段：任一子步未完成都须进入，避免卡在 quality 却整段跳过
+        _run_post_report_block = any(
+            _grading_substage_due(grading_cursor, s)
+            for s in ('hallucination', 'render', 'output_validation', 'quality')
+        )
+        if _run_post_report_block:
+            if feedback_runtime is not None:
+                mark_stage(paths, manifest, 'hallucination')
+            _update_task(task_id, current_item=len(scoped_pages) + 6, total_items=total_steps, current_section='复核批改结果')
+            def finalize_candidate(paths, rebuilt=False):
+                from .evidence_contract import semantic_facts, validate_final_evidence
+                from .material_markings import normalize_markings_dir, open_material_runtime, open_units
+                from .note_evidence import (
+                    is_notes, normalize_note_dir, validate_note_ontology, validate_note_feedback,
+                    align_note_report, normalize_feedback_zones,
+                )
+                def read_pages():
+                    return [safe_json_load(p) for p in sorted_json_pages(paths['pass1_json'])]
+                before_facts = semantic_facts(read_pages())
+                report_path = os.path.join(paths['pass2_report'], f'{subject}_{sample_id}_report.json')
+                ontology_path = os.path.join(paths['base'], 'student_ontology.json')
+                hallucination_path = os.path.join(paths['pass2_report'], f'{subject}_{sample_id}_hallucination.json')
+                candidate_sessions = (os.path.join(paths['pass2_report'], os.path.basename(sessions_json_path))
+                                      if sessions_json_path else None)
+                candidate_stats = {key: {} for key in ('slot_presence_guard', 'fixed_english_choice_guard',
+                                                      'fixed_english_page15_guard', 'fixed_math_sample_guard')}
+                hallucination_report = run_hallucination_filter(
+                    subject, paths['pass1_json'], report_path, hallucination_path,
+                    ontology_path=ontology_path if os.path.exists(ontology_path) else None,
+                    stage=stage, page_nums=scope_page_nums,
                     **runtime_kwargs,
                 )
-            )
-            candidate_stats['fixed_english_choice_guard']['restored_after_hallucination'] = (
-                _reapply_fixed_english_choice_guards_for_pages(
-                    pages,
-                    paths,
-                    scope_page_nums=scope_page_nums,
-                **({'feedback_runtime': feedback_runtime, 'source_document_sha256': source_document_sha256} if feedback_runtime is not None else {}))
-            )
-            candidate_stats['fixed_english_page15_guard']['restored_after_hallucination'] = (
-                _reapply_fixed_english_page15_guards_for_pages(
-                    pages,
-                    paths,
-                    scope_page_nums=scope_page_nums,
-                **({'feedback_runtime': feedback_runtime, 'source_document_sha256': source_document_sha256} if feedback_runtime is not None else {}))
-            )
-            candidate_stats['fixed_math_sample_guard']['restored_after_hallucination'] = (
-                _reapply_fixed_math_sample_guards_for_pages(
-                    pages,
-                    paths,
-                    scope_page_nums=scope_page_nums,
-                **({'feedback_runtime': feedback_runtime, 'source_document_sha256': source_document_sha256} if feedback_runtime is not None else {}))
-            )
 
-            from .note_evidence import is_notes, validate_note_ontology, validate_note_feedback, align_note_report, normalize_feedback_zones
-            if open_material_runtime(feedback_runtime):
-                # 复核可回写Pass1/诊断/批语，输出前再次核验，不能绕过笔记证据约束。
-                normalize_markings_dir(paths['pass1_json'], feedback_runtime=feedback_runtime, page_nums=scope_page_nums)
-                if is_notes(feedback_runtime):
-                    normalize_note_dir(paths['pass1_json'], feedback_runtime=feedback_runtime, page_nums=scope_page_nums)
-            final_memory = build_memory(paths['pass1_json'], subject, sample_id, **runtime_kwargs)
-            save_memory(final_memory, paths['pass2_report'], subject, sample_id, **runtime_kwargs)
-            final_sessions = build_all_session_memories(paths['pass1_json'], paths['pass2_report'], subject, sample_id,
-                                       sessions_json_path=candidate_sessions, **runtime_kwargs)
-            if semantic_facts(read_pages()) != before_facts:
-                if rebuilt:
-                    raise ValueError('再次复核仍改变事实依据，已停止自动重算并保留原结果')
-                from .execution_control import current_execution
-                execution = current_execution()
-                if execution is not None:
-                    execution.remaining()
-                final_profile = build_student_profile(paths['pass2_report'], subject, sample_id, **runtime_kwargs)
-                final_ontology = build_ontology(subject=subject, sample_id=sample_id, base_dir=paths['base'],
-                    report_dir=paths['pass2_report'], sample_meta=sample_meta, session_memories=final_sessions,
-                    profile=final_profile, iteration_guidance=grading_iteration_guidance,
-                    pass1_dir=paths.get('pass1_json') or '', **runtime_kwargs)
-                analyze_pass2(final_memory, subject, sample_id, report_path,
-                    os.path.join(paths['pass2_report'], f'{subject}_{sample_id}.thinking.txt'),
-                    profile=None, ontology=final_ontology, iteration_guidance=grading_iteration_guidance, **runtime_kwargs)
-                return finalize_candidate(paths, rebuilt=True)
-            if open_material_runtime(feedback_runtime):
-                final_ontology = safe_json_load(ontology_path)
+                candidate_stats['slot_presence_guard']['restored_after_hallucination'] = (
+                    _reapply_slot_presence_guards_for_pages(
+                        pages,
+                        paths,
+                        subject,
+                        scope_page_nums=scope_page_nums,
+                        source_document_sha256=source_document_sha256,
+                        **runtime_kwargs,
+                    )
+                )
+                candidate_stats['fixed_english_choice_guard']['restored_after_hallucination'] = (
+                    _reapply_fixed_english_choice_guards_for_pages(
+                        pages,
+                        paths,
+                        scope_page_nums=scope_page_nums,
+                    **({'feedback_runtime': feedback_runtime, 'source_document_sha256': source_document_sha256} if feedback_runtime is not None else {}))
+                )
+                candidate_stats['fixed_english_page15_guard']['restored_after_hallucination'] = (
+                    _reapply_fixed_english_page15_guards_for_pages(
+                        pages,
+                        paths,
+                        scope_page_nums=scope_page_nums,
+                    **({'feedback_runtime': feedback_runtime, 'source_document_sha256': source_document_sha256} if feedback_runtime is not None else {}))
+                )
+                candidate_stats['fixed_math_sample_guard']['restored_after_hallucination'] = (
+                    _reapply_fixed_math_sample_guards_for_pages(
+                        pages,
+                        paths,
+                        scope_page_nums=scope_page_nums,
+                    **({'feedback_runtime': feedback_runtime, 'source_document_sha256': source_document_sha256} if feedback_runtime is not None else {}))
+                )
+
+                if open_material_runtime(feedback_runtime):
+                    # 复核可回写Pass1/诊断/批语，输出前再次核验，不能绕过笔记证据约束。
+                    normalize_markings_dir(paths['pass1_json'], feedback_runtime=feedback_runtime, page_nums=scope_page_nums)
+                    if is_notes(feedback_runtime):
+                        normalize_note_dir(paths['pass1_json'], feedback_runtime=feedback_runtime, page_nums=scope_page_nums)
+                final_memory = build_memory(paths['pass1_json'], subject, sample_id, **runtime_kwargs)
+                save_memory(final_memory, paths['pass2_report'], subject, sample_id, **runtime_kwargs)
+                final_sessions = build_all_session_memories(paths['pass1_json'], paths['pass2_report'], subject, sample_id,
+                                           sessions_json_path=candidate_sessions, **runtime_kwargs)
+                if semantic_facts(read_pages()) != before_facts:
+                    if rebuilt:
+                        raise ValueError('再次复核仍改变事实依据，已停止自动重算并保留原结果')
+                    from .execution_control import current_execution
+                    execution = current_execution()
+                    if execution is not None:
+                        execution.remaining()
+                    final_profile = build_student_profile(paths['pass2_report'], subject, sample_id, **runtime_kwargs)
+                    final_ontology = build_ontology(subject=subject, sample_id=sample_id, base_dir=paths['base'],
+                        report_dir=paths['pass2_report'], sample_meta=sample_meta, session_memories=final_sessions,
+                        profile=final_profile, iteration_guidance=grading_iteration_guidance,
+                        pass1_dir=paths.get('pass1_json') or '', **runtime_kwargs)
+                    analyze_pass2(final_memory, subject, sample_id, report_path,
+                        os.path.join(paths['pass2_report'], f'{subject}_{sample_id}.thinking.txt'),
+                        profile=None, ontology=final_ontology, iteration_guidance=grading_iteration_guidance, **runtime_kwargs)
+                    return finalize_candidate(paths, rebuilt=True)
+                if open_material_runtime(feedback_runtime):
+                    final_ontology = safe_json_load(ontology_path)
+                    final_report = safe_json_load(report_path)
+                    validate_note_ontology(final_ontology, open_units(final_memory, feedback_runtime.context['material_type']))
+                    normalize_feedback_zones(final_report, final_ontology)
+                    validate_note_feedback(final_report, final_memory, final_ontology,
+                                           material_type=feedback_runtime.context['material_type'])
+                    align_note_report(final_report)
+                    safe_json_dump(report_path, final_report)
+                # 幻觉复核可能回写理解或报告，前言必须与最终页面绑定（所有材料适用）。
+                from .page_feedback import page_evidence, normalize_page_contexts
+                final_pages = []
+                for page_file in sorted_json_pages(paths['pass1_json']):
+                    page_data = safe_json_load(page_file)
+                    final_pages.append(page_evidence(page_data, page_data['page']))
                 final_report = safe_json_load(report_path)
-                validate_note_ontology(final_ontology, open_units(final_memory, feedback_runtime.context['material_type']))
-                normalize_feedback_zones(final_report, final_ontology)
-                validate_note_feedback(final_report, final_memory, final_ontology,
-                                       material_type=feedback_runtime.context['material_type'])
-                align_note_report(final_report)
+                final_report['page_feedback_contexts'] = normalize_page_contexts(
+                    final_report.get('page_feedback_contexts'), final_pages)
+                # 幻觉复核后仍保留配置卡未布置页说明
+                _gc2 = (manifest.get('grading_config') or {}) if isinstance(manifest, dict) else {}
+                _ua2 = _gc2.get('unassigned_pages') or []
+                if _ua2:
+                    _note2 = '未布置页：' + ','.join(str(p) for p in _ua2) + '（本轮未批改）'
+                    final_report['unassigned_pages'] = list(_ua2)
+                    final_report['unassigned_pages_note'] = _note2
+                    final_report['grading_config'] = {
+                        'assigned_pages': _gc2.get('assigned_pages') or [],
+                        'unassigned_pages': list(_ua2),
+                        'note': _note2,
+                    }
                 safe_json_dump(report_path, final_report)
-            # 幻觉复核可能回写理解或报告，前言必须与最终页面绑定（所有材料适用）。
-            from .page_feedback import page_evidence, normalize_page_contexts
-            final_pages = []
-            for page_file in sorted_json_pages(paths['pass1_json']):
-                page_data = safe_json_load(page_file)
-                final_pages.append(page_evidence(page_data, page_data['page']))
-            final_report = safe_json_load(report_path)
-            final_report['page_feedback_contexts'] = normalize_page_contexts(
-                final_report.get('page_feedback_contexts'), final_pages)
-            # 幻觉复核后仍保留配置卡未布置页说明
-            _gc2 = (manifest.get('grading_config') or {}) if isinstance(manifest, dict) else {}
-            _ua2 = _gc2.get('unassigned_pages') or []
-            if _ua2:
-                _note2 = '未布置页：' + ','.join(str(p) for p in _ua2) + '（本轮未批改）'
-                final_report['unassigned_pages'] = list(_ua2)
-                final_report['unassigned_pages_note'] = _note2
-                final_report['grading_config'] = {
-                    'assigned_pages': _gc2.get('assigned_pages') or [],
-                    'unassigned_pages': list(_ua2),
-                    'note': _note2,
-                }
-            safe_json_dump(report_path, final_report)
-            from .grader_pass2 import _validate_runtime_feedback
-            if feedback_runtime is not None:
-                _validate_runtime_feedback(final_report, final_memory)
-            validate_final_evidence(final_report, safe_json_load(ontology_path) if os.path.isfile(ontology_path) else {}, read_pages(),
-                                    manifest['pass1_review'].get('required_units', []), manifest['pass1_review'].get('reviewed_pages', []))
-            _render_pages(paths, pages, modes=('understanding', 'grading'), session_map=session_map)
-            if feedback_runtime is not None:
-                validate_artifacts(paths, pages, manifest, 'grading', expected_pages=manifest.get('source_page_count'))
-            return {'filter': hallucination_report, 'guards': candidate_stats, 'rebuilt': rebuilt}
+                from .grader_pass2 import _validate_runtime_feedback
+                if feedback_runtime is not None:
+                    _validate_runtime_feedback(final_report, final_memory)
+                validate_final_evidence(final_report, safe_json_load(ontology_path) if os.path.isfile(ontology_path) else {}, read_pages(),
+                                        manifest['pass1_review'].get('required_units', []), manifest['pass1_review'].get('reviewed_pages', []))
+                _render_pages(paths, pages, modes=('understanding', 'grading'), session_map=session_map)
+                if feedback_runtime is not None:
+                    validate_artifacts(paths, pages, manifest, 'grading', expected_pages=manifest.get('source_page_count'))
+                return {'filter': hallucination_report, 'guards': candidate_stats, 'rebuilt': rebuilt}
 
-        try:
-            finalized = candidate_transaction(paths, finalize_candidate, include_images=True)
-            manifest['postprocess'] = {'status': 'published', 'rebuild_count': int(finalized['rebuilt'])}
-            hallucination_report = finalized['filter']
-            for key, value in finalized['guards'].items():
-                manifest[key].update(value)
-        except Exception as exc:
-            from .artifact_transaction import transaction_pending
-            if transaction_pending(paths['base']):
-                raise
-            traceback.print_exc()
             try:
-                from .yangqian_debug import debug_log
-                debug_log(f'[homework_grading] 终态复核未发布: {exc}', extra_dir=paths.get('base'))
-            except Exception:
-                pass
-            manifest['postprocess'] = {'status': 'rejected', 'error': str(exc)}
-            hallucination_report = {'status': 'failed', 'total_issues': None,
-                                    'corrections_applied_count': None, 'error': str(exc)}
-            safe_json_dump(hallucination_path, hallucination_report)
-            manifest['warnings'] = list(dict.fromkeys(manifest.get('warnings', []) + [
-                '批改结果复核未完成，已有结果已保留，请人工核实后使用。']))
-            manifest['content_validation'] = {'status': 'inconclusive', 'failed_checks': ['hallucination']}
-            _update_task(task_id, warnings=manifest['warnings'], content_validation=manifest['content_validation'])
-        manifest['hallucination'] = {
-            'status': hallucination_report.get('status', 'ready'),
-            'error': hallucination_report.get('error', ''),
-            'total_issues': hallucination_report.get('total_issues', 0),
-            'corrections_applied': hallucination_report.get('corrections_applied_count', 0),
-        }
-        if feedback_runtime is not None:
-            mark_stage(paths, manifest, 'render')
-        _update_task(task_id, current_item=len(scoped_pages) + 7, total_items=total_steps, current_section='渲染三区批改')
-        # 成功候选已连同图片发布；失败时仅为保留的事实生成一致的可查看图片。
-        if manifest.get('postprocess', {}).get('status') != 'published':
-            _render_pages(paths, pages, modes=('understanding', 'grading'), session_map=session_map)
-
-        _update_task(task_id, current_section='生成批改质量红蓝卡标')
-        if feedback_runtime is not None:
-            mark_stage(paths, manifest, 'output_validation')
-            output_warnings = validate_artifacts(paths, pages, manifest, 'grading',
-                expected_pages=manifest.get('source_page_count'))
-            manifest['output_validation'] = {'status': 'passed', 'target_stage': 'grading'}
-            manifest['warnings'] = list(dict.fromkeys(manifest.get('warnings', []) + output_warnings))
-            _update_task(task_id, warnings=manifest['warnings'])
-            mark_stage(paths, manifest, 'quality')
-        try:
-            if ((manifest.get('material_evidence') or {}).get('status') == 'incomplete'
-                    or manifest.get('postprocess', {}).get('status') != 'published' or any(
-                    u.get('status') != 'completed' for u in manifest['pass1_review'].get('required_units', []))):
-                raise ValueError('批改证据尚未通过复核，暂不生成质量评分')
-            red_blue_review = evaluate_homework_red_blue(paths, manifest, **runtime_kwargs)
-        except Exception as exc:
-            traceback.print_exc()
-            red_blue_review = {
-                'status': 'failed',
-                'score': None,
-                'color': '',
-                'error': str(exc) or '红蓝卡标评分失败',
+                finalized = candidate_transaction(paths, finalize_candidate, include_images=True)
+                manifest['postprocess'] = {'status': 'published', 'rebuild_count': int(finalized['rebuilt'])}
+                hallucination_report = finalized['filter']
+                for key, value in finalized['guards'].items():
+                    manifest[key].update(value)
+            except Exception as exc:
+                from .artifact_transaction import transaction_pending
+                if transaction_pending(paths['base']):
+                    raise
+                traceback.print_exc()
+                try:
+                    from .yangqian_debug import debug_log
+                    debug_log(f'[homework_grading] 终态复核未发布: {exc}', extra_dir=paths.get('base'))
+                except Exception:
+                    pass
+                manifest['postprocess'] = {'status': 'rejected', 'error': str(exc)}
+                hallucination_report = {'status': 'failed', 'total_issues': None,
+                                        'corrections_applied_count': None, 'error': str(exc)}
+                safe_json_dump(hallucination_path, hallucination_report)
+                manifest['warnings'] = list(dict.fromkeys(manifest.get('warnings', []) + [
+                    '批改结果复核未完成，已有结果已保留，请人工核实后使用。']))
+                manifest['content_validation'] = {'status': 'inconclusive', 'failed_checks': ['hallucination']}
+                _update_task(task_id, warnings=manifest['warnings'], content_validation=manifest['content_validation'])
+            manifest['hallucination'] = {
+                'status': hallucination_report.get('status', 'ready'),
+                'error': hallucination_report.get('error', ''),
+                'total_issues': hallucination_report.get('total_issues', 0),
+                'corrections_applied': hallucination_report.get('corrections_applied_count', 0),
             }
-        manifest['red_blue_review'] = {
-            'status': red_blue_review.get('status', 'failed'),
-            'score': red_blue_review.get('score'),
-            'color': red_blue_review.get('color', ''),
-            'error': red_blue_review.get('error', ''),
-        }
-        if feedback_runtime is not None and red_blue_review.get('status') != 'ready':
-            manifest['warnings'] = list(dict.fromkeys(manifest.get('warnings', []) + [
-                '批改结果已保留，但质量评分未成功；可在结果中单独重试评分']))
-            _update_task(task_id, warnings=manifest['warnings'])
+            if feedback_runtime is not None:
+                mark_stage(paths, manifest, 'render')
+            _update_task(task_id, current_item=len(scoped_pages) + 7, total_items=total_steps, current_section='渲染三区批改')
+            # 成功候选已连同图片发布；失败时仅为保留的事实生成一致的可查看图片。
+            if manifest.get('postprocess', {}).get('status') != 'published':
+                _render_pages(paths, pages, modes=('understanding', 'grading'), session_map=session_map)
+
+            _update_task(task_id, current_section='生成批改质量红蓝卡标')
+            if feedback_runtime is not None:
+                mark_stage(paths, manifest, 'output_validation')
+                output_warnings = validate_artifacts(paths, pages, manifest, 'grading',
+                    expected_pages=manifest.get('source_page_count'))
+                manifest['output_validation'] = {'status': 'passed', 'target_stage': 'grading'}
+                manifest['warnings'] = list(dict.fromkeys(manifest.get('warnings', []) + output_warnings))
+                _update_task(task_id, warnings=manifest['warnings'])
+                mark_stage(paths, manifest, 'quality')
+            try:
+                if ((manifest.get('material_evidence') or {}).get('status') == 'incomplete'
+                        or manifest.get('postprocess', {}).get('status') != 'published' or any(
+                        u.get('status') != 'completed' for u in manifest['pass1_review'].get('required_units', []))):
+                    raise ValueError('批改证据尚未通过复核，暂不生成质量评分')
+                red_blue_review = evaluate_homework_red_blue(paths, manifest, **runtime_kwargs)
+            except Exception as exc:
+                traceback.print_exc()
+                red_blue_review = {
+                    'status': 'failed',
+                    'score': None,
+                    'color': '',
+                    'error': str(exc) or '红蓝卡标评分失败',
+                }
+            manifest['red_blue_review'] = {
+                'status': red_blue_review.get('status', 'failed'),
+                'score': red_blue_review.get('score'),
+                'color': red_blue_review.get('color', ''),
+                'error': red_blue_review.get('error', ''),
+            }
+            if feedback_runtime is not None and red_blue_review.get('status') != 'ready':
+                manifest['warnings'] = list(dict.fromkeys(manifest.get('warnings', []) + [
+                    '批改结果已保留，但质量评分未成功；可在结果中单独重试评分']))
+                _update_task(task_id, warnings=manifest['warnings'])
+        else:
+            print('[grading-resume] 跳过 hallucination/render/quality（沿用已落盘终态）', flush=True)
+            hallucination_report = dict(manifest.get('hallucination') or {})
+            if not hallucination_report.get('status'):
+                hallucination_report = {'status': 'ready', 'total_issues': 0, 'corrections_applied': 0}
+            red_blue_review = dict(manifest.get('red_blue_review') or {})
+            final_report = safe_json_load(report_path) if os.path.isfile(report_path) else {}
+            manifest.setdefault('hallucination', hallucination_report)
+            manifest.setdefault('postprocess', {'status': 'published'})
         final_report = safe_json_load(report_path)
         pending = final_report.get('content_validation', {}).get('status') == 'needs_review'
         if pending:
@@ -2099,32 +2494,70 @@ def execute_staged_homework_grading(
                     record_stage_receipt(paths, manifest, 'quality')
         from .completion import finish_delivery
         completion = finish_delivery(manifest, final_report)
-        try:
-            from .verify_suggestions import generate_verify_suggestions
-            _update_task(task_id, current_section='生成核验可点短句', completed=False)
-            generate_verify_suggestions(
-                paths, manifest,
-                feedback_runtime=feedback_runtime,
-                prefer_keep_llm=False,
-            )
-        except Exception as sug_exc:
-            traceback.print_exc()
+        if _grading_substage_due(grading_cursor, 'verify_suggest'):
             try:
+                from .verify_suggestions import generate_verify_suggestions
+                _update_task(task_id, current_section='生成核验可点短句', completed=False)
+                generate_verify_suggestions(
+                    paths, manifest,
+                    feedback_runtime=feedback_runtime,
+                    prefer_keep_llm=False,
+                )
+            except Exception as sug_exc:
+                traceback.print_exc()
+                try:
+                    from .yangqian_debug import debug_log
+                    debug_log(f'[homework_grading] 核验可点短句生成失败: {sug_exc}', extra_dir=paths.get('base'))
+                except Exception:
+                    pass
+        else:
+            print('[grading-resume] 跳过 verify_suggest', flush=True)
+        if _grading_substage_due(grading_cursor, 'class_multi'):
+            try:
+                class_map_fin = _ensure_class_multi_context(manifest, session_map, paths, subject, sample_id)
+                if class_map_fin and class_map_fin.get('student_count'):
+                    from .class_multi_grading import finalize_class_multi_outputs
+                    from .explanation_layers import material_portrait_label
+                    _update_task(task_id, current_section='生成班级多人报告与学生记忆画像', completed=False)
+                    ctx_fin = (feedback_runtime.context if feedback_runtime is not None else None) or manifest.get('feedback_context') or {}
+                    prior_mem = None
+                    prior_path = os.path.join(paths.get('pass2_report') or '', 'class_multi', 'class_student_memories.json')
+                    if os.path.isfile(prior_path):
+                        prior_mem = safe_json_load(prior_path)
+                    finalize_class_multi_outputs(
+                        paths=paths,
+                        manifest=manifest,
+                        class_map=class_map_fin,
+                        subject=subject,
+                        subject_label=SUBJECT_LABELS.get(subject, subject),
+                        material_label=material_portrait_label(ctx_fin, filename),
+                        prior_student_memories=prior_mem if isinstance(prior_mem, dict) else None,
+                        prior_class_reports=None,
+                    )
+                    safe_json_dump(paths['manifest'], manifest)
+            except Exception as class_exc:
+                traceback.print_exc()
+                manifest.setdefault('warnings', [])
+                w = f'班级多人报告/记忆画像生成未完成，逐页批改结果已保留：{class_exc}'
+                if w not in manifest['warnings']:
+                    manifest['warnings'].append(w)
+                _update_task(task_id, warnings=manifest['warnings'])
+        else:
+            print('[grading-resume] 跳过 class_multi finalize（产物已在）', flush=True)
+        if _grading_substage_due(grading_cursor, 'result_cards'):
+            try:
+                from .result_cards import pin_grading_result_cards
+                pin_grading_result_cards(paths, manifest, feedback_runtime=feedback_runtime)
+            except Exception as pin_exc:
                 from .yangqian_debug import debug_log
-                debug_log(f'[homework_grading] 核验可点短句生成失败: {sug_exc}', extra_dir=paths.get('base'))
-            except Exception:
-                pass
-        try:
-            from .result_cards import pin_grading_result_cards
-            pin_grading_result_cards(paths, manifest, feedback_runtime=feedback_runtime)
-        except Exception as pin_exc:
-            from .yangqian_debug import debug_log
-            debug_log(f'[homework_grading] 钉结果卡失败: {pin_exc}', extra_dir=paths.get('base'))
-            traceback.print_exc()
-            manifest.setdefault('warnings', [])
-            w = '批改结果已保留，本子结果卡未自动生成，可稍后重试沉淀。'
-            if w not in manifest['warnings']:
-                manifest['warnings'].append(w)
+                debug_log(f'[homework_grading] 钉结果卡失败: {pin_exc}', extra_dir=paths.get('base'))
+                traceback.print_exc()
+                manifest.setdefault('warnings', [])
+                w = '批改结果已保留，本子结果卡未自动生成，可稍后重试沉淀。'
+                if w not in manifest['warnings']:
+                    manifest['warnings'].append(w)
+        else:
+            print('[grading-resume] 跳过 result_cards（已钉过）', flush=True)
         manifest['updated_at'] = datetime.datetime.now().isoformat()
         manifest['input_units'] = build_page_units_fn(paths, filename, analysis_id)
         safe_json_dump(paths['manifest'], manifest)

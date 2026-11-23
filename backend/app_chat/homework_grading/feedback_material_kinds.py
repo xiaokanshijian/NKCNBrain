@@ -21,6 +21,14 @@ def is_open_material(material_type: str) -> bool:
     return (material_type or '') in OPEN_MATERIALS
 
 
+def is_composition(material_type: str) -> bool:
+    return (material_type or '') == 'composition'
+
+
+def is_notes_material(material_type: str) -> bool:
+    return (material_type or '') == 'notes'
+
+
 def is_grading_eligible_material(material_type: str) -> bool:
     return (material_type or '') in GRADING_ELIGIBLE_MATERIALS
 

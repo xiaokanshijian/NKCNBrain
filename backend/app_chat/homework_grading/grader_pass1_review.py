@@ -2101,16 +2101,24 @@ def _is_cross_page_boundary_only_error(error_type: Any) -> bool:
     if '跨页' not in text:
         return False
     return any(token in text for token in (
-        '截断', '信息不足', '不完整', '无法评估全文', '无法评价全文',
-        '全文结构', '字数达标', '全文字数',
+        '截断', '信息不足', '内容不足', '上下文不足', '不完整',
+        '无法评估全文', '无法评价全文', '全文结构', '字数达标', '全文字数',
     ))
 
 
-def _adjacent_page_exists(page_data: Dict[str, Any], available_pages: Set[int]) -> bool:
+def _adjacent_page_exists(
+    page_data: Dict[str, Any],
+    available_pages: Set[int],
+    *,
+    composition: bool = False,
+) -> bool:
     try:
         page_num = int(page_data.get('page'))
     except (TypeError, ValueError):
         return False
+    # 作文天生连续：相邻 PDF 页在本轮即视为可衔接，不强依赖 boundary 是否已写出。
+    if composition:
+        return (page_num - 1 in available_pages) or (page_num + 1 in available_pages)
     boundary = page_data.get('boundary') or {}
     return bool(
         (boundary.get('continues_from_prev') and page_num - 1 in available_pages)
@@ -2123,14 +2131,12 @@ def _reconcile_open_material_boundary_errors(
     *,
     feedback_runtime=None,
 ) -> int:
-    """相邻页已在本轮时，移除把单页边界误当内容错误的复核残留。"""
+    """作文：相邻页已在本轮时，清除「仅因跨页边界」造成的待确认／错因，不得再标跨页内容不足。"""
     if feedback_runtime is None:
         return 0
-    from .feedback_material_kinds import is_open_material
-    if (feedback_runtime.context or {}).get('material_type') == 'notes':
-        # 混排笔记的相邻PDF页不一定同源；不得因为存在邻页就把待确认提升成正确。
-        return 0
-    if not is_open_material((feedback_runtime.context or {}).get('material_type')):
+    from .feedback_material_kinds import is_composition
+    # 混排笔记的相邻PDF页不一定同源；不得因为存在邻页就把待确认提升成正确。
+    if not is_composition((feedback_runtime.context or {}).get('material_type')):
         return 0
     available_pages = {
         parse_page_num(os.path.basename(path))
@@ -2140,11 +2146,11 @@ def _reconcile_open_material_boundary_errors(
     reconciled = 0
     for json_path in json_paths:
         page_data = safe_json_load(json_path)
-        if not _adjacent_page_exists(page_data, available_pages):
+        if not _adjacent_page_exists(page_data, available_pages, composition=True):
             continue
         changed_items: Dict[str, Dict[str, Any]] = {}
         for question in page_data.get('questions') or []:
-            if not isinstance(question, dict) or not question.get('cross_page'):
+            if not isinstance(question, dict):
                 continue
             old_error = str(question.get('error_type') or '').strip()
             verdict = str(question.get('verdict') or '').strip()
@@ -2152,24 +2158,47 @@ def _reconcile_open_material_boundary_errors(
                 str(question.get('student_answer') or '').strip()
                 or str(question.get('understanding') or '').strip()
             )
-            if (
-                not has_local_content
-                or verdict not in ('correct', 'partial', 'uncertain')
-                or not _is_cross_page_boundary_only_error(old_error)
-            ):
+            note = str(question.get('cross_page_note') or '')
+            boundary_only = _is_cross_page_boundary_only_error(old_error) or (
+                '跨页' in note and any(tok in note for tok in ('不足', '截断', '不完整', '无法'))
+            )
+            # 作文：仅清「跨页内容不足」类阻断；字迹不清等真实 uncertain 不动。
+            unresolved_trap = (
+                verdict == 'uncertain'
+                and not question.get('cross_page_resolved')
+                and (
+                    boundary_only
+                    or (bool(question.get('cross_page')) and not old_error)
+                )
+            )
+            if not has_local_content or not (boundary_only or unresolved_trap):
+                continue
+            if verdict in ('wrong', 'partial') and not boundary_only:
                 continue
             question_id = str(question.get('id') or '').strip()
-            new_verdict = 'uncertain'
-            question['material_check'] = {'status': 'unresolved', 'blocks_assessment': True,
-                                          'reason': '相邻页存在，全文要求与内容仍需核对', 'evidence': []}
+            # 有可读内容且相邻页已在本轮：形成性保留/给出结论，标记跨页已衔接。
+            if verdict in ('correct', 'partial', 'wrong'):
+                new_verdict = verdict
+            else:
+                new_verdict = 'correct'
             question['verdict'] = new_verdict
-            question['error_type'] = ''
+            if boundary_only:
+                question['error_type'] = ''
+            question['cross_page_resolved'] = True
+            question['cross_page_note'] = None
+            question['material_check'] = {
+                'status': 'resolved',
+                'blocks_assessment': False,
+                'reason': '相邻页已纳入本轮作文衔接，不当作跨页内容不足。',
+                'evidence': [],
+            }
             audit = {
-                'reason': 'adjacent_page_present',
+                'reason': 'composition_adjacent_page_bridged',
                 'previous_verdict': verdict,
                 'previous_error_type': old_error,
                 'verdict': new_verdict,
-                'error_type': '',
+                'error_type': question.get('error_type') or '',
+                'cross_page_resolved': True,
             }
             question['boundary_review_reconciliation'] = audit
             if isinstance(question.get('self_review'), dict):
@@ -2191,7 +2220,12 @@ def _reconcile_open_material_boundary_errors(
             if not audit:
                 continue
             fix = item.get('fix') if isinstance(item.get('fix'), dict) else {}
-            item['fix'] = {**fix, 'verdict': audit['verdict'], 'error_type': ''}
+            item['fix'] = {
+                **fix,
+                'verdict': audit['verdict'],
+                'error_type': audit.get('error_type') or '',
+                'cross_page_resolved': True,
+            }
             item['boundary_reconciliation'] = audit
         review.setdefault('stats', {})['boundary_error_reconciled'] = len(changed_items)
         review['post_review_signature'] = _review_snapshot_signature(

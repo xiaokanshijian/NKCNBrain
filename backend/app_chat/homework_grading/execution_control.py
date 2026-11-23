@@ -91,9 +91,55 @@ class Execution:
         return seconds
 
     def mark(self, stage):
+        """换阶段时重置阶段窗口；旧阶段刚好耗尽时不得挡住下一阶段启动。整任务预算仍强制执行。"""
+        if self.aborted.is_set():
+            raise BudgetExceeded('同阶段执行已失败，已停止后续模型请求并保留检查点', scope='cancelled')
+        now = time.monotonic()
+        if now >= self.deadline:
+            raise BudgetExceeded(
+                '整份任务执行时间预算已用尽；已验证的检查点保留，可继续运行',
+                scope='task', phase=self.stage,
+                stage_timeout_seconds=self.stage_seconds,
+                task_timeout_seconds=self.task_seconds,
+            )
+        stage_name = str(stage or self.stage)
+        if stage_name != self.stage:
+            self.stage = stage_name
+            self.stage_deadline = min(self.deadline, now + self.stage_seconds)
+            return
         self.remaining()
-        if stage != self.stage:
-            self.stage, self.stage_deadline = stage, min(self.deadline, time.monotonic() + self.stage_seconds)
+
+    def apply_class_multi_budget(self, student_count=0):
+        """班级多人按人数拉长阶段/整任务预算，避免 40 人在页批改末段因 30 分钟阶段超时断掉。"""
+        try:
+            n = int(student_count or 0)
+        except (TypeError, ValueError):
+            n = 0
+        if n <= 0:
+            n = 20
+        # 阶段：至少 90min，约每人 +60s，封顶 3h（40 人实测理解阶段可超 30min）
+        stage_need = min(10800, max(5400, 2400 + n * 60))
+        # 整任务：至少 4h，约每人 +3min，封顶 6h
+        task_need = min(21600, max(14400, 7200 + n * 180))
+        changed = False
+        if stage_need > self.stage_seconds:
+            self.stage_seconds = stage_need
+            changed = True
+        if task_need > self.task_seconds:
+            self.task_seconds = task_need
+            self.deadline = self.started + self.task_seconds
+            changed = True
+        if changed:
+            self.stage_deadline = max(
+                self.stage_deadline,
+                min(self.deadline, time.monotonic() + self.stage_seconds),
+            )
+            print(
+                f'[execution] class_multi 预算调整 n={n} '
+                f'stage={self.stage_seconds}s task={self.task_seconds}s',
+                flush=True,
+            )
+        return changed
 
     def audit(self):
         return {**self.identity, 'basis_code_hashes': (self.runtime.dependencies['model_config']
@@ -128,6 +174,10 @@ def managed_execution(fn):
         manifest = safe_json_load(path) if path.is_file() else {}
         execution = Execution(bound.arguments.get('feedback_runtime'), paths['base'],
                               bool(manifest.get('checkpoint_resume')))
+        # 续跑时 manifest 往往已有 class_multi：尽早拉长预算，避免理解阶段中途被 30min 砍断
+        cm0 = manifest.get('class_multi') if isinstance(manifest.get('class_multi'), dict) else {}
+        if cm0:
+            execution.apply_class_multi_budget(cm0.get('student_count'))
         previous = manifest.get('execution_provenance', {}).get('actual_code_fingerprint')
         basis = execution.runtime.dependencies['model_config'].get('consumer_code_hashes') if execution.runtime else None
         changed = ((previous is not None and previous != execution.identity['actual_code_fingerprint'])

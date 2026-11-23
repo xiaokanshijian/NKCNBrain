@@ -97,11 +97,24 @@ def _response_content(response, record, *, allow_reasoning_json=False):
     return raw
 
 
+def _usable_feedback_payload(data):
+    """首轮可用形态：逐题批语已是对象数组（即使个别条目或 overview 仍待修）。"""
+    if not isinstance(data, dict):
+        return False
+    feedback = data.get('per_question_feedback')
+    return isinstance(feedback, list) and bool(feedback) and all(isinstance(item, dict) for item in feedback)
+
+
 def request_json_object(call, messages, *, parser, validate, audit_path, stage,
                         attempts=2, retry_prompt=None, thinking_path=None, error_path=None,
                         retry_call_errors=False, repair_plan=None, on_exhausted=None,
-                        split_on_truncation=False, allow_reasoning_json=False):
-    """纠正输出/校验错误；受控传输耗尽与写入失败不进入上层重复调用。"""
+                        split_on_truncation=False, allow_reasoning_json=False,
+                        repair_after=1):
+    """纠正输出/校验错误；受控传输耗尽与写入失败不进入上层重复调用。
+
+    repair_after：前 N 次只做完整重试；第 N+1 次起才启用 repair_plan。
+    例如 attempts=4、repair_after=2 → 首轮 2 次完整输出 + 修理轮 2 次。
+    """
     history = []
     if audit_path and os.path.isfile(windows_io_path(audit_path)):
         previous = safe_json_load(audit_path)
@@ -119,19 +132,27 @@ def request_json_object(call, messages, *, parser, validate, audit_path, stage,
             safe_json_dump(audit_path, {'stage': stage, 'attempts': history})
         return cached
     last_raw, last_error, last_data, last_data_error = '', None, None, None
+    repair_after = max(1, int(repair_after or 1))
     for number in range(1, attempts + 1):
         current = list(messages)
-        plan = repair_plan(last_data, last_data_error) if number > 1 and repair_plan else None
+        use_repair = bool(repair_plan and number > repair_after and last_data is not None)
+        plan = repair_plan(last_data, last_data_error) if use_repair else None
         if number > 1:
             safe_error = type(last_error).__name__ if history[-1]['status'] == 'call_failed' else last_error
-            hint = retry_prompt(safe_error) if retry_prompt else (
-                f'上次输出未通过结构、字段或证据校验：{safe_error}。请修正后输出完整JSON对象，保留其他有效内容。')
-            previous_content = json.dumps(last_data, ensure_ascii=False) if plan else last_raw or '{}'
+            if plan:
+                hint = ''
+            else:
+                hint = retry_prompt(safe_error) if retry_prompt else (
+                    f'上次输出未通过结构、字段或证据校验：{safe_error}。'
+                    '请修正后重新输出完整JSON对象（须含全部必填顶层字段，不要只交补丁），保留其他有效内容。'
+                    '若含 open_material_overview.next_steps，必须为 ["建议一","建议二"] 这种 1～2 条字符串数组。')
+            previous_content = json.dumps(last_data, ensure_ascii=False) if (plan or last_data) else last_raw or '{}'
             current += [{'role': 'assistant', 'content': previous_content},
-                        {'role': 'user', 'content': hint + ('\n' + plan['prompt'] if plan else '')}]
+                        {'role': 'user', 'content': (hint + ('\n' + plan['prompt'] if plan else '')).strip()}]
         record = {'attempt': len(history) + 1, 'call_attempt': number,
                   'invocation_id': invocation, 'raw_response': None, 'status': 'received',
-                  'notebook_skills': audit_messages(current)}
+                  'notebook_skills': audit_messages(current),
+                  'phase': 'repair' if plan else 'initial'}
         history.append(record)
         if plan:
             record['repair_paths'] = plan['paths']
@@ -181,19 +202,25 @@ def request_json_object(call, messages, *, parser, validate, audit_path, stage,
             if thinking_path and record.get('reasoning_content'):
                 _write_text(thinking_path, record['reasoning_content'])
             try:
-                result = parser(raw)
-                if not isinstance(result, dict):
+                parsed = parser(raw)
+                if not isinstance(parsed, dict):
                     raise ModelOutputError('模型JSON顶层必须为对象')
-                json.dumps(result, allow_nan=False)
-                if plan:
-                    result = plan['merge'](result)
-                last_data = copy.deepcopy(result)
-                last_data_error = None
+                json.dumps(parsed, allow_nan=False)
+                result = plan['merge'](parsed) if plan else parsed
                 try:
-                    result = validate(result)
-                    json.dumps(result, allow_nan=False)
+                    validated = validate(result)
+                    json.dumps(validated, allow_nan=False)
                 except (ValueError, TypeError) as exc:
-                    last_data_error = exc
+                    # 修理弄坏结构时保留此前可用的首轮结果，供后续修理或 on_exhausted。
+                    if _usable_feedback_payload(result):
+                        last_data = copy.deepcopy(result)
+                        last_data_error = exc
+                    elif not plan and _usable_feedback_payload(parsed):
+                        last_data = copy.deepcopy(parsed)
+                        last_data_error = exc
+                    elif last_data is None and _usable_feedback_payload(parsed):
+                        last_data = copy.deepcopy(parsed)
+                        last_data_error = exc
                     raise
             except (ValueError, TypeError) as exc:
                 last_error = exc
@@ -204,8 +231,8 @@ def request_json_object(call, messages, *, parser, validate, audit_path, stage,
             else:
                 record['status'] = 'accepted'
                 persist()
-                save_checkpoint(cache_key, result)
-                return result
+                save_checkpoint(cache_key, validated)
+                return validated
         # 响应包本身不合规时，也保留其可读取正文供下一次纠正。
         elif isinstance(record.get('raw_response'), str):
             last_raw = record['raw_response']

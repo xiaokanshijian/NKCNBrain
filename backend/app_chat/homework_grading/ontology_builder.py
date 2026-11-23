@@ -18,7 +18,7 @@ import os
 import re
 import time
 import traceback
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from app_chat.homework_grading.llm_clients import _deepseek_client, homework_deepseek_model
 from app_chat.homework_grading.prompts import ontology_system, ontology_user
@@ -221,6 +221,27 @@ def _slim_session(memory: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:
         page_start, page_end = None, None
 
+    # 全量题号：ZPD 等可引用未进错题表的题；仅靠 kp_observations.evidence 会导致「诊断引用不存在的单元」
+    unit_ids: List[str] = []
+    seen_ids: Set[str] = set()
+    for page in memory.get('page_understanding') or []:
+        if not isinstance(page, dict):
+            continue
+        for unit in page.get('units') or page.get('questions') or []:
+            if not isinstance(unit, dict):
+                continue
+            qid = str(unit.get('qid_global') or '').strip()
+            if qid and qid not in seen_ids:
+                seen_ids.add(qid)
+                unit_ids.append(qid)
+    for q in memory.get('error_questions') or []:
+        if not isinstance(q, dict):
+            continue
+        qid = str(q.get('qid_global') or '').strip()
+        if qid and qid not in seen_ids:
+            seen_ids.add(qid)
+            unit_ids.append(qid)
+
     return {
         'order_index': memory.get('session_index'),
         'session_id': memory.get('session_id'),
@@ -233,6 +254,7 @@ def _slim_session(memory: Dict[str, Any]) -> Dict[str, Any]:
         'accuracy': (memory.get('accuracy') or {}).get('overall'),
         'question_count': memory.get('question_count'),
         'kp_observations': obs,
+        'unit_ids': unit_ids,
     }
 
 
@@ -346,13 +368,19 @@ def _call_l5(
                 except ValidationIssues as exc:
                     issues.extend(exc.issues)
         else:
+            # 合法题号含全页 unit_ids + kp 证据 + wgb_trust；未知引用就地剔除，避免多人合订偶发串号整单失败
             valid_ids = _valid_qids_from_pack(evidence_pack)
-            for bucket, entries in result['zones'].items():
-                for index, entry in enumerate(entries):
-                    refs = list(entry.get('evidence') or []) + list(entry.get('content_context_evidence') or [])
-                    refs += [ref for group in entry.get('error_clusters') or [] for ref in group.get('evidence') or []]
-                    if any(ref not in valid_ids for ref in refs):
-                        issues.append(issue(ValueError('诊断引用不存在的单元'), f'/zones/{bucket}/{index}'))
+            for _bucket, entries in (result.get('zones') or {}).items():
+                for entry in entries or []:
+                    if not isinstance(entry, dict):
+                        continue
+                    for key in ('evidence', 'content_context_evidence'):
+                        raw_refs = entry.get(key) or []
+                        if isinstance(raw_refs, list):
+                            entry[key] = [r for r in raw_refs if r in valid_ids]
+                    for group in entry.get('error_clusters') or []:
+                        if isinstance(group, dict) and isinstance(group.get('evidence'), list):
+                            group['evidence'] = [r for r in group['evidence'] if r in valid_ids]
         raise_issues(issues)
         return result
 
@@ -380,10 +408,23 @@ def _valid_qids_from_pack(pack: Dict[str, Any]) -> set:
                 and (q.get('diagnostic_eligible') or q.get('observation_eligible'))}
     out: set = set()
     for s in pack.get('session_timeline', []) or []:
+        if not isinstance(s, dict):
+            continue
+        for qid in s.get('unit_ids') or []:
+            if qid:
+                out.add(str(qid))
         for obs in s.get('kp_observations', []) or []:
+            if not isinstance(obs, dict):
+                continue
             for ev in obs.get('evidence', []) or []:
                 if ev:
-                    out.add(ev)
+                    out.add(str(ev))
+    # wgb_trust.by_qid 含全页题号，补齐多人/多 session 时 kp 证据过窄的情况
+    by_qid = ((pack.get('wgb_trust') or {}).get('by_qid') or {}) if isinstance(pack.get('wgb_trust'), dict) else {}
+    if isinstance(by_qid, dict):
+        for qid in by_qid.keys():
+            if qid:
+                out.add(str(qid))
     return out
 
 

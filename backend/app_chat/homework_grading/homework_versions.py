@@ -647,8 +647,13 @@ def _is_selected_page_file(name: str, page_nums: Optional[Set[int]]) -> bool:
     return page_num in page_nums
 
 
-def _keep_session_map(name: str, _path: str) -> bool:
-    return name.endswith('_sessions.json')
+def _keep_session_map(name: str, path: str) -> bool:
+    # 续跑/篇目迭代时保留篇目图与班级多人产物，finalize 会幂等覆盖
+    if name.endswith('_sessions.json'):
+        return True
+    if name == 'class_multi' and os.path.isdir(path):
+        return True
+    return False
 
 
 def _load_manifest(manifest_path: str) -> Dict[str, Any]:

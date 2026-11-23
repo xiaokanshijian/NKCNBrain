@@ -12,7 +12,22 @@ from app_chat.homework_grading.semantic_config import importance_of, max_importa
 
 
 ERROR_VERDICTS = {'wrong', 'partial', 'uncertain', 'unanswered'}
+CANONICAL_VERDICTS = frozenset({'correct', 'wrong', 'partial', 'unanswered', 'uncertain'})
+# 模型偶发非标 verdict：有小错≈partial（不当 correct）；其余未知→uncertain，避免进不了待批名单。
+VERDICT_ALIASES = {
+    'correct_with_minor_error': 'partial',
+    'mostly_correct': 'partial',
+    'nearly_correct': 'partial',
+    'almost_correct': 'partial',
+}
 _LISTENING_PATTERN = re.compile(r'听力|听写|\blisten', re.IGNORECASE)
+
+
+def canonicalize_verdict(verdict) -> str:
+    value = str(verdict or 'uncertain').strip()
+    if value in CANONICAL_VERDICTS:
+        return value
+    return VERDICT_ALIASES.get(value, 'uncertain')
 
 
 def _is_listening_question(question: Dict[str, Any]) -> bool:
@@ -50,6 +65,10 @@ def aggregate_pages(page_files: List[str], *, feedback_runtime=None) -> Dict[str
             validate_page(page_data, feedback_runtime)
         page_num = page_data.get('page') or parse_page_num(os.path.basename(page_file))
         questions = page_data.get('questions') or []
+        # 先归一 verdict，保证 page_understanding 与待批名单口径一致。
+        for raw in questions:
+            if isinstance(raw, dict):
+                raw['verdict'] = canonicalize_verdict(raw.get('verdict'))
         from .page_feedback import page_evidence
         page_understanding.append(page_evidence(page_data, page_num))
         page_correct = 0
@@ -60,7 +79,8 @@ def aggregate_pages(page_files: List[str], *, feedback_runtime=None) -> Dict[str
                 question = normalize_note_fields(copy.deepcopy(question))
             eligible = not notes or question['diagnostic_eligible']
             question_count += 1
-            verdict = str(question.get('verdict') or 'uncertain')
+            verdict = canonicalize_verdict(question.get('verdict'))
+            question['verdict'] = verdict
             verdict_dist[verdict] += 1
             knowledge_point = str(question.get('knowledge_point') or '').strip()
             if knowledge_point and eligible:

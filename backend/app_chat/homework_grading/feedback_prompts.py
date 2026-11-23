@@ -39,7 +39,8 @@ zone必须是单个字符串，只能为blind_spot、friction_zone、zpd或空�
 不得写成与未启用方法时几乎同构的纯知识点点评。
 若输出含 open_material_overview（整份报告，勿与逐条 comment 混写）：
 - 职责=线：材料画像与页序事实链；判断≤3条短点；不要写完整育人落点与三区处方（那是 diagnosis 的面）。
-- subject_and_layout偏「看到了什么」，content_review偏克制的「这说明什么」，next_steps 1～2条可执行动作；
+- subject_and_layout偏「看到了什么」，content_review偏克制的「这说明什么」；
+- next_steps 必须严格为字符串数组，形如 ["建议一","建议二"]（1～2条），禁止「一、……二、……」整段字符串；
 - 禁止把整篇诊断扩写进 overview。
 上述各处都用中文概念说话，禁止方法代号溯源与注水冗长。
 不得将“未入三区”等同于信息不足或要求人工复核。业务评价要求见本轮冻结规则。'''
@@ -112,8 +113,34 @@ def system_prompt(runtime, phase, *, base=None, page_num=None, source_sha256='',
         entries = curriculum_entries(runtime)
         extra += '\n【本轮冻结课程内容】\n' + (prompts._format_curriculum_block(entries) if entries else '未绑定课标；按题目证据描述，不虚构课标ID。')
     from .material_markings import open_material_runtime
+    from .feedback_material_kinds import is_composition, is_notes_material
+    material_type = (runtime.context or {}).get('material_type')
     if open_material_runtime(runtime):
         if phase == 'detect':
+            # 覆盖作业卷「整小题一手写大框」惯性，避免作文/笔记整页收成一个 position。
+            extra += (
+                '\n【开放材料版面单元（覆盖作业卷“独立题目/整小题大框”惯性）】'
+                '本轮不是题目卷：不要按“一道独立题一个大作答框”理解页面。'
+                '每个 questions 项是一个批改版面单元；position 只包住该单元自身内容，'
+                '禁止把整页正文默认收成单一大框，也禁止无依据地逐行碎拆。'
+                '识别不到印刷题号时用 auto-1、auto-2…按阅读顺序编号。'
+            )
+            if is_composition(material_type):
+                extra += (
+                    '\n【作文版面切分】以自然段为默认单元：标题、缩进起段、空行分段各成一段；'
+                    '仅当相邻段明显同属一层意思（如连续背景/情节/人物评价）才可合并同框。'
+                    '多段作文一页通常应有多个单元，不得整页只出 auto-1。'
+                    '作文几乎每页都要考虑跨页：页尾未收束或下页页首续写时，'
+                    'boundary.continues_to_next／continues_from_prev 必须为 true，'
+                    '并给页尾／页首相关单元标 cross_page=true；不要因当页也能读一些字而省略。'
+                )
+            if is_notes_material(material_type):
+                extra += (
+                    '\n【笔记版面切分】以「一块相近内容」为单元：同一知识点/小节/题组的主体记录'
+                    '与其旁批、圈画可同框或紧密关联；不要整页一个框，也不要每一行单独一框。'
+                    '荧光笔涂画、下划线、圈画、框选、箭头、星号等标注除旁批外也不得漏检；'
+                    '只有标记没有手写时仍须定位并可用 note_role=annotation|source_excerpt。'
+                )
             extra += ('\n【标记事实协议】除现有坐标和印刷文字外，若有荧光、圈画或下划线，'
                       '每个相关单元增加printed_text_marked，按原文记录覆盖范围，'
                       '例如xxx<红色荧光笔涂画>被覆盖原文</红色荧光笔涂画>xxx。'
@@ -140,7 +167,28 @@ def system_prompt(runtime, phase, *, base=None, page_num=None, source_sha256='',
             extra += ('\n颜色标签格式：颜色使用红色、橙色、黄色、绿色、蓝色、紫色、粉色、黑色、灰色、棕色、白色、青色；'
                       '看不清具体颜色使用“颜色不明”。标签后缀只用荧光笔涂画、笔、下划线、圈画；必须闭合配对。'
                       '无标记不输出附加字段，不输出HTML或样式。')
-    if runtime.context.get('material_type') == 'notes':
+    if is_composition(material_type):
+        if phase in ('grade', 'review'):
+            extra += (
+                '\n【作文评价协议】按段落／意群单元形成性评价，不因跨页续写单独设 uncertain；'
+                '相邻页已在本轮时禁止以「跨页内容不足／单页上下文不足」作为待确认原因。'
+                'student_answer 转写该单元可见手写；understanding 先忠实概括本单元实际表达。'
+                'correct_answer 可为 null；没有唯一标准答案不是 uncertain 的理由。'
+            )
+        if phase == 'cross_page':
+            base = (
+                '你是作文跨页衔接助手。将给出的连续页视为同一篇文章的前后文，'
+                '衔接页缘段落／意群的续写关系，补全因跨页被标待确认的单元理解。'
+                '只输出JSON对象，顶层为cross_page_group和corrections数组。'
+            )
+            extra += (
+                '\n【作文跨页协议】按PDF页序阅读前后文；页尾未完成段与下页页首续写必须衔接。'
+                'corrections 覆盖待衔接单元：每项含page、id、verdict、understanding、'
+                'cross_page=true、cross_page_resolved=true；有可读内容时不得因跨页保持 uncertain。'
+                '可修正 student_answer／error_type／knowledge_point，但转写必须有图据。'
+                '不要把多段合并回整页一个单元；保持原有段落／意群切分。'
+            )
+    if is_notes_material(material_type):
         if phase == 'detect':
             extra += ('\n【笔记JSON扩展协议】顶层增加page_origin：'
                       '{"source_kind":"workbook|textbook|handwritten|unknown",'
@@ -170,7 +218,8 @@ def system_prompt(runtime, phase, *, base=None, page_num=None, source_sha256='',
                       '候选印刷页码只用于定位，须比较题干、材料和来源确认是否同题。'
                       '确认跨页关联的条目增加supporting_qids，包含自身及另一页真实单元的qid_global。'
                       '无明确对应关系不能确认跨页成功，cross_page_resolved不得为true。'
-                      '修正可包含student_answer和understanding，但转写必须有对应图片证据。')
+                      '修正可包含student_answer和understanding，但转写必须有对应图片证据。'
+                      '跨页续记较常见：在来源一致时衔接页缘相关内容区，勿漏标注与涂画。')
             extra += ('\n【逐单元材料核对协议】覆盖requires_material_check=true的每个单元，放在corrections数组，'
                       '每项含page、id、material_status（resolved|not_required|unresolved）、reason。'
                       'resolved表示已找到对应材料；not_required表示题干和作答在本页已足够，不需要跨页。'
@@ -208,8 +257,20 @@ def user_prompt(runtime, phase, page_num, *, payload=None, prior_context=None, s
             '保留输入id、父题、位置、跨页关系和作答槽位；只填写当前阶段要求的字段。'
             '版面阶段只定位，理解/批改阶段先忠实转写，再独立理解、生成正确答案和评价。')
     from .material_markings import open_material_runtime
+    from .feedback_material_kinds import is_composition, is_notes_material
     if open_material_runtime(runtime):
         prompt = prompt.replace('版面阶段只定位', '版面阶段定位并记录印刷文字上的可见标记事实')
+        mt = (runtime.context or {}).get('material_type')
+        if phase == 'detect' and is_composition(mt):
+            prompt += (
+                '作文按自然段或相近意群切分批改版面单元，禁止整页单一大框；'
+                '页缘续写必须标 boundary 与 cross_page。'
+            )
+        if phase == 'detect' and is_notes_material(mt):
+            prompt += (
+                '笔记按相近内容区域切分批改版面单元，粒度勿过粗（整页）或过细（逐行）；'
+                '旁批以外的圈画涂色标注不得漏检；有续记证据时标跨页。'
+            )
     if supplement:prompt+='本次仅补全请求的置信度或理解字段，不改变已有定位、题号和作答。'
     if payload is not None: prompt+='\n'+json.dumps(payload,ensure_ascii=False)
     prompt+='\n'+stage_instructions(runtime,phase,payload=payload,page_num=page_num,source_sha256=source_sha256,conditional=True)

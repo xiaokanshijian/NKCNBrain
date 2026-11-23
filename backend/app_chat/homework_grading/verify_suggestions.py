@@ -375,16 +375,17 @@ def _parse_page_llm_payload(raw: Any, expected_qids: List[str]) -> Dict[str, Dic
                     row = v
                     break
         if not isinstance(row, dict):
-            raise ValueError(f'缺少题 {qid} 的建议')
+            continue
         item = {
             'layout': _normalize_phrases(row.get('layout')),
             'understanding': _normalize_phrases(row.get('understanding')),
             'grading': _normalize_phrases(row.get('grading')),
         }
-        for role in _ROLES:
-            if len(item[role]) < 2:
-                raise ValueError(f'题 {qid} 的 {role} 建议不足 2 条')
+        if any(len(item[role]) < 2 for role in _ROLES):
+            continue
         out[qid] = item
+    if expected_qids and not out:
+        raise ValueError('模型输出没有可用的题目建议')
     return out
 
 
@@ -523,7 +524,14 @@ def generate_page_suggestions_llm(
     except Exception:
         content = str(resp or '')
     parsed = _loads_json_with_retry_text(content)
-    return _parse_page_llm_payload(parsed, expected)
+    parsed_map = _parse_page_llm_payload(parsed, expected)
+    absent = [qid for qid in expected if qid not in parsed_map]
+    if absent:
+        print(
+            f'[verify_suggestions] 第{page_num}页模型未给出 {", ".join(absent)}，这些题改用通用短句',
+            flush=True,
+        )
+    return parsed_map
 
 
 def _load_pass2_comments(paths: Dict[str, str], manifest: Dict[str, Any]) -> Dict[str, str]:

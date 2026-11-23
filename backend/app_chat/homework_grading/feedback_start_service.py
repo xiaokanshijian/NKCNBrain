@@ -116,7 +116,7 @@ def start_grading_request(workspace, filename, data, *, resolution=None, rerun=F
         if rerun:
             from .feedback_rerun_plan import choose_rerun_runtime
             runtime, rerun_plan = choose_rerun_runtime(current, filename, data, workspace=workspace)
-            target = 'grading' if rerun_plan['stage'] == 'all' else rerun_plan['stage']
+            target = 'grading' if rerun_plan['stage'] in ('all', 'report') else rerun_plan['stage']
             resolution['warnings'].extend(rerun_plan['warnings'])
         else:
             runtime = build_request_runtime(resolution['feedback_context'], data,
@@ -163,6 +163,20 @@ def start_grading_request(workspace, filename, data, *, resolution=None, rerun=F
             from .artifact_transaction import recover_transaction
             recover_transaction(destination / 'homework_grading')
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        report_only = bool(rerun_plan and rerun_plan.get('stage') == 'report')
+        if report_only and not clone:
+            raise ValueError('没有可沿用的批改工作区，不能只重出报告和卡片')
+        checkpoint_resume = bool(clone and (old.get('status') in RECOVERABLE
+                                            or (rerun_plan or {}).get('resume')
+                                            or report_only))
+        # 续跑须记住中断时所在步骤，才能从该步起重做剩余（勿整段从零浪费且改写已定结果）
+        resume_from = 'memory' if report_only else ''
+        if checkpoint_resume and isinstance(old, dict) and not report_only:
+            resume_from = str(
+                old.get('failure_stage') or old.get('processing_stage') or ''
+            ).strip()
+            if resume_from in ('startup', 'completed', 'interrupted'):
+                resume_from = str(old.get('failure_stage') or '').strip()
         manifest = {**(old if clone else {}), **snapshot, 'run_id': run_id,
                     'source_page_count': source_page_count,
                     'username': workspace, 'selected_files': [filename], 'mode': 'single',
@@ -172,12 +186,24 @@ def start_grading_request(workspace, filename, data, *, resolution=None, rerun=F
                     'subject': runtime.context['subject_code'],
                     'subject_label': runtime.context['subject_name'],
                     'feedback_context': runtime.context, 'status': 'prepared',
-                    'checkpoint_resume': bool(clone and (old.get('status') in RECOVERABLE
-                                                or (rerun_plan or {}).get('resume'))),
+                    'checkpoint_resume': checkpoint_resume,
+                    'resume_from_processing_stage': resume_from if checkpoint_resume else '',
+                    'resume_from_failure_stage': str((old or {}).get('failure_stage') or '') if checkpoint_resume else '',
                     'failure_stage': '', 'error': '', 'processing_stage': 'startup',
                     'created_at': now, 'updated_at': now, 'task_id': task_id, 'target_stage': target,
                     'completion': {'status': 'running', 'target_stage': target, 'report_usable': False,
                                    'issues': [], 'message': '批改任务正在执行。'}}
+        # 续跑时保留班级多人映射（clone 的 old 里已有；显式再写一层防 snapshot 冲掉）
+        if checkpoint_resume and isinstance(old, dict) and isinstance(old.get('class_multi'), dict):
+            manifest['class_multi'] = old.get('class_multi')
+        # 班级多人：前序记忆沿用 / 从头重做（仅开链首文件带 reset）
+        prior_mode = str(data.get('class_multi_prior_mode') or '').strip().lower()
+        if prior_mode in ('use', 'redo'):
+            manifest['class_multi_prior_mode'] = prior_mode
+        if data.get('class_multi_reset_prior') is True or str(
+            data.get('class_multi_reset_prior') or ''
+        ).strip().lower() in ('1', 'true'):
+            manifest['class_multi_reset_prior'] = True
         atomic_json(destination / 'manifest.json', manifest)
         rerun_meta = {}
         if rerun_plan is not None:

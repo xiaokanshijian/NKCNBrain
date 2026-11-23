@@ -69,13 +69,15 @@ def partial_feedback(previous, error, memory, validate_item):
     candidate = copy.deepcopy(previous)
     candidate['per_question_feedback'] = accepted
     if 'open_material_overview' in candidate:
+        from .validation_issues import coerce_next_steps
         overview = candidate.get('open_material_overview')
         if isinstance(overview, dict) and str(overview.get('subject_and_layout') or '').strip() and str(
                 overview.get('content_review') or '').strip() and overview.get('subject_and_layout') != _PLACEHOLDER_OVERVIEW['subject_and_layout']:
-            steps = [str(x).strip() for x in (overview.get('next_steps') or []) if str(x).strip()]
+            steps = coerce_next_steps(overview.get('next_steps')) or []
+            steps = [str(x).strip() for x in steps if str(x).strip()]
             if _REVIEW_NOTICE not in steps:
                 steps.append(_REVIEW_NOTICE)
-            candidate['open_material_overview'] = dict(overview, next_steps=steps[:4])
+            candidate['open_material_overview'] = dict(overview, next_steps=steps[:4] or list(_PLACEHOLDER_OVERVIEW['next_steps']))
         else:
             candidate['open_material_overview'] = copy.deepcopy(_PLACEHOLDER_OVERVIEW)
     candidate['content_validation'] = {'status': 'needs_review', 'issues': copy.deepcopy(error.issues)}

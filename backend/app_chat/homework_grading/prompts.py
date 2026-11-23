@@ -163,7 +163,7 @@ position 使用归一化坐标，相对图像宽高均映射到 0–1000，格�
 {
   "page": <整数，页码>,
   "subject": "<math|chinese|english>",
-  "page_header": "<页眉/篇目标题，可空字符串>",
+  "page_header": "<印刷标题，说明这一页是什么；没有印刷标题就填空字符串>",
   "boundary": {
     "continues_from_prev": false,
     "description_prev": null,
@@ -186,6 +186,11 @@ position 使用归一化坐标，相对图像宽高均映射到 0–1000，格�
     }
   ]
 }
+
+【page_header 只写印刷标题】
+page_header 只填写页面上印着的标题，用来说明这一页是什么。例如「3.1.2 代数式」「7.1 相交线」「有理数」。
+页面上没有这种印刷标题时，填 ""。
+手写姓名、姓名栏、班级加人名（如「七.1 曹博宣」「姓名：张三」）都不要写入 page_header。
 
 answer_slots 是可选版面扩展字段：仅当后续科目规则明确要求时输出；其它题目省略该字段，不要填占位内容。
 
@@ -1082,12 +1087,15 @@ def _format_ontology_zones_for_pass2(ontology: Optional[Dict[str, Any]]) -> str:
 OPEN_MATERIAL_OUTPUT_CONTRACT = '''
 【开放材料输出协议】
 输出顶层必须包含 open_material_overview。
-open_material_overview 严格包含：subject_and_layout（非空文字）、content_review（非空文字）、next_steps（一至两条非空文字）。
+open_material_overview 严格包含：subject_and_layout（非空文字）、content_review（非空文字）、
+next_steps（JSON 字符串数组，长度 1～2，每项一条可执行建议）。
+next_steps 必须严格形如 ["建议一","建议二"]，禁止写成「一、……二、……」整段字符串，禁止对象或空数组。
 职责拆分：overview=线（事实链+克制判断≤3短点）；diagnosis.summary=面（一句枢纽+三问支撑）；禁止两块互相复述整段。
 若本轮已注入外部方法：三个字段合起来可读出白话三问，但不要提前写完整育人落点与三区处方；
 要用中文写出方法概念痕迹；禁止英文/拼音方法名与表格章节出处，禁止注水冗长。
 不得写成与未启用方法时几乎同构的目录复述或零散补丁。
-逐单元批语必须覆盖输入中的每个书写单元，包括 verdict=correct 的单元；题号、页码必须沿用输入。不得输出百分制分数。'''
+逐单元批语必须覆盖输入中的每个书写单元，包括 verdict=correct 的单元；题号、页码必须沿用输入。不得输出百分制分数。
+顶层还必须包含 per_question_feedback（对象数组）；禁止只返回 repairs 补丁而省略全文必填字段。'''
 
 
 def _with_open_material_output_contract(system: str, feedback_runtime) -> str:
@@ -1417,6 +1425,22 @@ def _has_math_operation_law_name_question(detected: Dict[str, Any]) -> bool:
     return False
 
 
+def _detect_payload_for_prompt(detected: Dict[str, Any]) -> Dict[str, Any]:
+    """题目清单沿用检测写下的印刷标题，只去掉首尾空白。"""
+    if not isinstance(detected, dict):
+        return detected
+    header = detected.get("page_header")
+    if not header:
+        return detected
+    from .class_multi_grading import printed_page_header
+    cleaned = printed_page_header(header)
+    if cleaned == str(header).strip():
+        return detected
+    payload = dict(detected)
+    payload["page_header"] = cleaned
+    return payload
+
+
 def pass1_grade_user_prompt(
     subject: str,
     page_num: int,
@@ -1426,9 +1450,9 @@ def pass1_grade_user_prompt(
 ) -> str:
     if feedback_runtime is not None:
         from .feedback_prompts import user_prompt
-        return user_prompt(feedback_runtime, 'grade', page_num, payload=detected, prior_context=prior_context, supplement=False, source_sha256=source_document_sha256)
+        return user_prompt(feedback_runtime, 'grade', page_num, payload=_detect_payload_for_prompt(detected), prior_context=prior_context, supplement=False, source_sha256=source_document_sha256)
     hint = _SUBJECT_HINTS.get(subject, '')
-    detect_json = json.dumps(detected, ensure_ascii=False, indent=2)
+    detect_json = json.dumps(_detect_payload_for_prompt(detected), ensure_ascii=False, indent=2)
     prompt = (
         f'请批改以下第 {page_num} 页作业（科目：{subject}）。\n'
         f'题目清单已由上一阶段给出，请逐题补全 student_answer / correct_answer / verdict 等字段，'
@@ -1460,8 +1484,8 @@ def pass1_grade_user_prompt(
 def pass1_detect_supplement_user_prompt(subject: str, page_num: int, detected: Dict[str, Any], *, feedback_runtime=None) -> str:
     if feedback_runtime is not None:
         from .feedback_prompts import user_prompt
-        return user_prompt(feedback_runtime, 'detect', page_num, payload=detected, prior_context=None, supplement=True)
-    detect_json = json.dumps(detected, ensure_ascii=False, indent=2)
+        return user_prompt(feedback_runtime, 'detect', page_num, payload=_detect_payload_for_prompt(detected), prior_context=None, supplement=True)
+    detect_json = json.dumps(_detect_payload_for_prompt(detected), ensure_ascii=False, indent=2)
     return (
         f'请分析以下第 {page_num} 页作业扫描图（科目：{subject}）。\n'
         '【已有版面检测结果（最终结论，除 layout_confidence 外均不得修改）】\n'
@@ -1483,9 +1507,9 @@ def pass1_grade_supplement_user_prompt(
 ) -> str:
     if feedback_runtime is not None:
         from .feedback_prompts import user_prompt
-        return user_prompt(feedback_runtime, 'grade', page_num, payload={'detected': detected, 'graded': graded}, prior_context=prior_context, supplement=True)
+        return user_prompt(feedback_runtime, 'grade', page_num, payload={'detected': _detect_payload_for_prompt(detected), 'graded': graded}, prior_context=prior_context, supplement=True)
     hint = _SUBJECT_HINTS.get(subject, '')
-    detect_json = json.dumps(detected, ensure_ascii=False, indent=2)
+    detect_json = json.dumps(_detect_payload_for_prompt(detected), ensure_ascii=False, indent=2)
     grade_json = json.dumps(graded, ensure_ascii=False, indent=2)
     prompt = (
         f'请批改以下第 {page_num} 页作业（科目：{subject}）。\n'

@@ -1380,6 +1380,100 @@ def generate_card_html_for_card(username: str, cid: int, extra: Optional[Dict[st
         title = card.contentTitle or ""
         content = card.content or ""
         if extra.get("grading_excerpt") or is_excerpt_grading_card(content, title):
+            # 班级多人：专用 HTML 模板（课标/素养量规层次，不用单人「看到/说明/需盯」）
+            try:
+                from app_chat.homework_grading.class_multi_grading import (
+                    build_class_multi_excerpt_html,
+                    is_class_multi_excerpt_card,
+                )
+                if extra.get("grading_class_multi") or is_class_multi_excerpt_card(content, title):
+                    analysis_id_cm = str(extra.get("analysis_id") or "").strip()
+                    run_id_cm = extra.get("run_id")
+                    if not analysis_id_cm:
+                        # 优先钉卡头 analysis_id|run_id（勿把旧版 class_multi|班级号|hw 当 analysis_id）
+                        for m_aid in re.finditer(
+                            r"<!--nkcn_grading_card:批改·解释精要\|([^|>]+)\|([^>]+)-->",
+                            content or "",
+                        ):
+                            a0, r0 = m_aid.group(1).strip(), m_aid.group(2).strip()
+                            if a0 and a0 != "class_multi" and not a0.startswith("hw"):
+                                analysis_id_cm, run_id_cm = a0, r0
+                                break
+                    html_cm = None
+                    if analysis_id_cm and analysis_id_cm != "class_multi":
+                        from app_chat.homework_grading.service import prepare_homework_workspace
+                        from app_chat.homework_grading.result_cards import _load_json, _named_json, _sample_id
+                        paths_cm = prepare_homework_workspace(
+                            username, analysis_id_cm,
+                            None if run_id_cm in (None, "", "current") else run_id_cm,
+                            create=False,
+                        )
+                        bundle_path = os.path.join(
+                            paths_cm.get("pass2_report") or "", "class_multi", "class_assignment_bundle.json",
+                        )
+                        bundle = _load_json(bundle_path)
+                        if isinstance(bundle, dict) and bundle:
+                            uv_cm = None
+                            sug_cm = {}
+                            mtype_cm = "homework"
+                            try:
+                                manifest_cm = _load_json(paths_cm.get("manifest") or "")
+                                fctx_cm = (manifest_cm or {}).get("feedback_context") or {}
+                                if isinstance(fctx_cm, dict):
+                                    mtype_cm = str(fctx_cm.get("material_type") or "homework")
+                                subject_cm = str(
+                                    (manifest_cm or {}).get("subject")
+                                    or (fctx_cm.get("subject_code") if isinstance(fctx_cm, dict) else "")
+                                    or "chinese"
+                                )
+                                sample_cm = _sample_id(analysis_id_cm)
+                                report_cm = _named_json(
+                                    paths_cm.get("pass2_report") or "", subject_cm, sample_cm, "_report.json",
+                                )
+                                if isinstance(report_cm, dict) and isinstance(report_cm.get("user_verification"), dict):
+                                    uv_cm = report_cm.get("user_verification")
+                                from app_chat.homework_grading.verify_suggestions import suggestions_for_html
+                                sug_cm = suggestions_for_html(paths_cm) or {}
+                            except Exception:
+                                pass
+                            html_cm = build_class_multi_excerpt_html(
+                                bundle,
+                                analysis_id=analysis_id_cm,
+                                run_id=str(run_id_cm or "current"),
+                                user_verification=uv_cm,
+                                verify_suggestions=sug_cm,
+                                material_type=mtype_cm,
+                            )
+                            try:
+                                prebuilt = os.path.join(
+                                    paths_cm.get("pass2_report") or "", "class_multi", "excerpt_card.html",
+                                )
+                                with open(prebuilt, "w", encoding="utf-8") as fh:
+                                    fh.write(html_cm)
+                            except Exception:
+                                pass
+                    if not html_cm and is_class_multi_excerpt_card(content, title):
+                        # 无 workspace 时：用卡片 Markdown 做最小结构化页（仍避免单人栏目）
+                        body_txt = re.sub(r"<!--nkcn_grading_card:[^>]*-->", "", content or "").strip()
+                        html_cm = (
+                            "<!DOCTYPE html><html lang='zh-CN'><head><meta charset='UTF-8'/>"
+                            "<title>班级多人批改·解释精要</title>"
+                            "<style>body{font-family:Microsoft YaHei,sans-serif;line-height:1.7;padding:24px;max-width:900px;margin:0 auto}"
+                            "pre{white-space:pre-wrap;font-family:inherit}</style></head><body>"
+                            "<h1>班级多人批改·解释精要</h1>"
+                            f"<pre>{body_txt.replace('&','&amp;').replace('<','&lt;')}</pre>"
+                            "<p>人机交互核验：请对照逐页批改图核验后迭代更新。</p></body></html>"
+                        )
+                    if html_cm:
+                        backup = os.path.isfile(_card_html_path(username, int(cid)))
+                        return _save_card_html(username, int(cid), html_cm, backup_before=backup)
+            except Exception as cm_exc:
+                try:
+                    from app_chat.homework_grading.yangqian_debug import debug_log
+                    debug_log(f"[card_html] 班级多人模板失败，回退单人解释精要模板: {cm_exc}")
+                except Exception:
+                    pass
+
             analysis_id = str(extra.get("analysis_id") or "").strip()
             run_id = extra.get("run_id")
             if not analysis_id:

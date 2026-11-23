@@ -372,6 +372,351 @@ def _cross_qtype_detail_md(buckets: List[Dict[str, Any]], units: List[Dict[str, 
     return '\n'.join(lines)
 
 
+def build_verify_interaction_embed(
+    user_verification: Optional[Dict[str, Any]] = None,
+    *,
+    material_type: str = 'homework',
+    verify_suggestions: Optional[Dict[str, Any]] = None,
+    analysis_id: str = '',
+    run_id: str = '',
+) -> Dict[str, str]:
+    """供班级多人等专用 HTML 复用：核验横幅 + 样式 + 弹窗脚本（与单人解释精要同一套交互）。"""
+    banner = _verify_banner_html(user_verification, material_type=material_type)
+    if not banner:
+        banner = (
+            '<section class="uv-banner" id="uv-verify-banner" aria-label="人机交互核验">'
+            '<div class="uv-head"><strong>人机交互核验</strong></div>'
+            '<p class="uv-summary">当前暂无短名单待核验项。可在批改面板对照逐页结果；'
+            '若稍后出现待核验项，刷新本卡 HTML 即可提交核验并迭代更新。</p>'
+            '<div class="uv-actions">'
+            '<button type="button" class="uv-iterate-btn" id="uv-iterate-btn">迭代更新批改结果</button>'
+            '<span class="uv-iterate-hint">已有核验记录时可点此回写当次批改（不新开归档）。</span>'
+            '</div></section>'
+        )
+    css = """
+.uv-banner{margin:14px 0 8px;padding:12px 14px;border:1px solid #fcd34d;border-left:4px solid #f59e0b;border-radius:8px;background:#fffbeb;}
+.uv-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+.uv-head strong{font-size:14px;color:#92400e;}
+.uv-counts em{font-style:normal;margin-right:8px;font-size:12px;padding:2px 6px;border-radius:999px;background:#fff;border:1px solid #fde68a;}
+.uv-summary{margin:0 0 10px;font-size:13px;color:#78350f;}
+.uv-tier{margin:8px 0;}
+.uv-tier-name{font-size:13px;font-weight:600;color:#92400e;margin-bottom:6px;}
+.uv-tier-name em{font-style:normal;font-weight:500;color:#b45309;}
+.uv-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0;}
+.uv-chip{display:inline-block;padding:3px 8px;border-radius:6px;background:#fff;border:1px solid #fde68a;color:#1d4ed8;text-decoration:none;font-size:12px;}
+.uv-chip.is-i{border-color:#fca5a5;} .uv-chip.is-ii{border-color:#fdba74;} .uv-chip.is-iii{border-color:#fde68a;}
+.uv-verify-btn{appearance:none;border:1px solid #c45c54;background:#fff;color:#c45c54;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;}
+.uv-verify-btn:hover{background:#fff1ef;}
+.uv-row.is-done .uv-verify-btn{display:none;}
+.uv-done-mark{font-size:12px;color:#15803d;}
+.uv-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;}
+.uv-iterate-btn{appearance:none;border:1px solid #1d4ed8;background:#1d4ed8;color:#fff;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;}
+.uv-iterate-btn:disabled{opacity:.6;cursor:not-allowed;}
+.uv-iterate-hint{font-size:12px;color:#92400e;}
+.uv-modal-mask{position:fixed;inset:0;background:rgba(15,23,42,.35);display:flex;align-items:center;justify-content:center;z-index:9999;}
+.uv-modal{width:min(520px,92vw);max-height:86vh;overflow:auto;background:#fff;border-radius:12px;padding:16px 18px;box-shadow:0 12px 40px rgba(0,0,0,.18);}
+.uv-modal h3{margin:0 0 8px;font-size:16px;}
+.uv-qid{font-size:12px;color:#64748b;margin-bottom:10px;}
+.uv-verdict{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;font-size:13px;}
+.uv-steps{display:none;flex-direction:column;gap:10px;margin:8px 0 12px;}
+.uv-steps.show{display:flex;}
+.uv-step textarea{width:100%;min-height:56px;margin-top:4px;border:1px solid #d8e0e8;border-radius:6px;padding:6px 8px;font-size:12px;}
+.uv-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.uv-chip.is-active{background:#dbeafe;border-color:#93c5fd;}
+.uv-chips-hint{width:100%;font-size:11px;color:#64748b;}
+.uv-chip-choice{display:none;align-items:center;flex-wrap:wrap;gap:8px;margin-top:6px;font-size:12px;}
+.uv-chip-choice.is-show{display:flex;}
+.uv-chip-choice button{appearance:none;border:1px solid #c9d5e4;background:#fff;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;}
+.uv-chip-choice button.primary{background:#2d6fae;border-color:#2d6fae;color:#fff;}
+.uv-modal-actions{display:flex;justify-content:flex-end;gap:8px;}
+.uv-modal-actions button{appearance:none;border:1px solid #d8e0e8;background:#fff;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;}
+.uv-modal-actions .primary{background:#c45c54;border-color:#c45c54;color:#fff;}
+"""
+    suggest_json = _esc_json(verify_suggestions or {})
+    aid = _esc(analysis_id or '')
+    rid = _esc(run_id or 'current')
+    script = f"""
+<script type="application/json" id="uv-suggest-data">{suggest_json}</script>
+<div id="uv-modal-root" hidden></div>
+<script>
+(function(){{
+  function apiUsername(){{
+    try {{ return new URLSearchParams(window.location.search).get('username') || ''; }} catch(e){{ return ''; }}
+  }}
+  function postToParents(payload){{
+    var targets=[];
+    try {{ if(window.parent && window.parent!==window) targets.push(window.parent); }} catch(e1){{}}
+    try {{ if(window.top && window.top!==window && targets.indexOf(window.top)<0) targets.push(window.top); }} catch(e2){{}}
+    try {{ if(window.opener && targets.indexOf(window.opener)<0) targets.push(window.opener); }} catch(e3){{}}
+    targets.forEach(function(w){{ try {{ w.postMessage(payload, '*'); }} catch(err){{}} }});
+  }}
+  function markVerified(qid){{
+    document.querySelectorAll('.uv-row[data-qid="'+qid+'"]').forEach(function(row){{
+      row.classList.add('is-done');
+      var mark = row.querySelector('.uv-done-mark');
+      if(mark) mark.hidden = false;
+    }});
+  }}
+  function closeVerifyAssist(){{
+    postToParents({{ type:'nkcn-homework-verify-assist-close' }});
+  }}
+  function openVerifyAssist(qid){{
+    if(!qid) return;
+    postToParents({{
+      type:'nkcn-homework-verify-assist',
+      evidence: qid,
+      analysisId: (document.body && document.body.getAttribute('data-analysis-id')) || '',
+      analysis_id: (document.body && document.body.getAttribute('data-analysis-id')) || '',
+      runId: (document.body && document.body.getAttribute('data-run-id')) || 'current',
+      run_id: (document.body && document.body.getAttribute('data-run-id')) || 'current'
+    }});
+  }}
+  function loadVerifySuggestions(){{
+    try {{
+      var el = document.getElementById('uv-suggest-data');
+      if(!el) return {{}};
+      var raw = (el.textContent || '').trim();
+      if(!raw) return {{}};
+      var data = JSON.parse(raw);
+      return (data && typeof data === 'object') ? data : {{}};
+    }} catch(e){{ return {{}}; }}
+  }}
+  function escHtml(s){{
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }}
+  function chipsHtmlForRole(sug, role){{
+    var list = (sug && Array.isArray(sug[role])) ? sug[role] : [];
+    if(!list.length){{
+      return '<div class="uv-chips"><span class="uv-chips-hint">暂无预置短句，可直接手写</span></div>';
+    }}
+    return '<div class="uv-chips" data-role="'+role+'">' + list.map(function(t){{
+      return '<button type="button" class="uv-chip" data-text="'+escHtml(t)+'">'+escHtml(t)+'</button>';
+    }}).join('') + '<div class="uv-chips-hint">点选填入下方说明；仍可手改</div></div>';
+  }}
+  function hideChipChoice(stepEl){{
+    if(!stepEl) return;
+    var bar = stepEl.querySelector('.uv-chip-choice');
+    if(bar){{ bar.classList.remove('is-show'); bar.setAttribute('data-pending',''); }}
+  }}
+  function applyChipText(stepEl, text, mode){{
+    if(!stepEl || !text) return;
+    var box = stepEl.querySelector('.uv-step-err');
+    var ta = stepEl.querySelector('textarea');
+    if(box) box.checked = true;
+    if(!ta) return;
+    var cur = (ta.value || '').trim();
+    ta.value = (mode === 'append' && cur) ? (cur + '；' + text) : text;
+  }}
+  function applyChipToStep(stepEl, text, chipBtn){{
+    if(!stepEl || !text) return;
+    var box = stepEl.querySelector('.uv-step-err');
+    var ta = stepEl.querySelector('textarea');
+    if(box) box.checked = true;
+    if(!ta) return;
+    var cur = (ta.value || '').trim();
+    if(chipBtn){{
+      stepEl.querySelectorAll('.uv-chip').forEach(function(b){{ b.classList.remove('is-active'); }});
+      chipBtn.classList.add('is-active');
+    }}
+    if(!cur){{ ta.value = text; return; }}
+    var bar = stepEl.querySelector('.uv-chip-choice');
+    if(!bar){{ ta.value = text; return; }}
+    bar.setAttribute('data-pending', text);
+    bar.classList.add('is-show');
+  }}
+  function openVerifyModal(qid, label){{
+    var root = document.getElementById('uv-modal-root');
+    if(!root || !qid) return;
+    var allSug = loadVerifySuggestions();
+    var sug = allSug[qid] || {{}};
+    root.hidden = false;
+    root.innerHTML =
+      '<div class="uv-modal-mask"><div class="uv-modal" role="dialog">' +
+      '<h3>提交核验结果</h3>' +
+      '<div class="uv-qid">'+ (label || qid) +' · '+ qid +'</div>' +
+      '<div class="uv-verdict">' +
+      '<label><input type="radio" name="uv-v" value="correct" checked>原批改结果无误</label>' +
+      '<label><input type="radio" name="uv-v" value="incorrect">原批改结果有误</label>' +
+      '</div>' +
+      '<div class="uv-steps" id="uv-steps">' +
+      ['layout|无损版面','understanding|无损理解','grading|三区批改'].map(function(pair){{
+        var p=pair.split('|');
+        return '<div class="uv-step" data-role="'+p[0]+'">' +
+          '<label><input type="checkbox" class="uv-step-err"> '+p[1]+' 有误</label>' +
+          '<textarea placeholder="若有误：误认/误判在哪里…"></textarea>' +
+          chipsHtmlForRole(sug, p[0]) +
+          '<div class="uv-chip-choice" data-pending="">' +
+          '<span>说明框已有内容，请选择：</span>' +
+          '<button type="button" class="primary" data-act="replace">替换</button>' +
+          '<button type="button" data-act="append">追加</button>' +
+          '<button type="button" data-act="cancel">取消</button>' +
+          '</div></div>';
+      }}).join('') +
+      '</div>' +
+      '<div class="uv-modal-actions">' +
+      '<button type="button" id="uv-cancel">取消</button>' +
+      '<button type="button" class="primary" id="uv-save">保存核验</button>' +
+      '</div></div></div>';
+    openVerifyAssist(qid);
+    function syncSteps(){{
+      var inc = root.querySelector('input[name="uv-v"][value="incorrect"]');
+      var steps = root.querySelector('#uv-steps');
+      if(steps) steps.classList.toggle('show', !!(inc && inc.checked));
+    }}
+    root.querySelectorAll('input[name="uv-v"]').forEach(function(r){{ r.addEventListener('change', syncSteps); }});
+    syncSteps();
+    root.querySelectorAll('.uv-chip').forEach(function(btn){{
+      btn.addEventListener('click', function(){{
+        applyChipToStep(btn.closest('.uv-step'), btn.getAttribute('data-text') || btn.textContent || '', btn);
+      }});
+    }});
+    root.querySelectorAll('.uv-chip-choice').forEach(function(bar){{
+      bar.addEventListener('click', function(ev){{
+        var actBtn = ev.target && ev.target.closest ? ev.target.closest('button[data-act]') : null;
+        if(!actBtn) return;
+        var act = actBtn.getAttribute('data-act') || '';
+        var step = bar.closest('.uv-step');
+        var pending = bar.getAttribute('data-pending') || '';
+        if(act === 'replace') applyChipText(step, pending, 'replace');
+        else if(act === 'append') applyChipText(step, pending, 'append');
+        hideChipChoice(step);
+      }});
+    }});
+    root.querySelector('#uv-cancel').onclick = function(){{
+      root.hidden = true; root.innerHTML=''; closeVerifyAssist();
+    }};
+    root.querySelector('#uv-save').onclick = function(){{
+      var verdict = (root.querySelector('input[name="uv-v"]:checked')||{{}}).value || 'correct';
+      var step_notes = {{}};
+      root.querySelectorAll('.uv-step').forEach(function(st){{
+        var role = st.getAttribute('data-role');
+        var has = !!(st.querySelector('.uv-step-err') && st.querySelector('.uv-step-err').checked);
+        var note = (st.querySelector('textarea') && st.querySelector('textarea').value) || '';
+        step_notes[role] = {{ has_error: has, note: note }};
+      }});
+      fetch('/api/ci/homework/verify_save', {{
+        method:'POST', headers:{{'Content-Type':'application/json'}},
+        body: JSON.stringify({{
+          username: apiUsername(),
+          analysis_id: (document.body && document.body.getAttribute('data-analysis-id')) || '',
+          run_id: 'current',
+          qid_global: qid,
+          label: label || qid,
+          verdict: verdict,
+          step_notes: step_notes
+        }}),
+        credentials:'same-origin'
+      }}).then(function(r){{ return r.json(); }}).then(function(res){{
+        if(res && res.error_num === 0){{
+          markVerified(qid);
+          root.hidden = true; root.innerHTML='';
+          closeVerifyAssist();
+          postToParents({{ type:'nkcn-homework-verify-saved', qid:qid, verifiedCount: res.verified_count||0 }});
+        }} else {{
+          alert((res && res.msg) || '保存失败');
+        }}
+      }}).catch(function(){{ alert('保存失败'); }});
+    }};
+  }}
+  function startVerifyIterate(){{
+    var username = apiUsername();
+    var analysisId = (document.body && document.body.getAttribute('data-analysis-id')) || '';
+    if(!username || !analysisId){{ alert('缺少本子或批改标识'); return; }}
+    var btn = document.getElementById('uv-iterate-btn');
+    var hasParent = false;
+    try {{ hasParent = !!(window.parent && window.parent !== window); }} catch(e){{ hasParent = false; }}
+    if(hasParent){{
+      if(btn) btn.disabled = true;
+      postToParents({{
+        type:'nkcn-homework-verify-iterate',
+        username: username,
+        analysisId: analysisId,
+        analysis_id: analysisId,
+        runId: (document.body && document.body.getAttribute('data-run-id')) || 'current',
+        run_id: (document.body && document.body.getAttribute('data-run-id')) || 'current'
+      }});
+      setTimeout(function(){{ if(btn) btn.disabled = false; }}, 1600);
+      return;
+    }}
+    if(btn) btn.disabled = true;
+    fetch('/api/ci/homework/verify_iterate', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{ username:username, analysis_id:analysisId, run_id:'current' }}),
+      credentials:'same-origin'
+    }}).then(function(r){{ return r.json(); }}).then(function(res){{
+      if(!(res && res.error_num===0 && res.job_id)){{
+        if(btn) btn.disabled = false;
+        alert((res && res.msg) || '启动失败');
+        return;
+      }}
+      var jobId = res.job_id;
+      var timer = setInterval(function(){{
+        fetch('/api/ci/homework/verify_iterate_status', {{
+          method:'POST', headers:{{'Content-Type':'application/json'}},
+          body: JSON.stringify({{ job_id: jobId }}), credentials:'same-origin'
+        }}).then(function(r){{ return r.json(); }}).then(function(st){{
+          var job = (st && st.job) || {{}};
+          if(job.status && job.status !== 'running'){{
+            clearInterval(timer);
+            if(btn) btn.disabled = false;
+            if(job.status === 'ok') alert('迭代更新完成，请刷新解释精要卡查看。');
+            else alert(job.error || job.msg || '迭代更新失败');
+          }}
+        }}).catch(function(){{}});
+      }}, 2000);
+    }}).catch(function(){{ if(btn) btn.disabled = false; alert('启动失败'); }});
+  }}
+  document.addEventListener('click', function(e){{
+    var t = e.target;
+    if(!t) return;
+    var a = t.closest ? t.closest('a.loc-jump') : null;
+    if(a){{
+      e.preventDefault();
+      var evidence = a.getAttribute('data-evidence') || '';
+      if(!evidence) return;
+      postToParents({{
+        type:'nkcn-homework-jump',
+        evidence: evidence,
+        analysisId: (document.body && document.body.getAttribute('data-analysis-id')) || '',
+        runId: (document.body && document.body.getAttribute('data-run-id')) || ''
+      }});
+      return;
+    }}
+    var vbtn = t.closest ? t.closest('.uv-verify-btn') : null;
+    if(vbtn){{
+      e.preventDefault();
+      openVerifyModal(vbtn.getAttribute('data-qid')||'', vbtn.getAttribute('data-label')||'');
+      return;
+    }}
+    if(t.id === 'uv-iterate-btn' || (t.classList && t.classList.contains('uv-iterate-btn'))){{
+      e.preventDefault();
+      startVerifyIterate();
+    }}
+  }});
+  (function loadVerified(){{
+    var username = apiUsername();
+    var analysisId = (document.body && document.body.getAttribute('data-analysis-id')) || '';
+    if(!username || !analysisId) return;
+    fetch('/api/ci/homework/verify_list', {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{ username:username, analysis_id:analysisId }}),
+      credentials:'same-origin'
+    }}).then(function(r){{ return r.json(); }}).then(function(res){{
+      var items = ((res && res.verifications) || {{}}).items || {{}};
+      Object.keys(items).forEach(function(qid){{ markVerified(qid); }});
+    }}).catch(function(){{}});
+  }})();
+}})();
+</script>
+"""
+    return {
+        'banner': banner,
+        'css': css,
+        'body_attrs': f'data-analysis-id="{aid}" data-run-id="{rid}"',
+        'tail': script,
+    }
+
+
 def _verify_banner_html(
     user_verification: Optional[Dict[str, Any]],
     *,
@@ -771,6 +1116,56 @@ def _page_conf_chips(meta: Dict[str, Any]) -> str:
     )
 
 
+_POINT_MARKS = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'
+
+
+def _split_display_points(text: str) -> list:
+    """看到/说明的展示分点。已有圈号则按圈号拆开；否则按分号、句号拆开并补圈号。"""
+    raw = re.sub(r'\s+', ' ', str(text or '')).strip()
+    if not raw:
+        return []
+    if sum(raw.count(ch) for ch in _POINT_MARKS) >= 2:
+        parts = re.split(r'(?=[' + _POINT_MARKS + r'])', raw)
+        out = []
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            if part[0] in _POINT_MARKS:
+                body = part[1:].strip(' ：:；;')
+                if body:
+                    out.append((part[0], body))
+            else:
+                out.append(('', part))
+        if len([x for x in out if x[1]]) >= 2:
+            return out
+    chunks = [
+        p.strip(' ；;。')
+        for p in re.split(r'[；;。]', raw)
+        if p.strip(' ；;。')
+    ]
+    if len(chunks) >= 2:
+        return [
+            (_POINT_MARKS[i] if i < len(_POINT_MARKS) else str(i + 1), chunk)
+            for i, chunk in enumerate(chunks)
+        ]
+    return [('', raw)]
+
+
+def _mat_point_line(label: str, text: str, limit: int) -> str:
+    clipped = _clip_keep_lines(text, limit)
+    points = _split_display_points(clipped)
+    if len(points) < 2:
+        return f'<div class="mat-line"><strong>{_esc(label)}</strong> {_esc(clipped)}</div>'
+    items = []
+    for mark, body in points:
+        no = f'<span class="mat-no">{_esc(mark)}</span>' if mark else ''
+        items.append(f'<li>{no}{_esc(body)}</li>')
+    return (
+        f'<div class="mat-line mat-point-line"><strong>{_esc(label)}</strong>'
+        f'<ol class="mat-points">{"".join(items)}</ol></div>'
+    )
+
 
 def _material_visual_html(
     report: Dict[str, Any],
@@ -840,15 +1235,9 @@ def _material_visual_html(
 
     g2 = []
     if layers.get(SEE):
-        g2.append(
-            f'<div class="mat-line"><strong>看到</strong> '
-            f'{_esc(_clip_keep_lines(layers[SEE], 900))}</div>'
-        )
+        g2.append(_mat_point_line('看到', layers[SEE], 900))
     if layers.get(MEAN):
-        g2.append(
-            f'<div class="mat-line"><strong>说明</strong> '
-            f'{_esc(_clip_keep_lines(layers[MEAN], 700))}</div>'
-        )
+        g2.append(_mat_point_line('说明', layers[MEAN], 700))
     if isinstance(overview, dict):
         layout = _clip_keep_lines(overview.get('subject_and_layout'), 420)
         if layout and layout not in (layers.get(SEE) or ''):
@@ -962,6 +1351,50 @@ def _hub_visual_html(
     )
 
 
+def _expectation_panel_html(report: Dict[str, Any]) -> str:
+    """单人整篇诊断若在三问之前写了期望水准，就单独放在报告最前。"""
+    diagnosis = (report or {}).get('diagnosis') or {}
+    if not isinstance(diagnosis, dict):
+        return ''
+    summary = str(diagnosis.get('summary') or '')
+    if '本次期望水准' not in summary and '希望做到的水准' not in summary:
+        return ''
+    head = summary.split('【看到了什么】', 1)[0].strip()
+    if len(head) < 12:
+        return ''
+    try:
+        from .semantic_feedback_brief import strip_internal_jargon
+        head = strip_internal_jargon(head)
+    except Exception:
+        pass
+    try:
+        from .class_multi_grading import _class_report_md_to_html
+        body = _class_report_md_to_html(head)
+    except Exception:
+        body = ''.join(
+            f'<p>{_esc(line.strip())}</p>'
+            for line in re.split(r'\n+', head)
+            if line.strip()
+        )
+    if not body:
+        return ''
+    figure = ''
+    judgment = summary.split('【看到了什么】', 1)[1].strip() if '【看到了什么】' in summary else ''
+    if judgment:
+        try:
+            from .class_multi_grading import _diagnosis_figure_html
+            figure = _diagnosis_figure_html(judgment)
+        except Exception:
+            figure = ''
+    return (
+        '<section class="expect" id="sec-expect">'
+        '<div class="expect-kicker">本次期望水准</div>'
+        f'<div class="expect-body">{body}</div>'
+        f'{figure}'
+        '</section>'
+    )
+
+
 def render_excerpt_html(payload: Dict[str, Any]) -> str:
     subject = payload.get('subject') or 'chinese'
     filename = _esc(payload.get('filename') or '批改材料')
@@ -1067,7 +1500,31 @@ def render_excerpt_html(payload: Dict[str, Any]) -> str:
             + '</section>'
         )
 
-    side_links = ['<a href="#sec-overview" data-goto="0">总览</a>']
+    expectation_html = _expectation_panel_html(report)
+    workup_html = ''
+    try:
+        from .class_multi_grading import _assignment_workup_html
+        diagnosis = (report or {}).get('diagnosis') or {}
+        summary = str(diagnosis.get('summary') or '') if isinstance(diagnosis, dict) else ''
+        points = [line.strip() for line in summary.splitlines() if line.strip()]
+        briefs = []
+        for unit in units or []:
+            if not isinstance(unit, dict):
+                continue
+            briefs.append({
+                'stem': unit.get('stem'),
+                'qid': unit.get('qid') or unit.get('id'),
+                'verdict': unit.get('verdict'),
+                'knowledge_point': unit.get('knowledge_point'),
+                'error_type': unit.get('error_type') or '',
+            })
+        workup_html = _assignment_workup_html({'points': points, 'question_briefs': briefs})
+    except Exception:
+        workup_html = ''
+    side_links = []
+    if expectation_html:
+        side_links.append('<a href="#sec-expect" data-goto="0">本次期望水准</a>')
+    side_links.append('<a href="#sec-overview" data-goto="0">总览</a>')
     if material_md:
         side_links.append('<a href="#sec-material" data-goto="0">材料理解</a>')
     if hub_md:
@@ -1081,7 +1538,7 @@ def render_excerpt_html(payload: Dict[str, Any]) -> str:
         f'<p class="eyebrow">{_esc(material_cn)}批改留存</p>'
         f'<h1>批改·解释精要</h1>'
         f'<p class="sub">{filename}</p></header>'
-        f'{overview_html}{material_html}{hub_html}</div>'
+        f'{expectation_html}{workup_html}{overview_html}{material_html}{hub_html}</div>'
     ]
     group = 2
     for i in range(0, len(page_sections), group):
@@ -1139,6 +1596,17 @@ p {{ margin:8px 0; }}
   padding:16px 18px 18px; margin:0 0 16px;
 }}
 .panel-head {{ display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; }}
+.expect {{ margin:0 0 16px; padding:14px 16px; border-radius:12px; border:1px solid #d7c4a2; border-left:4px solid #8a5a14; background:linear-gradient(180deg,#fff8ec,#fffdf8); }}
+.expect-kicker {{ font-size:13px; font-weight:700; color:#8a5a14; letter-spacing:.04em; margin-bottom:6px; }}
+.expect-body ul {{ margin:6px 0 0; padding-left:0; list-style:none; }}
+.expect-body li {{ margin:6px 0; padding:8px 10px 8px 12px; background:#fff; border:1px solid var(--line); border-radius:8px; line-height:1.55; }}
+.expect-body li.band-ok {{ background:#eef7f1; border-left:4px solid #2c6b5a; }}
+.expect-body li.band-mid {{ background:#fff8ec; border-left:4px solid #8a5a14; }}
+.expect-body li.band-low {{ background:#fbf1f0; border-left:4px solid #b4453b; }}
+.expect-body li.triad-learn {{ background:#f3f7fb; border-left:4px solid #2f5f8a; }}
+.expect-body li.triad-teach {{ background:#f7f3fb; border-left:4px solid #6a4c93; }}
+.expect-body li.triad-grow {{ background:#f3f8f4; border-left:4px solid #2c6b5a; }}
+.expect-body li.chain {{ background:#fff; border-left:4px solid #8a5a14; }}
 .hint {{ color:var(--muted); font-size:13px; margin:8px 0 12px; }}
 .view-tabs {{ display:flex; flex-wrap:wrap; gap:6px; }}
 .view-tabs .tab {{
@@ -1253,6 +1721,7 @@ th,td {{ padding:8px 10px; border-bottom:1px solid var(--line); text-align:left;
   .sidenav a {{ margin:0; }}
   .pager {{ left:0; }}
   .bar-row {{ grid-template-columns:1fr; }}
+  .look-grid,.look-meter {{ grid-template-columns:1fr; }}
 }}
 
 .loc-list, .loc-short, .loc-all {{
@@ -1302,6 +1771,56 @@ th,td {{ padding:8px 10px; border-bottom:1px solid var(--line); text-align:left;
 .mat-g3 {{ background:#eef7f1; border-color:#c3dbcb; }}
 .mat-g3 strong {{ color:#2b6b45; }}
 .mat-line {{ margin:6px 0; font-size:13.5px; line-height:1.7; }}
+.mat-point-line strong {{ display:block; margin-bottom:2px; }}
+.mat-points {{ margin:2px 0 0; padding:0; list-style:none; }}
+.mat-points li {{ position:relative; margin:5px 0; padding-left:1.7em; line-height:1.65; }}
+.mat-no {{ position:absolute; left:0; top:0; font-weight:600; }}
+.chart-embed,.expect-body li.chart-embed {{ padding:4px 0 2px; border:0; background:transparent; }}
+.workup {{ margin:8px 0 12px; }}
+.kpi-row {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(108px,1fr)); gap:8px; margin:8px 0 12px; }}
+.kpi {{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:8px 10px; }}
+.kpi b {{ display:block; font-size:18px; color:#1a4d40; line-height:1.2; }}
+.kpi span {{ font-size:12px; color:var(--muted); }}
+table.lite {{ width:100%; border-collapse:collapse; margin:8px 0; font-size:13px; }}
+table.lite th, table.lite td {{ border:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; }}
+table.lite th {{ background:#f7f4ee; font-weight:600; }}
+.fig-block {{ margin:8px 0 12px; }}
+.fig-cap {{ font-size:12px; font-weight:700; color:#8a5a14; letter-spacing:.04em; margin-bottom:4px; }}
+.beh-group {{ margin:6px 0 8px; }}
+.beh-group > b {{ display:block; font-size:12px; color:#2f5f8a; margin-bottom:4px; }}
+.look-kicker {{ font-size:13px; font-weight:700; color:#8a5a14; letter-spacing:.04em; }}
+.look-note {{ margin:4px 0 8px; font-size:12px; color:var(--muted); }}
+.look-grid {{ display:grid; grid-template-columns:minmax(280px,420px) minmax(0,1fr); gap:16px; align-items:center; }}
+.radar {{ width:100%; height:auto; display:block; }}
+.radar-ring {{ fill:none; stroke:#e2dccf; stroke-width:1; }}
+.radar-spoke {{ stroke:#e2dccf; stroke-width:1; }}
+.radar-shape {{ fill:rgba(44,107,90,.22); stroke:#2c6b5a; stroke-width:2; }}
+.radar-label {{ font-size:12px; fill:#1c2430; }}
+.radar-label.lv-1 {{ fill:#b4453b; }}
+.radar-label.lv-2 {{ fill:#8a5a14; }}
+.radar-label.lv-3 {{ fill:#2c6b5a; }}
+.radar-score {{ font-size:18px; font-weight:700; fill:#1c2430; }}
+.radar-legend {{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:12px; color:var(--muted); margin-top:4px; }}
+.radar-legend i {{ display:inline-block; width:18px; height:8px; border-radius:4px; }}
+.lv-1 {{ background:#e09a93; }}
+.lv-2 {{ background:#e2c48a; }}
+.lv-3 {{ background:#7bc396; }}
+.look-meters {{ display:flex; flex-direction:column; gap:8px; }}
+.look-meter {{ display:grid; grid-template-columns:minmax(10em,18em) 1fr auto; gap:8px; align-items:center; }}
+.look-name {{ font-size:13px; line-height:1.35; }}
+.look-track {{ display:block; height:10px; border-radius:5px; background:#efe8db; overflow:hidden; }}
+.look-track i {{ display:block; height:100%; border-radius:4px; }}
+.look-lv {{ font-size:12px; color:var(--muted); }}
+.chain-fig {{ display:flex; flex-wrap:wrap; align-items:stretch; gap:6px; margin:10px 0 4px; }}
+.chain-step {{ flex:1 1 140px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 10px; border-top:3px solid #8a5a14; }}
+.chain-step.s2 {{ border-top-color:#2f5f8a; }}
+.chain-step.s3 {{ border-top-color:#6a4c93; }}
+.chain-step.s4 {{ border-top-color:#2c6b5a; }}
+.chain-step b {{ display:block; font-size:12px; color:var(--muted); font-weight:600; }}
+.chain-step span {{ font-size:13px; }}
+.chain-arrow {{ align-self:center; color:#8a5a14; font-size:16px; }}
+.look-evidence {{ margin:8px 0 0; padding:0; list-style:none; }}
+.look-evidence li {{ margin:4px 0; padding:0; border:0; background:transparent; font-size:12.5px; color:var(--muted); }}
 .hub-grid {{ display:flex; flex-direction:column; gap:10px; }}
 .hub-card {{
   background:var(--hub-bg, #f4f1ea); border:1px solid var(--line);

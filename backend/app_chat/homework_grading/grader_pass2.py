@@ -169,6 +169,7 @@ def _build_diagnosis_from_ontology(ontology: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _validate_open_material_overview(payload: Dict[str, Any]) -> Dict[str, Any]:
+    from .validation_issues import coerce_next_steps
     overview = payload.get('open_material_overview')
     if not isinstance(overview, dict):
         raise ValueError('开放材料批语缺少 open_material_overview')
@@ -178,11 +179,10 @@ def _validate_open_material_overview(payload: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f'开放材料批语缺少 {field}')
         normalized[field] = value.strip()
-    steps = overview.get('next_steps')
-    if (not isinstance(steps, list) or not 1 <= len(steps) <= 2
-            or any(not isinstance(step, str) or not step.strip() for step in steps)):
+    steps = coerce_next_steps(overview.get('next_steps'))
+    if not steps:
         raise ValueError('开放材料下一步建议必须包含一至两条非空文字')
-    normalized['next_steps'] = [step.strip() for step in steps]
+    normalized['next_steps'] = steps
     return normalized
 
 
@@ -276,6 +276,14 @@ def _call_pass2_feedback_batch(
 
     def partial(data, error):
         from .partial_feedback import partial_feedback
+        from .validation_issues import coerce_next_steps
+
+        # 穷尽重试后尽量保住首轮：把「一、二、」类 next_steps 收成数组再进部分采纳。
+        overview = data.get('open_material_overview') if isinstance(data, dict) else None
+        if isinstance(overview, dict):
+            coerced = coerce_next_steps(overview.get('next_steps'))
+            if coerced:
+                data = dict(data, open_material_overview=dict(overview, next_steps=coerced))
 
         def validate_item(item, question):
             _validate_runtime_feedback({'per_question_feedback': [item]}, {'error_questions': [question]})
@@ -293,7 +301,9 @@ def _call_pass2_feedback_batch(
         stage='逐题批语', thinking_path=feedback_thinking_path,
         error_path=feedback_thinking_path.replace('.thinking.txt', '.error.txt'),
         repair_plan=feedback_repair_plan, on_exhausted=partial, split_on_truncation=True,
-        allow_reasoning_json=True)
+        allow_reasoning_json=True,
+        # 首轮完整输出 2 次 + 修理轮 2 次
+        attempts=4, repair_after=2)
 
 
 def _call_pass2_feedback_llm(memory, subject, sample_id, ontology, out_thinking_path,

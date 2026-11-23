@@ -1,6 +1,29 @@
 """可定位的输出错误；证据违规与措辞疑点分别记录，兼容原ValueError调用方。"""
 import copy
 import json
+import re
+
+
+def coerce_next_steps(steps):
+    """将「一、…二、…」整段或其它可拆形式收成 1～2 条字符串，供校验与兜底。"""
+    if isinstance(steps, list):
+        items = [str(step).strip() for step in steps if isinstance(step, str) and str(step).strip()]
+        if 1 <= len(items) <= 2:
+            return items
+        return items[:2] if items else None
+    if not isinstance(steps, str) or not steps.strip():
+        return None
+    text = steps.strip()
+    # 允许「一、…。二、…」同行连写，也允许换行/分号分隔。
+    parts = re.split(r'(?:^|[\n；;。])\s*[一二三四五六七八九十\d]+[、.．]\s*', text)
+    items = [part.strip().strip('；;。') for part in parts if part and part.strip()]
+    if len(items) < 2:
+        parts = re.split(r'[\n；;]+', text)
+        items = [part.strip().strip('；;。') for part in parts if part and part.strip()]
+    if not items and text:
+        items = [text]
+    items = [item for item in items if item][:2]
+    return items or None
 
 
 class TextConstraintError(ValueError):
@@ -126,16 +149,48 @@ def feedback_repair_plan(previous, error):
            if x['path'].startswith('/per_question_feedback/') and x['path'].split('/')[2].isdigit()}
     protected = {x['qid_global']: copy.deepcopy(x) for i, x in enumerate(items)
                  if i not in bad and isinstance(x, dict) and isinstance(x.get('qid_global'), str)}
+    prev_by_index = {i: copy.deepcopy(x) for i, x in enumerate(items) if isinstance(x, dict)}
     apply = plan['merge']
 
     def merge(patch):
-        candidate = apply(patch)
+        # 优先接受完整 JSON；若仍给 repairs，把「只回了 comment 字符串」还原成完整批语对象。
+        if isinstance(patch, dict) and 'repairs' not in patch and isinstance(patch.get('per_question_feedback'), list):
+            candidate = copy.deepcopy(previous)
+            for key in ('open_material_overview', 'page_feedback_contexts', 'per_question_feedback'):
+                if key in patch:
+                    candidate[key] = copy.deepcopy(patch[key])
+        else:
+            candidate = apply(patch)
         values = candidate.get('per_question_feedback')
         if isinstance(values, list):
-            candidate['per_question_feedback'] = [copy.deepcopy(protected.get(x.get('qid_global'), x))
-                if isinstance(x, dict) else x for x in values]
-            present = {x.get('qid_global') for x in values if isinstance(x, dict)}
-            candidate['per_question_feedback'] += [copy.deepcopy(x) for qid, x in protected.items() if qid not in present]
+            fixed = []
+            for i, x in enumerate(values):
+                if isinstance(x, str) and i in prev_by_index:
+                    fixed.append({**copy.deepcopy(prev_by_index[i]), 'comment': x})
+                elif isinstance(x, dict):
+                    fixed.append(copy.deepcopy(protected.get(x.get('qid_global'), x)))
+                else:
+                    fixed.append(x)
+            present = {x.get('qid_global') for x in fixed if isinstance(x, dict)}
+            fixed.extend(copy.deepcopy(x) for qid, x in protected.items() if qid not in present)
+            candidate['per_question_feedback'] = fixed
+        overview = candidate.get('open_material_overview')
+        if isinstance(overview, dict):
+            coerced = coerce_next_steps(overview.get('next_steps'))
+            if coerced:
+                candidate['open_material_overview'] = dict(overview, next_steps=coerced)
         return candidate
 
-    return {**plan, 'merge': merge}
+    return {
+        **plan,
+        'merge': merge,
+        'prompt': (
+            '上次输出未通过校验。请输出与首轮相同结构的完整 JSON 对象（不要只交 repairs 补丁），'
+            '必须同时包含：open_material_overview（其中 next_steps 严格为 ["建议一","建议二"] 这种 1～2 条字符串数组，'
+            '禁止「一、……二、……」整段字符串）、per_question_feedback（对象数组，覆盖全部输入单元）、'
+            'page_feedback_contexts（若首轮有则保留）。'
+            '仅修正下列路径指出的问题，其余已通过内容必须原样保留；数组项不得重排。'
+            '证据不足时明确待确认，不得删除引用后保留无据结论。\n'
+            + json.dumps(error.issues, ensure_ascii=False)
+        ),
+    }

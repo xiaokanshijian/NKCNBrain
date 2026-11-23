@@ -329,6 +329,7 @@ def _collect_units(
     comments = _comment_map(report)
     units: List[Dict[str, Any]] = []
     pages_meta: List[Dict[str, Any]] = []
+    from .class_multi_grading import printed_page_header
 
     for path in sorted_json_pages(pass1_dir):
         page_num = parse_page_num(os.path.basename(path))
@@ -392,7 +393,7 @@ def _collect_units(
         ctx = pf_map.get(page_num) or {}
         pages_meta.append({
             'page': page_num,
-            'header': _clip(data.get('page_header'), 80),
+            'header': _clip(printed_page_header(data.get('page_header')), 80),
             'unit_title': _clip(ctx.get('unit_title'), 80),
             'quote': _clip(ctx.get('unit_evidence_quote'), 160),
             'summary': _clip_keep_lines(ctx.get('understanding_summary'), 520),

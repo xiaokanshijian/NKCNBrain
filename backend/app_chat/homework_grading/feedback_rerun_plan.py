@@ -7,6 +7,42 @@ from .preprocess import normalize_preprocess_mode
 from .completion import RECOVERABLE
 
 
+def _require_existing_page_grading(destination):
+    from .utils import sorted_json_pages
+    pages = sorted_json_pages(str(destination / 'homework_grading' / 'pass1_json'))
+    if not pages:
+        raise ValueError('没有已有逐页批改结果，不能只重出报告和卡片')
+
+
+def _mark_report_only_rerun(destination):
+    """留下逐页批改，只把批改阶段标成待重做，并从汇总错题线索起重出报告和卡片。"""
+    from .utils import safe_json_dump, safe_json_load
+    manifest_path = destination / 'manifest.json'
+    manifest = safe_json_load(str(manifest_path)) if manifest_path.is_file() else {}
+    if not isinstance(manifest, dict):
+        manifest = {}
+    stages = manifest.get('stages') if isinstance(manifest.get('stages'), dict) else {}
+    stages['grading'] = 'pending'
+    manifest['stages'] = stages
+    manifest['status'] = 'prepared'
+    manifest['target_stage'] = 'grading'
+    manifest['report_only_rerun'] = True
+    manifest['checkpoint_resume'] = True
+    manifest['resume_from_processing_stage'] = 'memory'
+    manifest['resume_from_failure_stage'] = ''
+    manifest['processing_stage'] = 'startup'
+    manifest['failure_stage'] = ''
+    manifest['error'] = ''
+    manifest['completion'] = {
+        'status': 'running',
+        'target_stage': 'grading',
+        'report_usable': False,
+        'issues': [],
+        'message': '正在沿用逐页批改，重出报告和卡片。',
+    }
+    safe_json_dump(str(manifest_path), manifest)
+
+
 def request_bool(data, key):
     value = data.get(key, False)
     if value in (True, 1, '1', 'true'):
@@ -18,10 +54,12 @@ def request_bool(data, key):
 
 def choose_rerun_runtime(root, filename, data, *, workspace=None):
     stage = data.get('rerun_stage', 'all')
-    if stage not in ('all', 'layout', 'understanding', 'grading'):
+    if stage not in ('all', 'layout', 'understanding', 'grading', 'report'):
         raise ValueError('重跑阶段无效')
     resume = request_bool(data, 'resume')
     has_sessions = 'session_ids' in data
+    if stage == 'report' and (has_sessions or resume or request_bool(data, 'full_recompute')):
+        raise ValueError('只重出报告和卡片时按整份已有逐页批改，不能与篇目、续跑或完整新跑混用')
     if resume and has_sessions:
         raise ValueError('续跑时不能同时选择篇目')
     if has_sessions:
@@ -118,10 +156,14 @@ def prepare_rerun_workspace(destination, original, workspace, analysis_id, runti
     from .red_blue_review import load_red_blue_review, load_iteration_context, build_iteration_context, save_iteration_context
     from .grader_pass1 import pass1_two_stage_enabled
     stage = plan['stage']
+    if stage == 'report' and ('session_ids' in data or plan.get('resume')):
+        raise ValueError('只重出报告和卡片时按整份已有逐页批改，不能与篇目或续跑混用')
     if stage in ('layout', 'understanding') and not pass1_two_stage_enabled(feedback_runtime=runtime):
         raise ValueError('本轮关闭了分阶段识别，不能只迭代版面或理解')
     original = Path(original)
     destination = Path(destination)
+    if stage == 'report':
+        _require_existing_page_grading(destination)
     original_paths = {'base': str(original / 'homework_grading'),
                       'pass2_report': str(original / 'homework_grading/pass2_report')}
     use_feedback = request_bool(data, 'use_red_blue_feedback')
@@ -137,6 +179,9 @@ def prepare_rerun_workspace(destination, original, workspace, analysis_id, runti
             raise ValueError('当前没有可恢复的中断任务')
         # 保留已成功的请求检查点；阶段产物仍须通过依赖和代码指纹核验。
         meta = {'checkpoint_resume': True}
+    elif stage == 'report':
+        meta = {'report_only_rerun': True}
+        _mark_report_only_rerun(destination)
     elif 'session_ids' in data or plan['resume']:
         meta = prepare_homework_session_rerun(workspace, analysis_id, stage,
             session_ids=data.get('session_ids'), resume=plan['resume'],

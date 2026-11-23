@@ -15,10 +15,33 @@ _IDENT_RE = re.compile(r"^材料标识[：:]\s*(.+?)\s*$")
 _DESC_RE = re.compile(r"^材料说明[：:]\s*(.*)$")
 _ORDER_HDR_RE = re.compile(r"^布置次序[：:]\s*$")
 _BATCH_RE = re.compile(r"^第\s*(\d+)\s*次[：:]\s*(.*)$")
+_MODE_RE = re.compile(r"^批改模式[：:]\s*(.+?)\s*$")
+_CLASS_ID_RE = re.compile(r"^班级号[：:]\s*(.+?)\s*$")
+_CLASS_SIZE_RE = re.compile(r"^班级人数[：:]\s*(\d+)\s*$")
+_ROSTER_RE = re.compile(r"^学生名单[：:]\s*(.*)$")
+_HW_INDEX_RE = re.compile(r"^作业次第[：:]\s*第?\s*(\d+)\s*次?\s*$")
+_PAGES_PER_RE = re.compile(r"^本次布置页数[：:]\s*(\d+)\s*$")
+# 名单分隔只用标点（中英文逗号/顿号/分号/竖线）；空格不当分隔符，只在切分后 strip
+_ROSTER_SPLIT_RE = re.compile(r"\s*[,，、;；\|/]\s*")
 
 
 def is_grading_config_content(content: str) -> bool:
     return CONFIG_MARKER in (content or "")
+
+
+def parse_student_roster(text: str) -> List[str]:
+    """解析学生名单：兼容「张三，李四」「张三, 李四」「张三 ，李四」（空格贴在逗号旁即可）。"""
+    raw = (text or "").strip()
+    if not raw or raw.startswith("（") or raw.startswith("("):
+        return []
+    raw = raw.strip(" ,，、;；|/\t\r\n\u3000")
+    out: List[str] = []
+    for part in _ROSTER_SPLIT_RE.split(raw):
+        # 仅去掉姓名两侧空白/全角空格，不把空格当成分隔
+        name = (part or "").strip(" \t\r\n\u3000").strip("·.•．")
+        if name:
+            out.append(name)
+    return out
 
 
 def parse_page_list(text: str) -> List[int]:
@@ -83,6 +106,12 @@ def parse_grading_config(content: str) -> Tuple[Optional[Dict[str, Any]], List[s
         in_order = False
         page_owner: Dict[int, int] = {}
         dup_pages: List[int] = []
+        grading_mode = ""
+        class_id = ""
+        student_count = 0
+        roster: List[str] = []
+        homework_index = 0
+        pages_per_assignment = 0
 
         for ln in lines:
             s = ln.strip()
@@ -95,6 +124,30 @@ def parse_grading_config(content: str) -> Tuple[Optional[Dict[str, Any]], List[s
             m = _DESC_RE.match(s)
             if m:
                 description = m.group(1).strip()
+                continue
+            m = _MODE_RE.match(s)
+            if m:
+                grading_mode = m.group(1).strip()
+                continue
+            m = _CLASS_ID_RE.match(s)
+            if m:
+                class_id = m.group(1).strip()
+                continue
+            m = _CLASS_SIZE_RE.match(s)
+            if m:
+                student_count = int(m.group(1))
+                continue
+            m = _ROSTER_RE.match(s)
+            if m:
+                roster = parse_student_roster(m.group(1))
+                continue
+            m = _HW_INDEX_RE.match(s)
+            if m:
+                homework_index = int(m.group(1))
+                continue
+            m = _PAGES_PER_RE.match(s)
+            if m:
+                pages_per_assignment = int(m.group(1))
                 continue
             if _ORDER_HDR_RE.match(s) or s.startswith("布置次序"):
                 in_order = True
@@ -126,11 +179,80 @@ def parse_grading_config(content: str) -> Tuple[Optional[Dict[str, Any]], List[s
             # 同卡重复文件名：以第一次为准，跳过后续
             continue
         seen_files.add(filename)
+
+        mode_l = grading_mode.strip()
+        is_class_multi = (
+            mode_l in ("班级多人", "多人", "class_multi", "class")
+            or "多人" in mode_l
+        )
+        # 已填齐班级核心字段却未写多人模式 → 明确报错，避免误当成单人或静默当多人
+        if (
+            not is_class_multi
+            and class_id
+            and student_count > 0
+            and pages_per_assignment > 0
+        ):
+            errors.append(
+                f"材料「{filename}」已填班级号/人数/页数，请写「批改模式：班级多人」（并填写作业次第）"
+            )
+            continue
+        if is_class_multi:
+            if not class_id:
+                errors.append(f"材料「{filename}」班级多人模式须填写「班级号」")
+                continue
+            if student_count <= 0:
+                errors.append(f"材料「{filename}」班级多人模式须填写正整数「班级人数」")
+                continue
+            if pages_per_assignment <= 0:
+                errors.append(f"材料「{filename}」班级多人模式须填写正整数「本次布置页数」")
+                continue
+            if homework_index <= 0:
+                errors.append(f"材料「{filename}」班级多人模式须填写「作业次第」")
+                continue
+            if roster and len(roster) not in (0, student_count):
+                errors.append(
+                    f"材料「{filename}」学生名单人数({len(roster)})与班级人数({student_count})不一致"
+                )
+                continue
+            expected = student_count * pages_per_assignment
+            assigned = list(range(1, expected + 1))
+            page_to_batch = {p: homework_index for p in assigned}
+            batches = [{"k": homework_index, "pages": assigned}]
+            try:
+                from app_chat.homework_grading.class_multi_grading import build_class_page_map
+                class_page_map = build_class_page_map(
+                    student_count=student_count,
+                    pages_per_assignment=pages_per_assignment,
+                    roster=roster,
+                    class_id=class_id,
+                    homework_index=homework_index,
+                    total_pages=0,
+                )
+            except Exception as exc:
+                errors.append(f"材料「{filename}」班级映射失败: {exc}")
+                continue
+            materials.append({
+                "filename": filename,
+                "description": description,
+                "batches": batches,
+                "assigned_pages": assigned,
+                "page_to_batch": page_to_batch,
+                "grading_mode": "班级多人",
+                "class_multi": True,
+                "class_id": class_id,
+                "student_count": student_count,
+                "roster": roster,
+                "homework_index": homework_index,
+                "pages_per_assignment": pages_per_assignment,
+                "class_page_map": class_page_map,
+            })
+            continue
+
         if not batches:
-            errors.append(f"材料「{filename}」至少需要一次有效布置")
+            errors.append(f"材料「{filename}」至少需要一次有效布置（单人写「布置次序」；多人写班级字段）")
             continue
         batches.sort(key=lambda b: b["k"])
-        assigned: List[int] = []
+        assigned = []
         for b in batches:
             for p in b["pages"]:
                 if p not in assigned:
@@ -146,6 +268,8 @@ def parse_grading_config(content: str) -> Tuple[Optional[Dict[str, Any]], List[s
             "batches": batches,
             "assigned_pages": assigned,
             "page_to_batch": dict(page_owner),
+            "grading_mode": grading_mode or "单人",
+            "class_multi": False,
         })
 
     if errors and not materials:
@@ -252,6 +376,18 @@ def build_session_map_from_config(
     total_pages: int,
 ) -> Dict[str, Any]:
     """用配置卡第k次合成 sessions.json 结构（仅覆盖已布置页）。"""
+    if material.get("class_multi"):
+        from app_chat.homework_grading.class_multi_grading import build_session_map_for_class
+        # 校验页数：人数×每生页数不得超文档
+        expected = int(material.get("student_count") or 0) * int(material.get("pages_per_assignment") or 0)
+        if total_pages and expected and total_pages < expected:
+            raise ValueError(
+                f"班级多人配置需要 {expected} 页（{material.get('student_count')}人×"
+                f"{material.get('pages_per_assignment')}页），文档仅 {total_pages} 页"
+            )
+        return build_session_map_for_class(
+            material, subject=subject, sample_id=sample_id, total_pages=total_pages,
+        )
     sessions: List[Dict[str, Any]] = []
     for i, batch in enumerate(material.get("batches") or [], start=1):
         pages = [p for p in batch.get("pages") or [] if 1 <= int(p) <= total_pages]

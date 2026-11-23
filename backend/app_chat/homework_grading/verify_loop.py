@@ -440,6 +440,27 @@ def _rebuild_downstream(
     except Exception:
         traceback.print_exc()
 
+    class_map = manifest.get('class_multi') if isinstance(manifest.get('class_multi'), dict) else None
+    if class_map and class_map.get('student_count'):
+        _set_job(job_id, phase='class_multi', progress=90, msg='更新班级多人报告与学生记忆')
+        try:
+            from app_chat.homework_grading.class_multi_grading import finalize_class_multi_outputs
+            from app_chat.homework_grading.explanation_layers import material_portrait_label
+            from app_chat.homework_grading.utils import SUBJECT_LABELS
+            ctx = (feedback_runtime.context if feedback_runtime is not None else None) or manifest.get('feedback_context') or {}
+            filename = (manifest.get('selected_files') or [''])[0]
+            finalize_class_multi_outputs(
+                paths=paths,
+                manifest=manifest,
+                class_map=class_map,
+                subject=subject,
+                subject_label=SUBJECT_LABELS.get(subject, subject),
+                material_label=material_portrait_label(ctx, filename),
+            )
+            safe_json_dump(paths['manifest'], manifest)
+        except Exception:
+            traceback.print_exc()
+
     _set_job(job_id, phase='cards', progress=92, msg='更新批改输出卡片与 HTML')
     pin_grading_result_cards(paths, manifest, feedback_runtime=feedback_runtime)
 

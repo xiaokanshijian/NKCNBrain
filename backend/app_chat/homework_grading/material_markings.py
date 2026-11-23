@@ -89,12 +89,15 @@ def observation_eligible(question):
 
 def open_units(memory, material_type):
     from .note_evidence import normalize_note_fields
+    from .memory import canonicalize_verdict
     units = []
     for raw in memory.get('error_questions') or []:
         q = normalize_markings(copy.deepcopy(raw))
+        q['verdict'] = canonicalize_verdict(q.get('verdict'))
         if material_type == 'notes':
             normalize_note_fields(q)
         else:
+            # partial（含由 correct_with_minor_error 归一而来）可诊断；不当作纯 correct。
             q['diagnostic_eligible'] = bool(
                 str(q.get('student_answer') or '').strip()
                 and q.get('verdict') in ('correct', 'partial', 'wrong')

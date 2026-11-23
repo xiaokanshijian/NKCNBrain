@@ -51,16 +51,29 @@ def grade_cross_page_group(
         for image_path in image_paths
     ]
     from .note_evidence import is_notes
-    user_text = (
-        '核对候选笔记页是否同源同题；不能由候选页码推定作答连续。'
-        '逐一返回requires_material_check=true单元的核对状态；本页独立题标not_required，'
-        '依赖材料却无法对应时标unresolved，不能用空数组代替核对结果。'
-        '材料来源可在本页或非相邻页；本页来源使用not_required并给出材料证据。'
-        '每项材料证据须包含qid_global、material_label、逐字quote和relation；明确材料数量，不能伪造引文。\n'
-        + json.dumps({'image_pdf_pages': group, 'visible_units': pending_questions or []}, ensure_ascii=False)
-        if is_notes(feedback_runtime) or any(q.get('requires_material_check') for q in pending_questions or []) else
-        cross_page_user_prompt(group, context_notes, pending_questions=pending_questions)
-    )
+    from .feedback_material_kinds import is_composition
+    material_type = ''
+    if feedback_runtime is not None:
+        material_type = str((feedback_runtime.context or {}).get('material_type') or '')
+    if is_notes(feedback_runtime) or any(q.get('requires_material_check') for q in pending_questions or []):
+        user_text = (
+            '核对候选笔记页是否同源同题；不能由候选页码推定作答连续。'
+            '逐一返回requires_material_check=true单元的核对状态；本页独立题标not_required，'
+            '依赖材料却无法对应时标unresolved，不能用空数组代替核对结果。'
+            '材料来源可在本页或非相邻页；本页来源使用not_required并给出材料证据。'
+            '每项材料证据须包含qid_global、material_label、逐字quote和relation；明确材料数量，不能伪造引文。\n'
+            + json.dumps({'image_pdf_pages': group, 'visible_units': pending_questions or []}, ensure_ascii=False)
+        )
+    elif is_composition(material_type):
+        user_text = (
+            '以下为同一篇作文的连续页。请衔接页缘段落／意群的续写关系，'
+            '对因跨页待确认的单元给出形成性结论：有可读内容时 cross_page_resolved=true，'
+            '且不得仅因跨页保持 uncertain 或写「跨页内容不足」。'
+            '保持原有段落单元切分，不要合并回整页单框。\n'
+            + cross_page_user_prompt(group, context_notes, pending_questions=pending_questions)
+        )
+    else:
+        user_text = cross_page_user_prompt(group, context_notes, pending_questions=pending_questions)
     content.append({
         'type': 'text',
         'text': user_text,

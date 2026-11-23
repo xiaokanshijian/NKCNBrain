@@ -5,6 +5,14 @@ from .utils import safe_json_dump
 
 def candidate_note_page_pairs(pages):
     pairs = []
+    seen = set()
+
+    def _add(pair):
+        key = tuple(pair)
+        if key not in seen:
+            seen.add(key)
+            pairs.append(list(pair))
+
     for page, data in pages.items():
         origin = normalize_page_origin(data.get('page_origin'))
         number = origin['printed_page_number']
@@ -28,7 +36,25 @@ def candidate_note_page_pairs(pages):
             duplicates = [p for p, d in pages.items()
                           if normalize_page_origin(d.get('page_origin')) == origin]
             if len(duplicates) == 1:
-                pairs.append([page, other])
+                _add([page, other])
+
+    # 独立手写笔记跨页较频繁：双方均有延续证据时，按 PDF 相邻页保守配对。
+    for page, data in pages.items():
+        origin = normalize_page_origin(data.get('page_origin'))
+        if origin['source_kind'] not in ('handwritten', 'unknown'):
+            continue
+        if not data.get('boundary', {}).get('continues_to_next'):
+            continue
+        other = page + 1
+        target = pages.get(other)
+        if not isinstance(target, dict):
+            continue
+        dest = normalize_page_origin(target.get('page_origin'))
+        if dest['source_kind'] not in ('handwritten', 'unknown'):
+            continue
+        if not target.get('boundary', {}).get('continues_from_prev'):
+            continue
+        _add([page, other])
     return pairs
 
 

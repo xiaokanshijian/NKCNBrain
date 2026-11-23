@@ -72,6 +72,11 @@ export function pinCIHomeworkResultCards(data) {
   return request.post('/api/ci/homework/pin_result_cards', data, { timeout: 60000 })
 }
 
+/** 班级多人开改计划：同班同科多次列表与材料设置一致性 */
+export function getCIHomeworkClassMultiPlan(data) {
+  return request.post('/api/ci/homework/class_multi_plan', data)
+}
+
 /** 轮询重新沉淀进度（可含先生成可点短句） */
 export function getCIHomeworkPinResultCardsStatus(data) {
   return request.post('/api/ci/homework/pin_result_cards_status', data)

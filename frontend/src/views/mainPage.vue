@@ -1133,7 +1133,7 @@
           <!-- 多QA对打分：逻辑保留，按钮按方案隐藏 -->
           <div class="add-card-presets" style="margin: 0 0 12px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
             <span style="color:#606266;font-size:13px;">预选项：</span>
-            <el-button size="small" :type="addCardPresetKind==='grading_config'?'primary':'default'" @click="applyAddCardPreset('grading_config')">批改配置卡</el-button>
+            <el-button size="small" :type="addCardPresetKind==='grading_config'?'primary':'default'" @click="applyAddCardPreset('grading_config')" title="本子只需一张；多文件用多个——材料——条目；可混排单人/班级多人">批改配置卡</el-button>
             <el-button size="small" :type="addCardPresetKind==='todo'?'primary':'default'" @click="applyAddCardPreset('todo')">TODO清单卡</el-button>
             <el-button size="small" :type="addCardPresetKind==='directory'?'primary':'default'" @click="applyAddCardPreset('directory')">目录卡</el-button>
             <el-button size="small" type="info" plain @click="clearAddCardPreset">清除预选项</el-button>
@@ -1293,11 +1293,55 @@
     </el-container>
   </div>
 
-  <el-dialog :model-value="!!ciSkillPending" title="本次批改" width="520px" class="ci-skill-start-dialog"
+  <el-dialog :model-value="!!ciSkillPending" title="本次批改" width="560px" class="ci-skill-start-dialog"
     :close-on-click-modal="false" @close="finishCISkillStart(null)">
     <p>{{ ciSkillPending?.filename }}</p>
     <NotebookSkillSelector v-if="ciSkillPending" v-model="ciSkillSelection"
       :username="ciSkillPending.username" @valid="ciSkillValid = $event" />
+    <div v-if="ciSkillPending?.classMulti?.is_class_multi" style="margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb;">
+      <p style="margin:0 0 8px;font-weight:600;">班级多人合订</p>
+      <p style="margin:0 0 8px;color:#4b5563;font-size:13px;">
+        班级 {{ ciSkillPending.classMulti.class_id }} · 第{{ ciSkillPending.classMulti.homework_index }}次 ·
+        {{ ciSkillPending.classMulti.student_count }}人 · 每生{{ ciSkillPending.classMulti.pages_per_assignment }}页
+      </p>
+      <el-alert v-for="(w, wi) in (ciSkillPending.classMulti.warnings || [])" :key="'cmw'+wi"
+        :title="w" type="warning" show-icon :closable="false" style="margin-bottom:8px;" />
+      <div v-if="(ciSkillPending.classMulti.assignments || []).length > 1" style="margin-top:8px;">
+        <p style="margin:0 0 6px;font-size:13px;">本班本学科配置卡中还有其它次第作业，请选择：</p>
+        <el-radio-group v-model="ciClassMultiScope">
+          <el-radio label="current">只改当前这次</el-radio>
+          <el-radio label="all">按次第依次完成多次批改</el-radio>
+        </el-radio-group>
+        <ul style="margin:8px 0 0;padding-left:18px;font-size:12px;color:#6b7280;">
+          <li v-for="a in ciSkillPending.classMulti.assignments" :key="a.filename">
+            第{{ a.homework_index }}次：{{ a.filename }}
+            <span v-if="a.filename === ciSkillPending.filename">（当前）</span>
+            <span v-if="a.has_completed_result" style="color:#15803d;"> · 已有批改结果</span>
+          </li>
+        </ul>
+        <!-- 当前次第>1 或后端已标前序完成时，选「多次」就展示沿用/重做（不依赖 has_prior 才显示，避免识别漏了看不见） -->
+        <div v-if="ciClassMultiScope === 'all' && (ciSkillPending.classMulti.has_prior_results || Number(ciSkillPending.classMulti.homework_index || 0) > 1)" style="margin-top:12px;">
+          <p style="margin:0 0 6px;font-size:13px;">
+            {{ ciSkillPending.classMulti.has_prior_results
+              ? '检测到前序次第已有完成的批改结果与记忆，请选择：'
+              : '当前不是第1次：请选择是否沿用前序结果与记忆（若库中确有第1次记忆会自动带上）：' }}
+          </p>
+          <el-radio-group v-model="ciClassMultiPriorMode">
+            <el-radio label="use">用已有前序结果和记忆，从本次起改后续</el-radio>
+            <el-radio label="redo">从头开始重做（清空前序记忆，自最早次第起）</el-radio>
+          </el-radio-group>
+          <p style="margin:6px 0 0;font-size:12px;color:#6b7280;">
+            <template v-if="(ciSkillPending.classMulti.prior_completed || []).length">
+              前序已完成：第{{ (ciSkillPending.classMulti.prior_completed || []).map(p => p.homework_index).join('、') }}次
+            </template>
+            <template v-else>
+              列表若未标「已有批改结果」，点开始后仍会尝试读取本班本学科已有记忆。
+            </template>
+          </p>
+        </div>
+      </div>
+      <p v-else style="margin:8px 0 0;font-size:13px;color:#6b7280;">目前本班本学科仅检测到这一次作业文件。</p>
+    </div>
     <template #footer>
       <el-button @click="finishCISkillStart(null)">取消</el-button>
       <el-button type="primary" :disabled="!ciSkillValid" @click="finishCISkillStart(ciSkillSelection)">开始处理</el-button>
@@ -1457,7 +1501,7 @@ import FeedbackMaterialDialog from "@/components/fileWindow/FeedbackMaterialDial
 import NotebookSkillSelector from "@/components/fileWindow/NotebookSkillSelector.vue"
 import FeedbackRuleManager from "@/components/admin/FeedbackRuleManager.vue"
 import CrossSubjectPanel from "@/components/fileWindow/CrossSubjectPanel.vue"
-import { queryCIAnalyses, startCIAnalysis, startHomeworkFeedback, startImageUnderstanding, getCIProgress, getCIResult, redoCIAnalysis, listCIHomeworkVersions, markCIHomeworkVersionKey, rerunCIHomework, retryCIHomeworkRedBlue, startCIReproduction, startCISketchRQuickstart, updateCIReproductionContext, iterateCIReproductionUnit, iterateCIReproductionLayoutRegions, autoIterateCIReproductionRound, applyCILiteBundleToReproduction, rollbackCIReproductionUnit, getCIPdfPageCount, startCIPass3, startCIHomeworkVerifyIterate, getCIHomeworkVerifyIterateStatus, pinCIHomeworkResultCards, getCIHomeworkPinResultCardsStatus } from "@/api/continuous_image"
+import { queryCIAnalyses, startCIAnalysis, startHomeworkFeedback, startImageUnderstanding, getCIProgress, getCIResult, redoCIAnalysis, listCIHomeworkVersions, markCIHomeworkVersionKey, rerunCIHomework, retryCIHomeworkRedBlue, startCIReproduction, startCISketchRQuickstart, updateCIReproductionContext, iterateCIReproductionUnit, iterateCIReproductionLayoutRegions, autoIterateCIReproductionRound, applyCILiteBundleToReproduction, rollbackCIReproductionUnit, getCIPdfPageCount, startCIPass3, startCIHomeworkVerifyIterate, getCIHomeworkVerifyIterateStatus, pinCIHomeworkResultCards, getCIHomeworkPinResultCardsStatus, getCIHomeworkClassMultiPlan } from "@/api/continuous_image"
 import CardGrid from "@/components/cardWindow/CardGrid.vue"
 import CardGridFold from "@/components/cardWindow/CardGridFold.vue"
 import ModelCard from "@/components/chatWindow/ModelCard.vue"
@@ -2092,6 +2136,18 @@ export default {
       showContinuousImagePanel: false,
       ciMaterialVisible: false,
       ciSkillPending: null,
+      ciClassMultiScope: 'current',
+      /** use=沿用前序记忆从当前起；redo=清空前序自最早次第起 */
+      ciClassMultiPriorMode: 'use',
+      ciClassMultiQueue: [],
+      /** 依次批改队列沿用的首次 Skill 选择 */
+      ciClassMultiSkillSelection: null,
+      /** 点「继续处理」后续跑完成后，若队列丢失则按配置卡补齐后续次第 */
+      ciClassMultiResumeChain: false,
+      /** 开链首文件是否清空前序（仅 redo） */
+      ciClassMultiResetPrior: false,
+      /** 班级多次队列里每一份都只重出报告和卡片 */
+      ciClassMultiReportOnly: false,
       ciSkillSelection: { enabled: false, names: [] },
       ciSkillValid: true,
       ciSkillManagerVisible: false,
@@ -2608,7 +2664,7 @@ export default {
     // this.stopPeriodicUpdate(); 
     document.removeEventListener('click', this.handleClickOutside)
     window.removeEventListener('scroll', this.updateTooltipPosition)
-  window.removeEventListener('resize', this.updateTooltipPosition)
+    window.removeEventListener('resize', this.updateTooltipPosition)
 
     // 移除事件监听
     document.removeEventListener('paste', this.handleGlobalPaste);
@@ -6087,21 +6143,44 @@ export default {
       const tip = '已配好模板，按格式填写';
       if (kind === 'grading_config') {
         this.userDefineForm.userText = `【批改配置卡】
+说明：（此行可留着，解析会忽略，不必删）一个本子只需这一张配置卡。每个「——材料——」对应导入区一个文件；可混排单人文件与班级多人文件；可配置多个班（不同「班级号」）。用不到的示例块整段删掉即可。材料标识须与导入区文件名完全一致。
 
 ——材料——
-材料标识：（文件名，须与本子导入区文件名完全一致）
-材料说明：（可选，材料情况说明）
+材料标识：（单人批改文件名：一个学生连续多次作业的 PDF）
+材料说明：（可选）
 布置次序：
 第1次：（页码列表，可跳号，如 1-3,7,10）
 第2次：
 
 ——材料——
-材料标识：（另一个文件名）
+材料标识：（一个文件只放一个班的一次作业多人拼接 PDF）
 材料说明：（可选）
-布置次序：
-第1次：
+批改模式：班级多人
+班级号：1班
+班级人数：5
+学生名单：（可选；中英文逗号分隔，逗号旁可有空格如「张三, 李四」。有名单则按名单；「学生xx/xxx」作占位转为学生n；无名单再按卷面识别，再否则学生1…学生n）
+作业次第：1
+本次布置页数：1
+
+——材料——
+材料标识：（可同班同科另一次作业的多人拼接 PDF）
+材料说明：（可选）
+批改模式：班级多人
+班级号：1班
+班级人数：5
+作业次第：2
+本次布置页数：1
+
+——材料——
+材料标识：（可其他某班某学科一次作业的多人拼接 PDF）
+材料说明：（可选）
+批改模式：班级多人
+班级号：2班
+班级人数：5
+作业次第：1
+本次布置页数：1
 `;
-        this.$message.success(tip);
+        this.$message.success('已配好批改配置卡模板（说明行可留着；含单人/多班多人示例，请改成真实文件名）');
         return;
       }
       if (kind === 'todo') {
@@ -6136,12 +6215,23 @@ A.（小节标题，可删）
           this.$message.error('批改配置卡模板结构被改坏：须保留【批改配置卡】、——材料——、材料标识');
           return false;
         }
-        if (!/第\s*\d+\s*次[：:]/.test(text)) {
-          this.$message.error('批改配置卡须至少有一行「第k次：」布置');
+        const hasSingleBatch = /第\s*\d+\s*次[：:]/.test(text);
+        const hasClassMulti = /批改模式[：:].*多人/.test(text) || (/班级号[：:]/.test(text) && /本次布置页数[：:]/.test(text));
+        if (!hasSingleBatch && !hasClassMulti) {
+          this.$message.error('批改配置卡须含「第k次：」单人布置，或「批改模式：班级多人」+班级号/人数/作业次第/本次布置页数');
           return false;
         }
-        // 材料标识 vs 本子文件名
-        const files = new Set(this.fileNameList || []);
+        // 材料标识 vs 导入区文件名（须用导入区全部文件，不能只用已勾选的 fileNameList；
+        // 否则「列表里看得见但没勾选」会误报找不到，重开/勾选后再生成又莫名好了）
+        const importNames = [];
+        const fl = this.$refs.FileList && this.$refs.FileList.fileList;
+        if (Array.isArray(fl) && fl.length) {
+          fl.forEach((item) => {
+            const n = item && item.file && item.file.name;
+            if (n) importNames.push(n);
+          });
+        }
+        const files = new Set(importNames.length ? importNames : (this.fileNameList || []));
         const missing = [];
         const re = /^材料标识[：:]\s*(.+?)\s*$/gm;
         let m;
@@ -6154,7 +6244,7 @@ A.（小节标题，可删）
           if (!files.has(name)) missing.push(name);
         }
         if (missing.length) {
-          this.$message.error('以下材料标识在本子中找不到匹配文件：' + missing.join('；'));
+          this.$message.error('以下材料标识在本子导入区找不到同名文件：' + missing.join('；'));
           return false;
         }
         return true;
@@ -11349,7 +11439,7 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
           this.verifyIterate.progress = 100
           if (job.status === 'ok') {
             this.verifyIterate.msg = '更新完成：已回写核验题/条，并刷新报告与卡片'
-            this.$message.success('迭代更新完成')
+            this.$message.success('迭代更新完成；解释精要卡 HTML 将自动刷新，若仍见旧内容请稍候再点开该卡')
             try {
               if (this.verifyIterate.analysisId) {
                 await this._openCIExistingResult(
@@ -11378,6 +11468,11 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
                 cid: this.verifyIterate.cid,
               },
             }))
+            // 迭代结束后若还有班级多人依次队列，再继续下一份
+            if ((this.ciClassMultiQueue || []).length) {
+              const u = localStorage.getItem('userId')
+              this.$nextTick(() => this._continueClassMultiQueueIfNeeded(u))
+            }
           } else {
             this.verifyIterate.msg = job.error || job.msg || '迭代更新失败'
             this.$message.error(this.verifyIterate.msg)
@@ -12015,8 +12110,238 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
 
     finishCISkillStart(selection) {
       const pending = this.ciSkillPending
+      const classMultiScope = this.ciClassMultiScope || 'current'
+      const classMultiPriorMode = this.ciClassMultiPriorMode || 'use'
+      const classMultiPlan = pending?.classMulti || null
       this.ciSkillPending = null
-      pending?.resolve(selection ? { enabled: selection.enabled, names: [...selection.names] } : null)
+      if (!selection) {
+        pending?.resolve(null)
+        return
+      }
+      pending?.resolve({
+        enabled: selection.enabled,
+        names: [...selection.names],
+        classMultiScope,
+        classMultiPriorMode,
+        classMultiPlan,
+      })
+    },
+
+    _classMultiQueueStorageKey(username) {
+      const u = username || localStorage.getItem('userId') || ''
+      return u ? `nkcn_class_multi_queue:${u}` : ''
+    },
+    _persistClassMultiQueueState(username) {
+      const key = this._classMultiQueueStorageKey(username)
+      if (!key) return
+      try {
+        sessionStorage.setItem(key, JSON.stringify({
+          queue: [...(this.ciClassMultiQueue || [])],
+          skill: this.ciClassMultiSkillSelection
+            ? {
+              enabled: !!this.ciClassMultiSkillSelection.enabled,
+              names: [...(this.ciClassMultiSkillSelection.names || [])],
+            }
+            : null,
+          scope: this.ciClassMultiScope || 'current',
+          priorMode: this.ciClassMultiPriorMode || 'use',
+          resetPrior: !!this.ciClassMultiResetPrior,
+          reportOnly: !!this.ciClassMultiReportOnly,
+          resumeChain: !!this.ciClassMultiResumeChain,
+        }))
+      } catch (e) { /* ignore quota */ }
+    },
+    _restoreClassMultiQueueState(username) {
+      const key = this._classMultiQueueStorageKey(username)
+      if (!key) return false
+      try {
+        const raw = sessionStorage.getItem(key)
+        if (!raw) return false
+        const data = JSON.parse(raw)
+        if (!data || typeof data !== 'object') return false
+        if (Array.isArray(data.queue) && data.queue.length && !(this.ciClassMultiQueue || []).length) {
+          this.ciClassMultiQueue = data.queue.filter(Boolean)
+        }
+        if (data.skill && !this.ciClassMultiSkillSelection) {
+          this.ciClassMultiSkillSelection = {
+            enabled: !!data.skill.enabled,
+            names: [...(data.skill.names || [])],
+          }
+        }
+        if (data.scope === 'all' || data.scope === 'current') {
+          this.ciClassMultiScope = data.scope
+        }
+        if (data.priorMode === 'use' || data.priorMode === 'redo') {
+          this.ciClassMultiPriorMode = data.priorMode
+        }
+        if (data.resetPrior) this.ciClassMultiResetPrior = true
+        if (typeof data.reportOnly === 'boolean') this.ciClassMultiReportOnly = data.reportOnly
+        if (data.resumeChain) this.ciClassMultiResumeChain = true
+        return true
+      } catch (e) {
+        return false
+      }
+    },
+    async _rebuildClassMultiRemainingQueue(username, currentFilename) {
+      const u = username || localStorage.getItem('userId')
+      const current = String(currentFilename || this.ciActiveResult?.manifest?.selected_files?.[0] || '').trim()
+      if (!u || !current) return false
+      try {
+        const planResp = await getCIHomeworkClassMultiPlan({ username: u, filename: current })
+        if (planResp.error_num !== 0 || !planResp.is_class_multi) return false
+        const assigns = [...(planResp.assignments || [])]
+          .filter(a => a && a.filename)
+          .sort((a, b) => (a.homework_index || 0) - (b.homework_index || 0))
+        const cur = assigns.find(a => a.filename === current)
+        const curIdx = cur ? Number(cur.homework_index || 0) : Number(planResp.homework_index || 0)
+        const rest = assigns
+          .filter(a => Number(a.homework_index || 0) > curIdx)
+          .map(a => a.filename)
+          .filter(Boolean)
+        if (!rest.length) return false
+        this.ciClassMultiQueue = rest
+        this.ciClassMultiScope = 'all'
+        this._persistClassMultiQueueState(u)
+        this.$message.info(`将继续按次第批改后续 ${rest.length} 次作业（会带上已完成次第的班级学生记忆）`)
+        return true
+      } catch (e) {
+        console.warn('[CI] rebuild class multi queue failed', e)
+        return false
+      }
+    },
+    async _rerunExistingHomeworkReport(filename, username, extra = {}) {
+      const records = await queryCIAnalyses({ username, files: [filename], scene_name: this.sceneName })
+      const record = records.error_num === 0
+        ? this._findHomeworkRecordForFile(records.singles, filename, 'homework_grading')
+        : null
+      if (!record?.analysis_id) {
+        this.$message.warning(`「${filename}」还没有可沿用的逐页批改，已停止`)
+        return false
+      }
+      const analysisId = record.analysis_id
+      this.ciHomeworkRunId = 'current'
+      this.ciHomeworkAnalysisId = analysisId
+      this.ciActiveAnalysisId = analysisId
+      this.ciActiveResult = null
+      this.showContinuousImagePanel = true
+      this.ciRunningTask = {
+        task_id: '',
+        analysis_id: analysisId,
+        analysis_type: 'homework_grading',
+        section: '正在沿用逐页批改，重出报告和卡片…',
+        item: 0,
+        total: 0,
+        error: '',
+        completed: false,
+      }
+      this._showCIProgressNotification([filename])
+      const resp = await rerunCIHomework({
+        username,
+        analysis_id: analysisId,
+        scene_name: this.sceneName,
+        rerun_stage: 'report',
+        ...((this.ciClassMultiPriorMode === 'use' || this.ciClassMultiPriorMode === 'redo')
+          ? { class_multi_prior_mode: this.ciClassMultiPriorMode } : {}),
+        ...(extra.resetPrior ? { class_multi_reset_prior: true } : {}),
+      })
+      if (resp.error_num !== 0) {
+        this.ciRunningTask = null
+        this._closeCIProgressNotification()
+        this.$message.error(resp.msg || `「${filename}」重出报告失败`)
+        return false
+      }
+      if (extra.resetPrior) {
+        this.ciClassMultiResetPrior = false
+        this._persistClassMultiQueueState(username)
+      }
+      this.ciRunningTask = {
+        ...resp,
+        task_id: resp.task_id,
+        analysis_id: analysisId,
+        analysis_type: 'homework_grading',
+        section: '准备重出报告和卡片',
+        item: 0,
+        total: 0,
+        error: '',
+        completed: false,
+      }
+      this.ciHomeworkPendingPageView = ''
+      this._showCIProgressNotification([filename])
+      this._startCIPoll(resp.task_id, analysisId, username)
+      this.$message.success(`已开始重出「${filename}」的批改报告和卡片，逐页批改沿用已有结果`)
+      return true
+    },
+
+    async _continueClassMultiQueueIfNeeded(username) {
+      const u = username || localStorage.getItem('userId')
+      this._restoreClassMultiQueueState(u)
+      // 队列丢了（失败后续跑/刷新）且原本要依次 / 点了继续处理：按配置卡补齐后续次第
+      if (!(this.ciClassMultiQueue || []).length
+        && (this.ciClassMultiScope === 'all' || this.ciClassMultiResumeChain)) {
+        const current = this.ciActiveResult?.manifest?.selected_files?.[0]
+          || this.ciRunningTask?.files?.[0]
+          || ''
+        await this._rebuildClassMultiRemainingQueue(u, current)
+      }
+      if (!(this.ciClassMultiQueue || []).length) return
+      // 核验迭代进行中时先不连开下一文件，避免抢进度与切换分析
+      if (this.verifyIterate && this.verifyIterate.running) {
+        this.$message.info('当前正在迭代更新批改结果，完成后将继续依次批改下一份作业')
+        this._persistClassMultiQueueState(u)
+        return
+      }
+      const next = this.ciClassMultiQueue.shift()
+      this._persistClassMultiQueueState(u)
+      if (!next) return
+      if (!u) {
+        this.ciClassMultiQueue = []
+        this.ciClassMultiSkillSelection = null
+        this.ciClassMultiResumeChain = false
+        return
+      }
+      try {
+        const settings = await feedbackMaterialSettings({ username: u, files: [next] })
+        if (settings.error_num !== 0 || !settings.feedback_eligible) {
+          this.$message.warning(`队列中的「${next}」材料设置未就绪，已停止后续次第`)
+          this.ciClassMultiQueue = []
+          this.ciClassMultiSkillSelection = null
+          this.ciClassMultiResumeChain = false
+          this._persistClassMultiQueueState(u)
+          return
+        }
+        const skillSel = this.ciClassMultiSkillSelection || { enabled: false, names: [] }
+        if (this.ciClassMultiReportOnly) {
+          this.$message.info(`沿用已有逐页批改，重出下一次报告和卡片：${next}（剩余 ${this.ciClassMultiQueue.length}）`)
+          const ok = await this._rerunExistingHomeworkReport(next, u, { resetPrior: this.ciClassMultiResetPrior })
+          if (!ok) {
+            this.ciClassMultiQueue = []
+            this.ciClassMultiReportOnly = false
+            this.ciClassMultiSkillSelection = null
+            this.ciClassMultiResumeChain = false
+            this._persistClassMultiQueueState(u)
+          }
+          return
+        }
+        this.$message.info(`开始依次批改下一次作业：${next}（剩余 ${this.ciClassMultiQueue.length}）`)
+        // 跳过再次弹窗：沿用首次开改时选的 Skill
+        await this._startCIAnalysis([next], 'single', u, {
+          requestedAction: 'grading',
+          material: settings.material,
+          homeworkTargetStage: 'grading',
+          skipSkillDialog: true,
+          notebookSkillSelection: {
+            enabled: !!skillSel.enabled,
+            names: [...(skillSel.names || [])],
+          },
+        })
+      } catch (e) {
+        console.error('[CI] class multi queue continue failed', e)
+        this.$message.error('依次批改下一文件失败，队列已清空')
+        this.ciClassMultiQueue = []
+        this.ciClassMultiSkillSelection = null
+        this.ciClassMultiResumeChain = false
+        this._persistClassMultiQueueState(u)
+      }
     },
 
     /** 启动分析（内部使用） */
@@ -12028,18 +12353,98 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
       try {
         let skillSelection
         if (options.requestedAction === 'grading') {
-          if (this.ciSkillPending) return
-          this.ciSkillSelection = { enabled: false, names: [] }
-          this.ciSkillValid = true
-          skillSelection = await new Promise(resolve => {
-            this.ciSkillPending = { filename: files[0], username, resolve }
-          })
-          if (!skillSelection) return
-          if (localStorage.getItem('userId') !== username) {
-            this.$message.warning('当前本子已切换，请重新选择批改材料')
-            return
+          if (options.skipSkillDialog && options.notebookSkillSelection) {
+            skillSelection = {
+              enabled: !!options.notebookSkillSelection.enabled,
+              names: [...(options.notebookSkillSelection.names || [])],
+            }
+          } else {
+            if (this.ciSkillPending) return
+            this.ciSkillSelection = { enabled: false, names: [] }
+            this.ciSkillValid = true
+            this.ciClassMultiScope = 'current'
+            this.ciClassMultiPriorMode = 'use'
+            this.ciClassMultiResetPrior = false
+            this.ciClassMultiSkillSelection = null
+            let classMultiPlan = null
+            try {
+              const planResp = await getCIHomeworkClassMultiPlan({ username, filename: files[0] })
+              if (planResp.error_num === 0 && planResp.is_class_multi) {
+                classMultiPlan = planResp
+                // 材料设置不一致等提示已在弹窗内 el-alert 展示，不再额外弹黄条吓人
+              } else if (planResp && planResp.error_num !== 0) {
+                // 不影响选 Skill / 开始处理；仅少「同班多次」选项
+                console.warn('[CI] class multi plan error', planResp)
+                this.$message.warning(
+                  (planResp.msg ? `${planResp.msg}。` : '')
+                  + '仍可照常选 Skill 开改当前文件；同班多次选项暂不可用'
+                )
+              }
+            } catch (e) {
+              console.warn('[CI] class multi plan query failed', e)
+              this.$message.warning('同班多次信息暂不可用，仍可照常选 Skill 开改当前文件')
+            }
+            skillSelection = await new Promise(resolve => {
+              this.ciSkillPending = { filename: files[0], username, resolve, classMulti: classMultiPlan }
+            })
+            if (!skillSelection) return
+            if (localStorage.getItem('userId') !== username) {
+              this.$message.warning('当前本子已切换，请重新选择批改材料')
+              return
+            }
+            if (this.ciRunningTask && !this.ciRunningTask.completed) return
+            // 班级多人多次：默认「用前序」→ 从当前次第起改后续；「从头重做」→ 自最早次第起并清空记忆
+            if (skillSelection.classMultiPlan?.is_class_multi && skillSelection.classMultiScope === 'all') {
+              const priorMode = (skillSelection.classMultiPriorMode === 'redo') ? 'redo' : 'use'
+              const assigns = [...(skillSelection.classMultiPlan.assignments || [])]
+                .sort((a, b) => (a.homework_index || 0) - (b.homework_index || 0))
+              const curHw = Number(skillSelection.classMultiPlan.homework_index || 0)
+              const chain = priorMode === 'redo'
+                ? assigns
+                : assigns.filter(a => Number(a.homework_index || 0) >= curHw)
+              const names = chain.map(a => a.filename).filter(Boolean)
+              if (names.length) {
+                const first = names[0]
+                this.ciClassMultiQueue = names.slice(1)
+                this.ciClassMultiSkillSelection = {
+                  enabled: !!skillSelection.enabled,
+                  names: [...(skillSelection.names || [])],
+                }
+                this.ciClassMultiScope = 'all'
+                this.ciClassMultiPriorMode = priorMode
+                this.ciClassMultiResetPrior = priorMode === 'redo'
+                this.ciClassMultiReportOnly = false
+                this._persistClassMultiQueueState(username)
+                if (first !== files[0]) {
+                  files = [first]
+                  try {
+                    const firstSettings = await feedbackMaterialSettings({ username, files: [first] })
+                    if (firstSettings.error_num === 0 && firstSettings.material) {
+                      options = { ...options, material: firstSettings.material }
+                    } else {
+                      this.$message.warning(`「${first}」材料设置未就绪，仍尝试开改；请核对后必要时单独重开`)
+                    }
+                  } catch (e) {
+                    console.warn('[CI] reload material for chain first failed', e)
+                    this.$message.warning(`未能重载「${first}」的材料设置，请核对后必要时单独重开`)
+                  }
+                }
+                if (priorMode === 'redo') {
+                  this.$message.info(`将从头重做第1→${assigns.length}次（清空前序记忆），共 ${names.length} 次`)
+                } else {
+                  this.$message.info(
+                    this.ciClassMultiQueue.length
+                      ? `将沿用前序结果与记忆，从第${curHw}次起依次批改共 ${names.length} 次`
+                      : `将沿用前序结果与记忆，批改第${curHw}次`
+                  )
+                }
+              }
+            } else {
+              this.ciClassMultiQueue = []
+              this.ciClassMultiSkillSelection = null
+              this.ciClassMultiResetPrior = false
+            }
           }
-          if (this.ciRunningTask && !this.ciRunningTask.completed) return
         }
         const contextDocs = Array.isArray(options.contextDocs)
           ? options.contextDocs
@@ -12052,7 +12457,24 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
           sub_scene_name: this.subSceneName,
           ...(options.material || {}),
         }
-        if (skillSelection) payload.notebook_skill_selection = skillSelection
+        // 后端 notebook_skills.selection 只允许 {enabled, names}；多人 scope/plan 不得塞进该字段
+        if (skillSelection) {
+          payload.notebook_skill_selection = {
+            enabled: !!skillSelection.enabled,
+            names: [...(skillSelection.names || [])],
+          }
+        }
+        if (this.ciClassMultiScope === 'all' || this.ciClassMultiPriorMode) {
+          if (this.ciClassMultiPriorMode === 'use' || this.ciClassMultiPriorMode === 'redo') {
+            payload.class_multi_prior_mode = this.ciClassMultiPriorMode
+          }
+          if (this.ciClassMultiResetPrior) {
+            payload.class_multi_reset_prior = true
+            // 仅开链首文件清空一次
+            this.ciClassMultiResetPrior = false
+            this._persistClassMultiQueueState(username)
+          }
+        }
         if (contextDocs.length > 0) {
           payload.context_docs = contextDocs
         }
@@ -12222,8 +12644,8 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
           return true
         }
         if (!String(analysisId).startsWith('homework_')) {
-          this.ciActiveResult = null
-          this.showContinuousImagePanel = false
+        this.ciActiveResult = null
+        this.showContinuousImagePanel = false
         }
         if (!quiet) this.$message.error(resp.msg || '读取结果失败，已有画面已保留')
         return false
@@ -12231,8 +12653,8 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         if (!canApply()) return false
         console.error('[CI] _loadCIResult error:', e)
         if (!String(analysisId).startsWith('homework_')) {
-          this.ciActiveResult = null
-          this.showContinuousImagePanel = false
+        this.ciActiveResult = null
+        this.showContinuousImagePanel = false
         }
         if (!quiet) this.$message.error('读取结果失败：' + (e.message || e))
         return false
@@ -12604,11 +13026,17 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
             this._stopCIPollTimer()
             this.ciHomeworkRedBlueRetryLoading = false
             const loaded = await this._loadCIGradingTaskResult(this.ciRunningTask, this.ciRunningTask.workspace, isCurrent)
-            this.refreshHomeworkResultCards(this.ciActiveResult?.manifest?.result_cards?.diagnosis_cid)
+            this.refreshHomeworkResultCards(
+              this.ciActiveResult?.manifest?.result_cards?.excerpt_cid
+              || this.ciActiveResult?.manifest?.result_cards?.diagnosis_cid
+            )
             if (loaded && isCurrent() && this.ciHomeworkPendingPageView) {
               const mode = this.ciHomeworkPendingPageView
               this.ciHomeworkPendingPageView = ''
               await this._openHomeworkPageViewMode(mode)
+            }
+            if (isCurrent() && !resp.error) {
+              await this._continueClassMultiQueueIfNeeded(username)
             }
             return
           }
@@ -12724,8 +13152,8 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
       this.ciHomeworkPendingPageView = ''
       this.ciSingleWorkAreaAutoOpenSignal = null
       if (!keepGradingTask) {
-        this.clearCIPollTimer()
-        this._closeCIProgressNotification()
+      this.clearCIPollTimer()
+      this._closeCIProgressNotification()
       }
     },
 
@@ -12893,16 +13321,84 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         return
       }
       const username = this.ciActiveResult?.manifest?.username || localStorage.getItem('userId')
-      const files = (Array.isArray(payload?.files) && payload.files.length)
-        ? payload.files
-        : (this.ciActiveResult?.manifest?.selected_files || ['作业批改迭代'])
-      const rerunStage = ['all', 'layout', 'understanding', 'grading'].includes(payload?.rerunStage)
+      let files = (Array.isArray(payload?.files) && payload.files.length)
+        ? [...payload.files]
+        : [...(this.ciActiveResult?.manifest?.selected_files || ['作业批改迭代'])]
+      const rerunStage = ['all', 'layout', 'understanding', 'grading', 'report'].includes(payload?.rerunStage)
         ? payload.rerunStage
         : 'all'
       const sessionIds = Array.isArray(payload?.sessionIds)
         ? payload.sessionIds.filter(Boolean)
         : []
       const resume = payload?.resume === true
+
+      // 完整重批：班级多人「只改当前 / 多次」与前序沿用/从头
+      if (payload?.classMultiPlan?.is_class_multi && payload?.classMultiScope === 'all') {
+        const priorMode = payload.classMultiPriorMode === 'redo' ? 'redo' : 'use'
+        const assigns = [...(payload.classMultiPlan.assignments || [])]
+          .sort((a, b) => (a.homework_index || 0) - (b.homework_index || 0))
+        const curHw = Number(payload.classMultiPlan.homework_index || 0)
+        const chain = priorMode === 'redo'
+          ? assigns
+          : assigns.filter(a => Number(a.homework_index || 0) >= curHw)
+        const names = chain.map(a => a.filename).filter(Boolean)
+        const first = names[0]
+        const skillSel = payload?.notebookSkillSelection || { enabled: false, names: [] }
+        this.ciClassMultiScope = 'all'
+        this.ciClassMultiPriorMode = priorMode
+        this.ciClassMultiSkillSelection = {
+          enabled: !!skillSel.enabled,
+          names: [...(skillSel.names || [])],
+        }
+        this.ciClassMultiReportOnly = rerunStage === 'report'
+        if (priorMode === 'redo' && first && first !== files[0]) {
+          this.ciClassMultiQueue = names.slice(1)
+          this.ciClassMultiResetPrior = true
+          this._persistClassMultiQueueState(username)
+          if (rerunStage === 'report') {
+            this.$message.info(`从「${first}」起，沿用各次已有逐页批改，只重出报告和卡片（共 ${names.length} 次）`)
+            const started = await this._rerunExistingHomeworkReport(first, username, { resetPrior: true })
+            if (!started) {
+              this.ciClassMultiQueue = []
+              this.ciClassMultiReportOnly = false
+              this._persistClassMultiQueueState(username)
+            }
+            return
+          }
+          this.$message.info(`完整重批将从头重做，已改从「${first}」起排（共 ${names.length} 次）`)
+          await this._startCIAnalysis([first], 'single', username, {
+            requestedAction: 'grading',
+            homeworkTargetStage: 'grading',
+            skipSkillDialog: true,
+            notebookSkillSelection: {
+              enabled: !!skillSel.enabled,
+              names: [...(skillSel.names || [])],
+            },
+            ...(payload?.material ? { material: payload.material } : {}),
+          })
+          return
+        }
+        this.ciClassMultiQueue = names.slice(1)
+        this.ciClassMultiResetPrior = priorMode === 'redo'
+        this._persistClassMultiQueueState(username)
+      } else if (payload?.classMultiScope === 'current') {
+        this.ciClassMultiQueue = []
+        this.ciClassMultiScope = 'current'
+        this.ciClassMultiResetPrior = false
+        this.ciClassMultiReportOnly = false
+        this._persistClassMultiQueueState(username)
+      }
+
+      // 「继续处理」：若本文件是班级多人合订，完成后按配置卡接上后续次第
+      if (resume) {
+        this.ciClassMultiResumeChain = true
+        this._restoreClassMultiQueueState(
+          this.ciActiveResult?.manifest?.username || localStorage.getItem('userId')
+        )
+        this._persistClassMultiQueueState(
+          this.ciActiveResult?.manifest?.username || localStorage.getItem('userId')
+        )
+      }
       const replacingSkills = Boolean(payload?.notebookSkillSelection)
       this.ciHomeworkRerunLoading = true
       // 重选 Skill 时后端会同步精选+交叉精髓，接口返回前先给可见进度，避免误以为卡死
@@ -12937,7 +13433,14 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
           ...(payload?.preprocessMode ? { preprocess_mode: payload.preprocessMode } : {}),
           ...(sessionIds.length ? { session_ids: sessionIds } : {}),
           ...(resume ? { resume: true } : {}),
+          ...((this.ciClassMultiPriorMode === 'use' || this.ciClassMultiPriorMode === 'redo')
+            ? { class_multi_prior_mode: this.ciClassMultiPriorMode } : {}),
+          ...(this.ciClassMultiResetPrior ? { class_multi_reset_prior: true } : {}),
         })
+        if (this.ciClassMultiResetPrior) {
+          this.ciClassMultiResetPrior = false
+          this._persistClassMultiQueueState(username)
+        }
         if (resp.error_num !== 0) {
           this.ciRunningTask = null
           this._closeCIProgressNotification()
@@ -12956,7 +13459,7 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
           error: '',
           completed: false,
         }
-        this.ciHomeworkPendingPageView = rerunStage === 'all' ? '' : rerunStage
+        this.ciHomeworkPendingPageView = (rerunStage === 'all' || rerunStage === 'report') ? '' : rerunStage
         this._showCIProgressNotification(files)
         this._startCIPoll(resp.task_id, analysisId, username)
         if (resume) {
@@ -12966,7 +13469,9 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
         } else {
           this.$message.success(sessionIds.length
             ? `已开始迭代 ${resp.effective_session_ids?.length || sessionIds.length} 个篇目`
-            : (rerunStage === 'all' ? '已开始完整迭代批改' : '已开始分阶段迭代'))
+            : (rerunStage === 'report'
+              ? '已开始重出批改报告和卡片，逐页批改沿用已有结果'
+              : (rerunStage === 'all' ? '已开始完整迭代批改' : '已开始分阶段迭代')))
         }
         return resp
       } catch (e) {

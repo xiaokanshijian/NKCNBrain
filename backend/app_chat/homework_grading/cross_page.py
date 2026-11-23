@@ -19,9 +19,84 @@ MAX_PAGES_PER_GROUP = 3
 
 
 def pass1_5_enabled(*, feedback_runtime=None) -> bool:
-    from .note_evidence import is_notes
-    raw = frozen_environment(feedback_runtime, 'HOMEWORK_PASS1_5_ENABLED', '1' if is_notes(feedback_runtime) else '0').strip().lower()
+    """作文/笔记默认开启跨页衔接；题目卷仍默认关闭，可用环境变量覆盖。"""
+    from .feedback_material_kinds import is_open_material
+    default_on = False
+    if feedback_runtime is not None:
+        default_on = is_open_material((feedback_runtime.context or {}).get('material_type'))
+    raw = frozen_environment(
+        feedback_runtime, 'HOMEWORK_PASS1_5_ENABLED', '1' if default_on else '0',
+    ).strip().lower()
     return raw in ('1', 'true', 'yes', 'y', 'on')
+
+
+def ensure_composition_bridges(all_jsons: Dict[int, Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
+    """作文多页默认相邻衔接：补 boundary，并给页缘单元标 cross_page。"""
+    pages = sorted(all_jsons.keys())
+    if len(pages) < 2:
+        return {}
+    boundaries: Dict[int, Dict[str, Any]] = {}
+    for index, page_num in enumerate(pages):
+        data = all_jsons[page_num]
+        boundary = data.get('boundary')
+        if not isinstance(boundary, dict):
+            boundary = {}
+        data['boundary'] = boundary
+        questions = [q for q in (data.get('questions') or []) if isinstance(q, dict)]
+        if index > 0:
+            boundary['continues_from_prev'] = True
+            if not str(boundary.get('description_prev') or '').strip():
+                boundary['description_prev'] = '作文正文自上页续写'
+            if questions:
+                questions[0]['cross_page'] = True
+        if index < len(pages) - 1:
+            boundary['continues_to_next'] = True
+            if not str(boundary.get('description_next') or '').strip():
+                boundary['description_next'] = '作文正文续写下页'
+            if questions:
+                questions[-1]['cross_page'] = True
+        boundaries[page_num] = boundary
+    return boundaries
+
+
+def candidate_composition_page_groups(
+    all_page_nums: List[int],
+    *,
+    max_pages_per_group: Optional[int] = None,
+) -> List[List[int]]:
+    """作文按 PDF 页序做连续窗组，保证跨页衔接几乎每页都会跑到。"""
+    pages = sorted(all_page_nums)
+    if len(pages) < 2:
+        return []
+    limit = MAX_PAGES_PER_GROUP if max_pages_per_group is None else int(max_pages_per_group)
+    if limit < 2:
+        limit = 2
+    # 先把连续页号收成一段，再按上限滑窗（与 build_cross_page_groups 一致）。
+    runs: List[List[int]] = []
+    current = [pages[0]]
+    for page_num in pages[1:]:
+        if page_num == current[-1] + 1:
+            current.append(page_num)
+        else:
+            runs.append(current)
+            current = [page_num]
+    runs.append(current)
+    final_groups: List[List[int]] = []
+    for run in runs:
+        if len(run) < 2:
+            continue
+        if len(run) <= limit:
+            final_groups.append(run)
+            continue
+        start = 0
+        while start < len(run):
+            window = run[start:start + limit]
+            if len(window) >= 2:
+                final_groups.append(window)
+            if start + limit >= len(run):
+                break
+            start += limit - 1
+    return final_groups
 
 
 def _iter_page_json_files(pass1_dir: str) -> List[str]:
@@ -188,14 +263,23 @@ def merge_corrections(all_jsons: Dict[int, Dict[str, Any]], result: Dict[str, An
             if not _can_apply_correction(question, page_data):
                 break
             old_verdict = question.get('verdict')
+            resolved_flag = correction.get('cross_page_resolved')
+            if resolved_flag is None:
+                resolved_flag = bool(new_verdict and new_verdict != 'uncertain')
             question.update({
                 'verdict': new_verdict or old_verdict,
                 'correct_answer': correction.get('correct_answer', question.get('correct_answer')),
                 'error_type': correction.get('error_type', question.get('error_type', '')),
                 'knowledge_point': correction.get('knowledge_point', question.get('knowledge_point', '')),
                 'cross_page': correction.get('cross_page', question.get('cross_page', True)),
-                'cross_page_resolved': correction.get('cross_page_resolved', bool(new_verdict and new_verdict != 'uncertain')),
+                'cross_page_resolved': resolved_flag,
             })
+            if 'understanding' in correction and correction.get('understanding') is not None:
+                question['understanding'] = correction.get('understanding')
+            if 'student_answer' in correction and correction.get('student_answer') is not None:
+                question['student_answer'] = correction.get('student_answer')
+            if resolved_flag:
+                question['cross_page_note'] = correction.get('cross_page_note') or None
             from .material_markings import MARKING_FIELDS, normalize_markings, open_material_runtime
             if open_material_runtime(feedback_runtime):
                 for field in MARKING_FIELDS:
@@ -357,12 +441,45 @@ def _find_clean_image(clean_dir: str, page_num: int) -> str:
     return ''
 
 
+def _filter_groups_by_page_runs(
+    groups: List[List[int]],
+    page_run_sets: Optional[List[List[int]]],
+) -> List[List[int]]:
+    """班级多人：跨页组不得跨越学生页块。"""
+    if not page_run_sets:
+        return groups
+    allowed_pairs: Set[Tuple[int, int]] = set()
+    for run in page_run_sets:
+        pages = sorted(int(p) for p in run)
+        for i in range(len(pages) - 1):
+            if pages[i + 1] == pages[i] + 1:
+                allowed_pairs.add((pages[i], pages[i + 1]))
+    filtered: List[List[int]] = []
+    for group in groups:
+        g = sorted(int(p) for p in group)
+        if len(g) < 2:
+            continue
+        # 拆成只在同一学生连续块内的子组
+        cur = [g[0]]
+        for p in g[1:]:
+            if (cur[-1], p) in allowed_pairs:
+                cur.append(p)
+            else:
+                if len(cur) >= 2:
+                    filtered.append(cur)
+                cur = [p]
+        if len(cur) >= 2:
+            filtered.append(cur)
+    return filtered
+
+
 def resolve_cross_pages(
     pass1_dir: str,
     clean_dir: str,
     subject: str,
     sample_id: str,
     scope_page_nums: Optional[Set[int]] = None,
+    page_run_sets: Optional[List[List[int]]] = None,
 *, feedback_runtime=None) -> List[Dict[str, Any]]:
     if feedback_runtime is not None:
         subject = feedback_runtime.context['subject_code']
@@ -390,30 +507,54 @@ def resolve_cross_pages(
             if not artifact_compatible(page, feedback_runtime):
                 finish([], 'configuration_mismatch')
                 raise ValueError('跨页输入与本轮配置不一致，必须重新生成')
+    max_pages = MAX_PAGES_PER_GROUP
+    composition = False
+    if feedback_runtime is not None:
+        from .feedback_material_kinds import cross_page_max_pages, is_composition
+        material_type = (feedback_runtime.context or {}).get('material_type')
+        max_pages = cross_page_max_pages(material_type)
+        composition = is_composition(material_type)
+        if composition:
+            ensure_composition_bridges(all_jsons)
+            for page_num, json_path in path_by_page.items():
+                safe_json_dump(
+                    json_path,
+                    stamp_feedback(all_jsons[page_num], feedback_runtime, 'cross_page'),
+                )
+
     boundaries = scan_boundaries(pass1_dir)
-    dependency_groups, blocked_pages = material_groups(all_jsons, MAX_PAGES_PER_GROUP)
-    if not boundaries and not dependency_groups:
+    dependency_groups, blocked_pages = material_groups(all_jsons, max_pages)
+    if not boundaries and not dependency_groups and not composition:
         logger.info('[%s-%s] 无跨页标记，Pass 1.5 跳过', subject, sample_id)
         return finish([], 'no_cross_page')
 
-    max_pages = MAX_PAGES_PER_GROUP
-    if feedback_runtime is not None:
-        from .feedback_material_kinds import cross_page_max_pages
-        max_pages = cross_page_max_pages((feedback_runtime.context or {}).get('material_type'))
     from .note_evidence import is_notes
-    dependency_groups, blocked_pages = material_groups(all_jsons, max_pages)
     notes = is_notes(feedback_runtime)
     if notes:
         from .note_page_links import candidate_note_page_pairs
         groups = candidate_note_page_pairs(all_jsons)
         if not groups and not dependency_groups:
             return finish([], 'unresolved_no_source_match')
+    elif composition:
+        groups = candidate_composition_page_groups(
+            sorted(all_jsons.keys()), max_pages_per_group=max_pages,
+        )
+        if not groups and not dependency_groups:
+            logger.info('[%s-%s] 作文页不足以组成跨页组，Pass 1.5 跳过', subject, sample_id)
+            return finish([], 'no_cross_page')
     else:
         groups = build_cross_page_groups(
             boundaries, sorted(all_jsons.keys()), max_pages_per_group=max_pages,
         )
     groups, combined_blocked = combine_material_groups(dependency_groups, groups, max_pages)
     blocked_pages.update(combined_blocked)
+    if page_run_sets:
+        before_n = len(groups)
+        groups = _filter_groups_by_page_runs(groups, page_run_sets)
+        logger.info(
+            '[%s-%s] 班级多人跨页过滤：%s → %s 组',
+            subject, sample_id, before_n, len(groups),
+        )
     logger.info('[%s-%s] 检测到跨页页面 %s，跨页组 %s', subject, sample_id, sorted(boundaries.keys()), groups)
 
     all_corrections: List[Dict[str, Any]] = []

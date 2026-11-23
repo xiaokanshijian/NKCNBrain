@@ -680,14 +680,14 @@
                 </div>
                 <div class="hg-tooltip-body">
                   <div v-for="row in tooltipRows(hoveredQuestion)" :key="row.label" class="hg-tooltip-row" :class="{ 'is-block': row.layers && row.layers.length }">
-                    <span>{{ row.label }}</span>
+                  <span>{{ row.label }}</span>
                     <div v-if="row.layers && row.layers.length" class="hg-three-q hg-three-q-compact">
                       <div v-for="layer in row.layers" :key="layer.key" class="hg-three-q-item">
                         <strong>{{ layer.key }}</strong>
                         <div v-if="layer.key === '这说明什么' && meanTagParts(layer.text).length" class="hg-mean-tags">
                           <div v-for="tag in meanTagParts(layer.text)" :key="tag.name"><em>{{ tag.name }}</em>{{ tag.value }}</div>
                           <p v-if="meanLeftover(layer.text)">{{ meanLeftover(layer.text) }}</p>
-                        </div>
+                </div>
                         <p v-else>{{ layer.text }}</p>
                       </div>
                     </div>
@@ -753,6 +753,42 @@
               <NotebookSkillSelector v-model="notebookSkillSelection" :username="skillWorkspace" @valid="notebookSkillValid = $event" />
             </template>
           </section>
+
+          <section v-if="showClassMultiRerunOptions" class="hg-rerun-fold is-expanded">
+            <div class="hg-rerun-fold-body">
+              <p style="margin:0 0 8px;font-weight:600;">班级多人 · 批改范围</p>
+              <div class="hg-preprocess-mode-list">
+                <label :class="['hg-preprocess-mode-option', { 'is-active': classMultiRerunScope === 'current' }]">
+                  <input v-model="classMultiRerunScope" type="radio" name="hg-cm-scope" value="current">
+                  <span><strong>只改当前这次</strong><em>仅重跑本份合订 PDF</em></span>
+                </label>
+                <label :class="['hg-preprocess-mode-option', { 'is-active': classMultiRerunScope === 'all' }]">
+                  <input v-model="classMultiRerunScope" type="radio" name="hg-cm-scope" value="all">
+                  <span><strong>按次第依次完成多次</strong><em>本班本学科当前及后续（或从头）</em></span>
+                </label>
+              </div>
+              <template v-if="classMultiRerunScope === 'all' && (classMultiPlan?.has_prior_results || Number(classMultiPlan?.homework_index || 0) > 1)">
+                <p style="margin:12px 0 6px;font-size:13px;">{{ classMultiPlan?.has_prior_results ? '检测到前序次第已有批改结果与记忆：' : '当前不是第1次，请选择是否沿用前序结果与记忆：' }}</p>
+                <div class="hg-preprocess-mode-list">
+                  <label :class="['hg-preprocess-mode-option', { 'is-active': classMultiPriorMode === 'use' }]">
+                    <input v-model="classMultiPriorMode" type="radio" name="hg-cm-prior" value="use">
+                    <span><strong>用已有前序</strong><em>从本次起改后续，带上前序记忆</em></span>
+                  </label>
+                  <label :class="['hg-preprocess-mode-option', { 'is-active': classMultiPriorMode === 'redo' }]">
+                    <input v-model="classMultiPriorMode" type="radio" name="hg-cm-prior" value="redo">
+                    <span><strong>从头重做</strong><em>清空前序记忆，自最早次第起</em></span>
+                  </label>
+                </div>
+              </template>
+              <ul v-if="(classMultiPlan?.assignments || []).length" style="margin:10px 0 0;padding-left:18px;font-size:12px;color:#5c6573;">
+                <li v-for="a in classMultiPlan.assignments" :key="a.filename">
+                  第{{ a.homework_index }}次：{{ a.filename }}
+                  <span v-if="a.has_completed_result"> · 已有结果</span>
+                </li>
+              </ul>
+            </div>
+          </section>
+
           <div class="hg-rerun-stage-list">
             <label
               v-for="option in rerunStageOptions"
@@ -925,7 +961,7 @@ import { API_BASE_URL } from '@/config/apiConfig'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { resolveHomeworkEvidencePage } from '@/utils/homeworkEvidence'
-import { listCIPass3Pairs, feedbackMaterialSettings } from '@/api/continuous_image'
+import { listCIPass3Pairs, feedbackMaterialSettings, getCIHomeworkClassMultiPlan } from '@/api/continuous_image'
 import FeedbackBasisStrip from './FeedbackBasisCard.vue'
 import NotebookSkillSelector from './NotebookSkillSelector.vue'
 
@@ -1063,6 +1099,9 @@ export default {
       selectedRerunSessionIds: [],
       selectedPreprocessMode: 'scan',
       useRedBlueFeedback: true,
+      classMultiPlan: null,
+      classMultiRerunScope: 'current',
+      classMultiPriorMode: 'use',
       rerunSectionsExpanded: {
         preprocess: false,
         sessions: false,
@@ -1078,6 +1117,7 @@ export default {
         { value: 'layout', label: '迭代无损版面', description: '清空无损版面、无损理解和三区批改结果' },
         { value: 'understanding', label: '迭代无损理解', description: '保留版面检测，清空无损理解和三区批改结果' },
         { value: 'grading', label: '迭代三区批改', description: '保留无损版面和无损理解，刷新诊断与批改图' },
+        { value: 'report', label: '只重出报告和卡片', description: '留下已有逐页批改，只重新写批改报告并输出卡片。单人多次按整份重出；班级多次按次第时，每一次都沿用自己已有的逐页结果' },
         { value: 'all', label: '完整迭代', description: '清空当前工作区，从 PDF 预处理重新跑完整流程' },
       ],
       // 与 confidence_zones.py GRAY_*_RGB_BY_SHADE 同步
@@ -1166,6 +1206,10 @@ export default {
       return Boolean(this.rerunSessions.length && !this.selectedRerunSessionIds.length)
     },
     redBlueReview() {
+      if (this.selectedRerunStage === 'report') return false
+      return Boolean(this.rerunSessions.length && !this.selectedRerunSessionIds.length)
+    },
+    redBlueReview() {
       const value = this.activeResult?.red_blue_review
       return value && typeof value === 'object' ? value : { status: 'missing' }
     },
@@ -1198,7 +1242,7 @@ export default {
           ? ['layout', 'understanding', 'grading']
           : ['grading']
       }
-      if (target === 'grading') return ['grading']
+      if (target === 'grading' || target === 'report') return ['grading']
       return this.redBlueEarlyStagesEnabled && ['layout', 'understanding'].includes(target)
         ? [target]
         : []
@@ -1235,6 +1279,19 @@ export default {
     },
     needsFullRecompute() {
       return this.canOpenRerunDialog && this.activeResult?.snapshot_status !== 'complete'
+    },
+    isClassMultiResult() {
+      const cm = this.manifest?.class_multi
+      return Boolean(cm && (cm.student_count || cm.class_id || cm.is_class_multi))
+        || this.classMultiPlan?.is_class_multi
+    },
+    showClassMultiRerunOptions() {
+      if (!this.isClassMultiResult) return false
+      // 三区批改、只重出报告和卡片、完整迭代都要能选「只改当前 / 按次第」
+      return this.needsFullRecompute
+        || this.replaceNotebookSkills
+        || this.refreshConfiguration
+        || ['all', 'grading', 'report'].includes(this.selectedRerunStage)
     },
     /** 可沿用原快照做分阶段/篇目迭代 */
     canIncrementalRerun() {
@@ -1650,7 +1707,7 @@ export default {
     window.addEventListener('resize', this.resizeTrendChart)
     window.addEventListener('keydown', this.handlePageKeydown)
     if (!this.pageViewOnly && !this.verifyAssist) {
-      this.$nextTick(() => this.renderTrendChart())
+    this.$nextTick(() => this.renderTrendChart())
     }
   },
   beforeUnmount() {
@@ -1977,7 +2034,7 @@ export default {
       // 进度条由 mainPage 托管，关闭本面板后仍可见
       this.$emit('start-pin-result-cards', { username, analysisId })
     },
-    confirmRerun() {
+    async confirmRerun() {
       if (this.rerunLoading || (this.runningTask && !this.runningTask.completed) || !this.canOpenRerunDialog) return
       this.selectedRerunStage = this.needsFullRecompute
         ? 'all'
@@ -1991,12 +2048,31 @@ export default {
       this.notebookSkillSelection = { enabled: false, names: [] }
       this.notebookSkillValid = true
       this.useRedBlueFeedback = this.redBlueReady
+      this.classMultiRerunScope = 'current'
+      this.classMultiPriorMode = 'use'
+      this.classMultiPlan = null
       this.rerunSectionsExpanded = {
         preprocess: false,
         sessions: false,
         redBlue: false,
       }
       this.rerunConfirmVisible = true
+      const filename = String(
+        this.activeResult?.manifest?.selected_files?.[0]
+        || this.manifest?.selected_files?.[0]
+        || ''
+      ).trim()
+      const username = this.skillWorkspace
+      if (filename && username) {
+        try {
+          const planResp = await getCIHomeworkClassMultiPlan({ username, filename })
+          if (planResp?.error_num === 0 && planResp.is_class_multi) {
+            this.classMultiPlan = planResp
+          }
+        } catch (e) {
+          console.warn('[HomeworkGradingPanel] class multi plan for rerun failed', e)
+        }
+      }
     },
     closeRerunConfirm() {
       this.rerunConfirmVisible = false
@@ -2011,15 +2087,14 @@ export default {
       const fullRecompute = this.needsFullRecompute || this.replaceNotebookSkills
       const rerunStage = fullRecompute
         ? 'all'
-        : (['all', 'layout', 'understanding', 'grading'].includes(this.selectedRerunStage)
-          ? this.selectedRerunStage
+        : (['all', 'layout', 'understanding', 'grading', 'report'].includes(this.selectedRerunStage)
+        ? this.selectedRerunStage
           : 'grading')
-      const sessionIds = this.selectedRerunSessionIds.filter(Boolean)
+      const sessionIds = rerunStage === 'report'
+        ? []
+        : this.selectedRerunSessionIds.filter(Boolean)
       const modeChanged = this.preprocessModeChanged
-      if (!fullRecompute && !modeChanged && !this.refreshConfiguration && this.rerunSessions.length && !sessionIds.length) return
-      if ((fullRecompute || modeChanged) && rerunStage !== 'all') return
-
-      // 只有显式采用当前配置或旧快照不可恢复时才读取当前材料设置；普通完整迭代继续沿用原快照。
+      if (rerunStage !== 'report' && !fullRecompute && !modeChanged && !this.refreshConfiguration && this.rerunSessions.length && !sessionIds.length) return
       let material = null
       if (this.refreshConfiguration || this.needsFullRecompute) {
         const filename = String(files[0] || this.activeResult?.manifest?.selected_files?.[0] || '').trim()
@@ -2040,6 +2115,12 @@ export default {
       }
 
       this.rerunConfirmVisible = false
+      const cmPayload = {}
+      if (this.showClassMultiRerunOptions && this.classMultiPlan?.is_class_multi) {
+        cmPayload.classMultiScope = this.classMultiRerunScope || 'current'
+        cmPayload.classMultiPriorMode = this.classMultiPriorMode || 'use'
+        cmPayload.classMultiPlan = this.classMultiPlan
+      }
       this.$emit('rerun', {
         analysisId,
         files,
@@ -2054,6 +2135,7 @@ export default {
         ...(material ? { material } : {}),
         // 仅当本次带入材料设置（依据可能变化）时不传篇目；其余情况保持原样传篇目
         ...(!fullRecompute && !modeChanged && !material && sessionIds.length ? { sessionIds } : {}),
+        ...cmPayload,
       })
     },
     onNotebookSkillsChange() {
@@ -2519,8 +2601,8 @@ export default {
       this._tooltipHideTimer = setTimeout(() => {
         this._tooltipHideTimer = null
         if (this.tooltipPinned || this.tooltipExpanded) return
-        this.hoveredQuestion = null
-        this.tooltipPointer = null
+      this.hoveredQuestion = null
+      this.tooltipPointer = null
         this.tooltipExpanded = false
       }, 120)
     },

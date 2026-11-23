@@ -9,6 +9,22 @@ NON_ASSESSED_ROLES = {'teaching_prompt', 'self_question', 'reading_prompt', 'sou
 NOTE_FIELDS = ('note_role', 'annotation_links', 'assessment_status', 'diagnostic_eligible',
                'material_check', 'assessment_reason')
 
+# 「才不会／并不会／绝不会」等表示「不会发生」，不是「学生不会」。
+# 「还不会／仍不会／根本不会」等仍视为能力缺陷断言。
+# 「失分／未得分」前若有「不会／并非／不致」等，由 phrase_findings 的否定前缀豁免。
+_ABILITY_DEFECT_ASSERT = (
+    r'未掌握|盲区|必须补答|要点不全|'
+    r'(?<!因此)(?<!不致)(?<!不会)(?:未得分|失分)|'
+    r'(?:还|仍|根本|完全|基本|几乎)不会|'
+    r'(?<![才并绝决万偏])不会(?![再错把被让使与和或因])'
+)
+_MASTERY_ASSERT = (
+    r'未掌握|已掌握|已经掌握|完全掌握|必须补答|要点不全|概念未建立|'
+    r'(?<!因此)(?<!不致)(?<!不会)(?:未得分|失分)|'
+    r'(?:还|仍|根本|完全|基本|几乎)不会|'
+    r'(?<![才并绝决万偏])不会(?![再错把被让使与和或因])'
+)
+
 # 只豁免同一分句中直接否定该断言的措辞；不能用前句的“不能推断”放行后句的误诊。
 from .semantic_checks import phrase_findings, evaluation_texts
 from .validation_issues import TextConstraintError, ValidationIssues, issue, raise_issues
@@ -358,10 +374,10 @@ def _validate_note_feedback_item(payload, memory, ontology, *, material_type='no
             _check_text(comment, r'(?:需要|必须|应当|请|建议)(?:再|重新)?(?:人工)?(?:补写|补答|复核)|信息不足',
                         '不得以未进入三区为由要求补写或复核')
         if not q['diagnostic_eligible']:
-            _check_text(comment, r'未掌握|不会|未得分|失分|盲区|必须补答|要点不全',
+            _check_text(comment, _ABILITY_DEFECT_ASSERT,
                         '待确认或非作答单元不能生成确定的能力缺陷：' + qid)
         if qid in annotation_refs and qid not in content_refs:
-            _check_text(comment, r'未掌握|已掌握|已经掌握|完全掌握|不会|未得分|失分|必须补答|要点不全|概念未建立',
+            _check_text(comment, _MASTERY_ASSERT,
                         '标注观察批语不能推定内容掌握：' + qid)
     # 最终报告的三区同样须符合当前证据，后处理不得加回不确定题的盲区。
     if 'zone_classification' in payload:
