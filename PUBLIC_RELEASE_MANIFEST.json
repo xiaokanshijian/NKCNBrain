@@ -1,7 +1,7 @@
 {
   "format": 1,
   "files": {
-    ".gitignore": "be14a1fed37a164765fe71aac0013d88e02e1d63dc0eaaae0356436047e47607",
+    ".gitignore": "be1b931026c8e6579a00266051db3188fbfce3b1ba2751961dd2f1da8e8e329d",
     "AGENTS.md": "da7d5a715f0f02e86aea7f63efe903b3b72aa783f50c563ca7f39cb9ee3cb662",
     "README.md": "b50b5beda226a9351098b18bbdb666e0772fda0e40d6e06aaa8630264361b87d",
     "backend/.env.example": "664a8cf4a8195cba3b53ffeb658d25fb6a293f009f47e04f548b27d6a1187fd8",
@@ -148,6 +148,7 @@
     "backend/app_chat/document_todo.py": "ee65cc56f8d4cd6665c7d92e8689f1b02137c4444b0b758d197ecdb72c5d8bcd",
     "backend/app_chat/document_todo_views.py": "291b3acc92c633f789d6600cf23c93851895d41cbec9dc0988a6255847184b84",
     "backend/app_chat/dsreasoner_api.py": "f471051908707bd589674bae17a36b712332ea92efe3d1813765c035d7a9b1e7",
+    "backend/app_chat/export_quadrant_bundle.py": "df4fbe69f40fcdf642530fdb18eee74dd9f9984020d34f5088a50b8d278f438a",
     "backend/app_chat/export_semantic_reorganize_bundle.py": "11853a9a8b8a729a6c7b4a1cf348558a886d8353a71fd60d218632512a1704c1",
     "backend/app_chat/feedback_material_identity.py": "8ba664f3685c85b1b609826ee911825adf715f67a89658c7d3a874d63c95085d",
     "backend/app_chat/feedback_material_settings.py": "d1d606f4e55bbe92a5d8fa38b15e0a126d91d46f532f86f87356a6eae402b2f1",
@@ -383,6 +384,7 @@
     "backend/app_chat/homework_grading/version_identity_test.py": "ada35431698113fb1672985343e15623b4f26db01f2eebd9c384eeb772b35082",
     "backend/app_chat/homework_grading/wgb_trust.py": "bd9d32d40d820477b74d87b2782025af3b9000b277b733af84256e52f831fb29",
     "backend/app_chat/homework_grading/yangqian_debug.py": "97e4c0b999595821b2c5a5c795615a9a96f3f7099a630087e753bf8d0644d80f",
+    "backend/app_chat/import_quadrant_bundle.py": "c793526c9bad726fc96feba1dd48faae8e533d0d9a1754574176490acdec0812",
     "backend/app_chat/import_semantic_reorganize_bundle.py": "364fbf226eafe0717036ddafc8be88921fd0478147544ad763a9c36add972a73",
     "backend/app_chat/interrupt_manager.py": "ccae6bbc5997c80981f7345f6303c5d98001e639f6f4803fe1f1af6f9917ebdc",
     "backend/app_chat/interrupt_views.py": "a909ef798a4d742a5aeb3c4c845bb4981ed273f414adf247a6aca5569a0380d1",
@@ -491,6 +493,7 @@
     "backend/djangoProject/urls.py": "6e91a6160554143107e656a1834c9c2b12b439ae09a1182249cdaff92c8c34a9",
     "backend/djangoProject/wsgi.py": "b0115370004b7dff15ab6a2d80830d7d38e8583b80ab17aa60968a80b919840d",
     "backend/docs/lyf更新/20261123_卡片语义空间V3与关键词图交互更新说明.md": "f0b68fc3919f7d6389bc259a6d3142b98a1f4d08f089a32dc7ebac4fc73d1abc",
+    "backend/docs/lyf更新/20261123_语义四象限结果导入导出工具更新说明.md": "d90ec83bad5d3ed62d249d7e200773d3db278d8c8b6e65f469985106f2f7975b",
     "backend/docs/连续图片批改功能说明文档.md": "29998f374b2fffd5c142690e1f3b48a95ae65c6498b5f1ecd0222049b30aa159",
     "backend/forward.py": "82c70c481f8c52b231d49a2dadf1a441da91df1e7a17735d78758d2cc3784f5f",
     "backend/llm_langchain/all_test/Huggface_get_model.py": "560c8f2c18c5bd8c7736f9b17b13ff9232457122a721b7e931af1d59b03f8442",

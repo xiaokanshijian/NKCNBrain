@@ -45,3 +45,6 @@ backend/app_chat/redirect_config.json
 # Vendored audio player is a source dependency, not application build output.
 !frontend/src/components/dist/
 !frontend/src/components/dist/**
+
+# Notebook data exported by the quadrant migration tool.
+*_quadrant_bundle.txt
