@@ -263,6 +263,10 @@ urlpatterns = [
     re_path('semantic_reorganize_status', views_semantic_reorganize.semantic_reorganize_status),
     re_path('semantic_reorganize_rollback', views_semantic_reorganize.semantic_reorganize_rollback),
     re_path('update_hierarchy_link_strength$', views_semantic_reorganize.update_hierarchy_link_strength_api),
+    re_path('semantic_intent_preference$', views_semantic_reorganize.semantic_intent_preference_api),
+    re_path('semantic_panel_suggest$', views_semantic_reorganize.semantic_panel_suggest_api),
+    re_path('semantic_confirm_pending$', views_semantic_reorganize.semantic_confirm_pending_api),
+    re_path('semantic_top_alternative_replace$', views_semantic_reorganize.semantic_top_alternative_replace_api),
 
     re_path('scene_cluster_semantic_start$', views_scene_cluster_semantic.scene_cluster_semantic_start),
     re_path('scene_cluster_semantic_status$', views_scene_cluster_semantic.scene_cluster_semantic_status),

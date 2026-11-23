@@ -158,11 +158,23 @@ def card_condense_path(username: str, cid: int) -> str:
 
 
 def _format_attr_line(kw: str, attrs: Optional[Dict[str, str]]) -> str:
+    """兼容旧 4 列，并追加 level|quadrant|status|analysis（方案 A10 扩展管道）。"""
     a = attrs or {}
-    return (
+    base = (
         f'{kw}|{a.get("four_color_type") or "?"}|'
         f'{a.get("dmt_level") or "?"}|{a.get("knowledge_type") or "?"}'
     )
+    # 有扩展字段才追加，避免旧链路写出多余空列污染
+    extra_keys = ('level', 'quadrant', 'status', 'analysis')
+    if any((a.get(k) or '').strip() for k in extra_keys):
+        analysis = (a.get('analysis') or '').replace('|', '/').replace('\n', ' ').strip()
+        base += (
+            f'|{a.get("level") or ""}|'
+            f'{a.get("quadrant") or ""}|'
+            f'{a.get("status") or ""}|'
+            f'{analysis}'
+        )
+    return base
 
 
 def write_keyword_attrs_file(
@@ -172,7 +184,7 @@ def write_keyword_attrs_file(
     *,
     header: str = '',
 ) -> str:
-    """按关键词顺序写入 词|四色|DMT|三类知识。"""
+    """按关键词顺序写入 词|四色|DMT|三类知识[|level|quadrant|status|analysis]。"""
     lines: List[str] = []
     if header:
         lines.append(header.rstrip() + '\n')
@@ -463,8 +475,14 @@ def condense_card_content(
         track_fn(username, 'deepseek', '卡片浓缩', f'cid={cid}')
     text = (content or '')[:12000]
     prompt = (
-        '请将下列卡片内容浓缩为几十字的几句话。'
-        '要求：尽可能将卡片内容浓缩涵盖完全；是浓缩不是摘要；只输出浓缩正文，不要标题或说明。\n\n'
+        '请将下列卡片内容浓缩为短而全的几句话（浓缩不是摘要）。\n'
+        '额外硬性要求（主体本体语义空间用人侧证据）：\n'
+        '1) 若卡片中有人的明确主体信号（如提问、表态、认知边界、知道/不确定/不知道），'
+        '必须把这些人的主体信号总结浓缩清楚，不要有细节遗漏或偏差，准确体现人的认知状态和边界；\n'
+        '2) 这些人主体部分必须用下列标记包住（可多段）：\n'
+        '[[HUMAN_SUBJECT_START]]……人主体浓缩……[[HUMAN_SUBJECT_END]]\n'
+        '3) 标记之外的浓缩内容算作机器部分；若完全无人主体信号，可不使用标记，只输出机器浓缩。\n'
+        '4) 只输出浓缩正文（可含上述标记），不要标题或说明。\n\n'
         f'卡片标题：{title or "（无）"}\n'
         f'卡片正文：\n{text}'
     )
@@ -472,11 +490,17 @@ def condense_card_content(
     rsp = client.chat.completions.create(
         model=DEEPSEEK_FALLBACK,
         messages=[
-            {'role': 'system', 'content': '你擅长把长文浓缩成短而全的几句话。'},
+            {
+                'role': 'system',
+                'content': (
+                    '你擅长把长文浓缩成短而全的几句话，'
+                    '并能用 [[HUMAN_SUBJECT_START]]…[[HUMAN_SUBJECT_END]] 准确标出人主体信号。'
+                ),
+            },
             {'role': 'user', 'content': prompt},
         ],
         temperature=0.3,
-        max_tokens=400,
+        max_tokens=500,
         extra_body={'thinking': {'type': 'disabled'}},
     )
     return (rsp.choices[0].message.content or '').strip()

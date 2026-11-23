@@ -350,10 +350,10 @@
     </div>
 
     <!-- 场景模型配置（P0-P5 业务写死模型） -->
-    <div class="scene-models-container" style="margin: 30px 0; padding: 20px; background: #f0f9eb; border-radius: 8px;">
+    <div class="scene-models-container scene-models-cap" style="margin: 30px 0; padding: 20px; background: #f0f9eb; border-radius: 8px;">
       <h2>一些系统能力的模型配置</h2>
       <p style="color: #666; margin-bottom: 12px;">
-        红蓝浅评、文档摘要、卡片 HTML 整理更新/卡片生图、输出目录卡、连续图片OCR/识别/理解、作业批改、交叉梳理 Skill 等处的模型。保存后立即生效，无需重启。
+        红蓝浅评、文档摘要、卡片 HTML 整理更新/卡片生图、输出目录卡、连续图片OCR/识别/理解、作业批改、交叉梳理 Skill、主体本体语义关键词空间（P4 降级链）等处的模型。保存后立即生效，无需重启。
       </p>
       <p style="color: #909399; margin-bottom: 20px; font-size: 13px;">
         <strong style="color: #67c23a;">标准配置</strong>：从已有模型配置里选择，只换模型缩写名，调用方式不变；
@@ -364,11 +364,11 @@
         <p v-if="group.name === 'P5'" style="color: #909399; font-size: 13px; margin: 0 0 12px 0;">
           以下项仅作展示，暂不支持在此修改。
         </p>
-        <el-form label-width="280px" style="max-width: 900px;">
+        <el-form label-width="260px" class="scene-models-cap-form">
           <el-form-item v-for="slot in group.slots" :key="slot.key" :label="slot.label">
             <el-select
               v-model="sceneModelValues[slot.key]"
-              style="width: 360px;"
+              class="scene-models-cap-select"
               filterable
               :disabled="slot.type === 'display_only' || slot.editable === false">
               <el-option
@@ -806,7 +806,7 @@ export default {
         P1: 'P1 · 输出目录卡（Claude 思考/校验）',
         P2: 'P2 · 连续图片理解（OCR、识字、版面精修、覆盖层等）',
         P3: 'P3 · 作业批改',
-        P4: 'P4 · 语义梳理',
+        P4: 'P4 · 语义梳理 / 主体本体语义空间',
         P5: 'P5 · 语音合成',
       };
       const buckets = {};
@@ -2393,6 +2393,24 @@ export default {
 .icon-connection:hover {
   color: #f78989;
   filter: drop-shadow(0 0 10px rgba(245, 108, 108, 0.4));
+}
+
+/* 一些系统能力的模型配置：略收窄，避免右侧大片空白 */
+.scene-models-cap {
+  max-width: 1100px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.scene-models-cap-form {
+  max-width: 100%;
+}
+.scene-models-cap-select {
+  width: 360px !important;
+}
+.scene-models-cap .el-form-item__content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
 }
 </style>
   

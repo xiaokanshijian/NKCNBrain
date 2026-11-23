@@ -39,7 +39,28 @@
         #{{ nodeDisplayLimitShortLabel }}
       </button>
       <button
-        v-if="viewMode === 'network' && !isOntologyScopeMode"
+        v-if="viewMode === 'network' && showAuxLinkToggles"
+        class="node-count-btn aux-link-btn"
+        :class="{ active: showContourLinks }"
+        @click="toggleAuxLinks('contour')"
+        title="等高线：围着同一上级子节点的闭合圈。点击打开或关闭"
+      >等高</button>
+      <button
+        v-if="viewMode === 'network' && showAuxLinkToggles"
+        class="node-count-btn aux-link-btn"
+        :class="{ active: showLongitudeLinks }"
+        @click="toggleAuxLinks('longitude')"
+        title="经度线：同色跨层虚线。点击打开或关闭"
+      >经度</button>
+      <button
+        v-if="viewMode === 'network' && isV3Pipeline"
+        class="node-count-btn aux-link-btn"
+        :class="{ active: quadrantPlaceMode }"
+        @click="toggleQuadrantPlaceMode"
+        title="四个象限各自重新排布，中间留空。跨象限的线沿轴线走。再点一次回到原来的力导向。"
+      >放入象限</button>
+      <button
+        v-if="viewMode === 'network' && !isOntologyScopeMode && !isV3Pipeline"
         class="node-count-btn keyword-pick-strategy-btn"
         @click="showKeywordPickStrategyDialog = true"
         :title="keywordPickStrategyTitle"
@@ -50,8 +71,8 @@
         v-if="viewMode === 'network'"
         class="export-full-graph-btn"
         :disabled="exportingNetworkPng"
-        @click="exportFullNetworkPng"
-        title="复制整张语义关键词空间图到剪贴板（高清 PNG）"
+        @click="showExportGraphDialog = true"
+        title="截取完整大图。可选择只截网络图，或连同上下左右的说明一起截"
       >
         {{ exportingNetworkPng ? '…' : '⤓' }}
       </button>
@@ -104,6 +125,11 @@
         <span class="legend-today-new-circle"></span>
         <span class="legend-color-text">当日新增</span>
       </span>
+      <span v-if="isV3Pipeline" class="legend-item">
+        <span class="legend-label">经线：</span>
+        <span class="legend-longitude-dash"></span>
+        <span class="legend-color-text">同色跨层</span>
+      </span>
       </div>
     </div>
     
@@ -132,6 +158,40 @@
               @click="applyNodeDisplayLimit(option.value)"
             >
               {{ option.label }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="showExportGraphDialog"
+      class="color-dmt-dialog-overlay"
+      @click.self="showExportGraphDialog = false"
+    >
+      <div class="color-dmt-dialog node-count-dialog" @click.stop>
+        <div class="dialog-header">
+          <h3>截取完整大图</h3>
+          <button class="dialog-close" @click="showExportGraphDialog = false">×</button>
+        </div>
+        <div class="dialog-content">
+          <div class="dialog-current">优先复制到剪贴板。若浏览器不让写入，会直接下载这张图。</div>
+          <div class="dialog-options keyword-pick-strategy-options">
+            <button
+              class="dialog-option-btn keyword-pick-option-btn"
+              :disabled="exportingNetworkPng"
+              @click="exportFullNetworkPng(false)"
+            >
+              <div class="keyword-pick-option-title">只截网络图</div>
+              <div class="keyword-pick-option-desc">节点、连线，以及图画布里的象限和轴端名称。</div>
+            </button>
+            <button
+              class="dialog-option-btn keyword-pick-option-btn"
+              :disabled="exportingNetworkPng"
+              @click="exportFullNetworkPng(true)"
+            >
+              <div class="keyword-pick-option-title">带上上下左右信息</div>
+              <div class="keyword-pick-option-desc">按页面上现在的样子，把图和上下左右的说明整张截下来。</div>
             </button>
           </div>
         </div>
@@ -182,14 +242,33 @@
     </div>
     
   <!-- 网络图视图 -->
-  <div v-if="viewMode === 'network'" class="network-view-wrapper">
+  <div v-if="viewMode === 'network'" class="network-view-wrapper" ref="networkViewWrapper">
+    <div v-if="isV3Pipeline && v3SpiralText" class="v3-spiral-banner">{{ v3SpiralText }}</div>
+    <div class="network-svg-container" :class="{ 'is-v3': isV3Pipeline }">
+      <div
+        v-if="isV3Pipeline && v3Thermometer"
+        class="v3-thermo v3-thermo-left"
+        :title="v3Thermometer.subject_reason || ''"
+      >
+        <div class="v3-thermo-label">主体</div>
+        <div class="v3-thermo-track">
+          <div
+            class="v3-thermo-fill"
+            :style="{ height: Math.min(100, Math.max(0, Number(v3Thermometer.subject_score) || 0)) + '%' }"
+          />
+        </div>
+        <div class="v3-thermo-score">{{ v3Thermometer.subject_score }}</div>
+        <div v-if="v3Thermometer.subject_reason" class="v3-thermo-reason">{{ v3ThermometerSubjectReasonShort }}</div>
+      </div>
     <div class="network-view-container" :style="{ height: computedContainerHeight }" ref="networkContainer">
       <div class="network-canvas-wrapper" ref="networkWrapper">
         <svg 
           ref="networkSvg" 
           class="network-svg"
           :viewBox="computedViewBox"
-          preserveAspectRatio="xMidYMid meet">
+          preserveAspectRatio="xMidYMid meet"
+          @mousemove="onNetworkMouseMove"
+          @mouseleave="clearGraphHover">
           <!-- SVG滤镜定义（橙色阴影） -->
           <defs>
             <filter id="orangeGlow" x="-50%" y="-50%" width="200%" height="200%">
@@ -280,34 +359,47 @@
             />
 
           </g>
+
+          <!-- 等高圈：围着同一上级的子节点，按角度收成闭合虚线，不连成额外边 -->
+          <g v-if="visibleContourRings.length" class="contour-rings" pointer-events="none">
+            <path
+              v-for="ring in visibleContourRings"
+              :key="ring.id"
+              class="contour-ring"
+              :class="{ 'is-hot': contourRingHot(ring), 'is-dim': contourRingDim(ring) }"
+              :data-contour-id="ring.id"
+              :d="ring.d"
+              stroke-dasharray="9 6"
+              stroke-linejoin="round"
+            />
+          </g>
           
           <!-- 连接线（透明热区便于右键细线） -->
           <g class="links">
-            <line
-              v-for="link in links"
+            <path
+              v-for="link in visibleLinks"
               :key="`hit-${link.source.id}-${link.target.id}`"
-              :x1="link.source.x"
-              :y1="link.source.y"
-              :x2="link.target.x"
-              :y2="link.target.y"
+              :d="linkCurve(link)"
               stroke="transparent"
               stroke-width="12"
+              fill="none"
               class="link-hit-area"
+              :class="{ 'contour-dim': graphLinkDimmed(link) }"
               @mouseenter="highlightLink(link, $event)"
               @mouseleave="resetHighlight"
               @contextmenu.prevent="handleLinkRightClick(link, $event)"
             />
-            <line
-              v-for="link in links"
+            <path
+              v-for="link in visibleLinks"
               :key="`${link.source.id}-${link.target.id}`"
-              :x1="link.source.x"
-              :y1="link.source.y"
-              :x2="link.target.x"
-              :y2="link.target.y"
+              :d="linkCurve(link)"
+              fill="none"
               :stroke-width="link.width"
               :stroke="link.color"
-              :opacity="link.opacity"
+              :opacity="quadrantLinkOpacity(link)"
+              :stroke-dasharray="link.dasharray || null"
               class="link-line"
+              :class="{ 'contour-dim': graphLinkDimmed(link) }"
               pointer-events="none"
             />
           </g>
@@ -387,7 +479,9 @@
               :class="{ 
                 'selected': selectedKeywords.includes(node.label),
                 'highlighted': highlightedNode === node.id,
-                'new-keyword': !!node.isNew
+                'new-keyword': !!node.isNew,
+                'contour-dim': graphNodeDimmed(node),
+                'longitude-breath': longitudeNodeBreathing(node)
               }"
             >
               <!-- 三类知识外圈：部落两层 / 组织一层 / 传统无圈 -->
@@ -425,13 +519,35 @@
                 pointer-events="none"
               />
               
+              <rect
+                v-if="node.pending || node.pendingFaded"
+                :x="-((node.radius || 10) + 10)"
+                :y="-((node.radius || 10) + 10)"
+                :width="((node.radius || 10) + 10) * 2"
+                :height="((node.radius || 10) + 10) * 2"
+                fill="none"
+                :stroke="node.pendingFaded ? '#b0b0b0' : '#888'"
+                stroke-dasharray="4,3"
+                :stroke-width="node.pendingFaded ? 1 : 1.5"
+                :opacity="node.pendingFaded ? 0.42 : 0.95"
+                pointer-events="none"
+              />
+              <circle
+                v-if="longitudeNodeBreathing(node)"
+                class="longitude-breath-halo"
+                :r="(node.radius || 10) + 7"
+                fill="none"
+                :stroke="longitudeBreathColor()"
+                stroke-width="2.4"
+                pointer-events="none"
+              />
               <circle
                 :r="node.radius"
                 :fill="node.color"
                 :stroke="node.stroke"
                 :stroke-width="node.strokeWidth"
                 class="node-circle"
-                @click="toggleKeywordSelection(node.label)"
+                @click="handleNodeClick(node, $event)"
                 @mouseenter="showTooltip(node, $event)"
                 @mouseleave="hideTooltip"
                 @mouseover.stop
@@ -439,7 +555,7 @@
                 @contextmenu.prevent="handleRightClick(node, $event)"
               />
               
-              <!-- 节点圆圈内的数字（卡片数量）；大本体模式无本子卡片，不显示 0 -->
+              <!-- 节点圆圈内的数字：v2=卡频；v3=文档命中+卡片模糊命中；大本体不显示 -->
               <text
                 v-if="!isOntologyScopeMode"
                 class="node-count-text"
@@ -477,11 +593,12 @@
               <text
                 v-else
                 class="node-label"
-                :font-size="node.fontSize || 10"
+                :font-size="node.labelFontSize || node.fontSize || 10"
+                :font-weight="node.labelWeight || 400"
                 :fill="node.textColor || '#333'"
                 text-anchor="middle"
                 dy=".35em"
-                :y="(node.radius || 10) + 10"
+                :y="(node.radius || 10) + (node.labelFontSize || 10)"
                 @contextmenu.prevent="handleRightClick(node, $event)"
               >
                 {{ node.label }}
@@ -548,7 +665,14 @@
               三类知识: {{ tooltipOntologyAttrs(tooltip.data?.label).kt }}
             </div>
           </template>
+          <template v-else-if="isV3Pipeline">
+            <div>统计合计: {{ tooltip.data?.cardCount || 0 }}（文档 {{ tooltip.data?.docHitCount || 0 }} + 卡片 {{ tooltip.data?.cardHitCount || 0 }}）</div>
+            <div class="tooltip-hint">文档/卡片按语义词匹配度累计（非卡频出图）</div>
+          </template>
           <div v-else>含此关键词的卡片: {{ tooltip.data?.cardCount }} 张</div>
+          <div v-if="tooltip.data?.level != null && tooltip.data?.level !== ''">层级: {{ tooltip.data.level }}</div>
+          <div v-if="tooltip.data?.quadrant">象限: {{ tooltip.data.quadrant }}</div>
+          <div v-if="tooltip.data?.pending">状态: 待确认</div>
           <div v-if="!isOntologyScopeMode && tooltip.data?.contributors && tooltip.data.contributors.length > 0">
             <span v-if="tooltip.data.isMultiWriter">贡献作者:</span>
             <span v-else>贡献阶段:</span>
@@ -592,6 +716,131 @@
         </div>
       </div>
       </div>
+      <div
+        v-if="isV3Pipeline && v3Thermometer"
+        class="v3-thermo v3-thermo-right"
+        :title="v3Thermometer.ontology_reason || ''"
+      >
+        <div class="v3-thermo-label">本体</div>
+        <div class="v3-thermo-track">
+          <div
+            class="v3-thermo-fill v3-thermo-fill-ontology"
+            :style="{ height: Math.min(100, Math.max(0, Number(v3Thermometer.ontology_score) || 0)) + '%' }"
+          />
+        </div>
+        <div class="v3-thermo-score">{{ v3Thermometer.ontology_score }}</div>
+        <div v-if="v3Thermometer.ontology_reason" class="v3-thermo-reason">{{ v3ThermometerOntologyReasonShort }}</div>
+      </div>
+    </div>
+    <div v-if="isV3Pipeline" class="v3-bottom-panel">
+      <div v-if="v3CoreIssue" class="v3-issue">
+        <div class="v3-bottom-label">核心问题</div>
+        <div class="v3-bottom-text">{{ v3CoreIssue }}</div>
+        <div v-if="v3CoreIssueAlternatives.length" class="v3-chip-row">
+          <span class="v3-chip-hint">备选</span>
+          <button
+            v-for="(alt, idx) in v3CoreIssueAlternatives"
+            :key="'ci-' + idx"
+            type="button"
+            class="v3-chip"
+            @click="saveV3IntentPreference({ preferred_core_issue: alt })"
+          >{{ alt }}</button>
+        </div>
+      </div>
+      <div v-if="isV3Pipeline" class="v3-issue">
+        <div class="v3-bottom-label">子问题</div>
+        <ol v-if="v3SubIssues.length" class="v3-sub-list">
+          <li v-for="(q, idx) in v3SubIssues" :key="'sub-' + idx">
+            <span class="v3-sub-text">{{ q }}</span>
+            <span class="v3-row-actions">
+              <button type="button" class="v3-mini-btn" @click="openPanelEdit({ kind: 'sub_edit', index: idx, current: q })">改</button>
+              <button type="button" class="v3-mini-btn" @click="deleteV3SubIssue(idx)">删</button>
+            </span>
+          </li>
+        </ol>
+        <button type="button" class="v3-mini-btn v3-mini-add" @click="openPanelEdit({ kind: 'sub_add' })">添加子问题</button>
+      </div>
+      <div v-if="v3ScaleSummaryLines.length" class="v3-bottom-scales">
+        <div
+          v-for="line in v3ScaleSummaryLines"
+          :key="line.key"
+          class="v3-scale-block"
+          :class="'v3-scale-' + line.key"
+        >
+          <div class="v3-scale-title">{{ line.title }}</div>
+          <div v-for="item in line.items" :key="line.key + '-' + item.key" class="v3-scale-item">
+            <div class="v3-scale-item-head">
+              <span class="v3-scale-badge" :class="'badge-' + item.key">{{ item.name }}</span>
+              <button
+                type="button"
+                class="v3-mini-btn"
+                @click="openPanelEdit({ kind: 'scale_edit', scaleKey: line.key, itemKey: item.key, itemName: item.name, current: item.text })"
+              >改</button>
+            </div>
+            <span class="v3-scale-desc">{{ item.text }}</span>
+          </div>
+          <div v-if="line.alternatives.length" class="v3-chip-row">
+            <span class="v3-chip-hint">刻度备选</span>
+            <button
+              v-for="chip in line.alternatives"
+              :key="line.key + '-' + chip.id"
+              type="button"
+              class="v3-chip"
+              :title="chip.label"
+              @click="chip.onClick()"
+            >{{ chip.label }}</button>
+          </div>
+        </div>
+      </div>
+      <div v-if="v3QuadrantMeaningLines.length" class="v3-quadrant-panel">
+        <div class="v3-bottom-label">本子四象限</div>
+        <div class="v3-bottom-scales v3-quadrant-scales">
+          <div
+            v-for="line in v3QuadrantMeaningLines"
+            :key="'qmean-' + line.key"
+            class="v3-scale-block"
+          >
+            <div class="v3-scale-item-head">
+              <div class="v3-scale-title">{{ line.title }}</div>
+              <button
+                type="button"
+                class="v3-mini-btn"
+                @click="openPanelEdit({ kind: 'quadrant_edit', itemKey: line.key, itemName: line.title, current: line.text })"
+              >改</button>
+            </div>
+            <div class="v3-quadrant-rule">{{ line.rule }}</div>
+            <div v-if="line.text" class="v3-scale-desc">{{ line.text }}</div>
+          </div>
+        </div>
+      </div>
+      <div v-if="v3TopAlternativeTiers.length" class="v3-top-block">
+        <div
+          v-for="tier in v3TopAlternativeTiers"
+          :key="'top-tier-' + tier.key"
+          class="v3-top-row"
+        >
+          <span class="v3-bottom-label">{{ tier.label }}</span>
+          <div v-if="tier.current.length" class="v3-chip-row">
+            <span class="v3-chip-hint">现有</span>
+            <span
+              v-for="(word, idx) in tier.current"
+              :key="'top-cur-' + tier.key + '-' + idx"
+              class="v3-chip v3-chip-current"
+            >{{ word }}</span>
+          </div>
+          <div v-if="tier.words.length" class="v3-chip-row">
+            <span class="v3-chip-hint">备选</span>
+            <button
+              v-for="(word, idx) in tier.words"
+              :key="'top-' + tier.key + '-' + idx"
+              type="button"
+              class="v3-chip"
+              @click="applyV3TopAlternative(tier.key, word)"
+            >{{ word }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
     </div>
     
     <!-- 🔥 右键菜单 -->
@@ -650,6 +899,147 @@
       >
         <span>{{ opt.label }}</span>
         <span v-if="(linkContextMenuLink && linkContextMenuLink.linkStrength) === opt.value" class="context-menu-check">✓</span>
+      </div>
+    </div>
+
+    <!-- v3 Top 备选：用户指定替换该档中的哪个现有词 -->
+    <div
+      v-if="showTopReplaceDialog"
+      class="color-dmt-dialog-overlay"
+      @click.self="closeTopReplaceDialog"
+    >
+      <div class="color-dmt-dialog v3-pending-dialog" @click.stop>
+        <div class="dialog-header">
+          <h3>用备选「{{ topReplaceAltWord }}」替换哪个{{ topReplaceTierLabel }}词？</h3>
+          <button class="dialog-close" @click="closeTopReplaceDialog">×</button>
+        </div>
+        <div class="dialog-content">
+          <p class="v3-top-replace-hint">
+            请从当前{{ topReplaceTierLabel }}里选一个意思最接近、你想换成更好表述的词；点取消则不做替换。
+          </p>
+          <div class="dialog-options v3-pending-options">
+            <button
+              v-for="(w, idx) in topReplaceCandidates"
+              :key="'top-repl-' + idx"
+              type="button"
+              class="dialog-option-btn v3-pending-option-btn"
+              :class="{ selected: topReplaceSelected === w }"
+              @click="topReplaceSelected = w"
+            >
+              <span class="v3-pending-option-label">{{ w }}</span>
+            </button>
+          </div>
+          <div class="v3-pending-actions">
+            <button type="button" class="dialog-option-btn" @click="closeTopReplaceDialog">取消</button>
+            <button
+              type="button"
+              class="dialog-option-btn"
+              :disabled="topReplaceSaving || !topReplaceSelected"
+              @click="confirmV3TopAlternativeReplace"
+            >{{ topReplaceSaving ? '替换中…' : '确认替换' }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 子问题 / 刻度说明：点选或手写 -->
+    <div
+      v-if="showPanelEditDialog"
+      class="color-dmt-dialog-overlay"
+      @click.self="closePanelEditDialog"
+    >
+      <div class="color-dmt-dialog v3-pending-dialog" @click.stop>
+        <div class="dialog-header">
+          <h3>{{ panelEditTitle }}</h3>
+          <button class="dialog-close" @click="closePanelEditDialog">×</button>
+        </div>
+        <div class="dialog-content">
+          <p class="v3-pending-lead">{{ panelEditLead }}</p>
+          <p v-if="panelEditKind !== 'sub_add' && panelEditCurrent" class="v3-pending-lead">原文：{{ panelEditCurrent }}</p>
+          <p v-if="panelEditLoading" class="v3-pending-lead">{{ panelEditKind === 'sub_add' ? '正在按本子现有内容准备可点的说法…' : '正在按原文做精修…' }}</p>
+          <div v-else-if="panelEditOptions.length" class="dialog-options v3-pending-options">
+            <button
+              v-for="(opt, idx) in panelEditOptions"
+              :key="'panel-opt-' + idx"
+              type="button"
+              class="dialog-option-btn v3-pending-option-btn"
+              :class="{ selected: panelEditPicked === opt }"
+              @click="pickPanelEditOption(opt)"
+            >
+              <span class="v3-pending-option-index">{{ idx + 1 }}</span>
+              <span class="v3-pending-option-label">{{ opt }}</span>
+            </button>
+          </div>
+          <p v-else class="v3-pending-lead">这次没有生成可点的说法，可以直接在下面写。</p>
+          <div class="v3-pending-custom">
+            <label>{{ panelEditKind === 'sub_add' ? '采用的说法（点上面一条会填到这里，也可以自己改）' : '修改稿（点上面一条会把精修后的全文填到这里，也可以再改）' }}</label>
+            <textarea v-model="panelEditDraft" class="keyword-edit-input v3-panel-draft" rows="4" @input="panelEditPicked = ''" />
+          </div>
+          <div class="v3-pending-actions">
+            <button type="button" class="dialog-option-btn" @click="closePanelEditDialog">取消</button>
+            <button
+              type="button"
+              class="dialog-option-btn v3-pending-confirm"
+              :disabled="panelEditSaving || !panelEditDraft.trim()"
+              @click="confirmPanelEdit"
+            >{{ panelEditSaving ? '保存中…' : '确认' }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- v3 存疑节点确认 -->
+    <div
+      v-if="showPendingDialog"
+      class="color-dmt-dialog-overlay"
+      @click.self="closePendingDialog"
+    >
+      <div class="color-dmt-dialog v3-pending-dialog" @click.stop>
+        <div class="dialog-header">
+          <h3>「{{ pendingDialogNode?.label }}」还没定</h3>
+          <button class="dialog-close" @click="closePendingDialog">×</button>
+        </div>
+        <div class="dialog-content">
+          <p class="v3-pending-lead">虚线框表示这个词还有几件不同的事没定。下面按事情分开，不是同一道题的很多答案。一次只拍板一条。</p>
+          <div
+            v-for="group in pendingDialogGroups"
+            :key="group.key"
+            class="v3-pending-group"
+          >
+            <div class="v3-pending-group-title">{{ group.title }}</div>
+            <p class="v3-pending-group-note">{{ group.note }}</p>
+            <div class="dialog-options v3-pending-options">
+              <button
+                v-for="(opt, idx) in group.items"
+                :key="group.key + '-' + idx"
+                type="button"
+                class="dialog-option-btn v3-pending-option-btn"
+                :class="{ selected: pendingSelectedChoice && pendingSelectedChoice.id === opt.id }"
+                @click="pendingSelectedChoice = opt; pendingCustomText = ''"
+              >
+                <span class="v3-pending-option-index">{{ idx + 1 }}</span>
+                <span class="v3-pending-option-body">
+                  <span class="v3-pending-option-label">{{ opt.label }}</span>
+                  <span v-if="opt.effect" class="v3-pending-option-preview">{{ opt.effect }}</span>
+                </span>
+              </button>
+            </div>
+          </div>
+          <p v-if="!pendingDialogOptionsList.length" class="v3-pending-lead">暂时没有备选说法，可以直接在下面写你的判断。</p>
+          <div class="v3-pending-custom">
+            <label>都不对，我自己写一句</label>
+            <input v-model="pendingCustomText" type="text" class="keyword-edit-input" placeholder="用你自己的话说明这个词" @input="pendingSelectedChoice = null" />
+          </div>
+        </div>
+        <div class="v3-pending-actions">
+          <button type="button" class="dialog-option-btn" @click="closePendingDialog">取消</button>
+          <button
+            type="button"
+            class="dialog-option-btn v3-pending-confirm"
+            :disabled="pendingConfirmSaving || (!pendingSelectedChoice?.id && !pendingCustomText.trim())"
+            @click="confirmPendingChoice"
+          >{{ pendingConfirmSaving ? '提交中…' : '确认' }}</button>
+        </div>
       </div>
     </div>
     
@@ -991,11 +1381,65 @@
 
 <script>
 import "../d3.min.js";
+import html2canvas from 'html2canvas';
+import { semantic_intent_preference, semantic_confirm_pending, semantic_top_alternative_replace, semantic_panel_suggest } from '@/api/card/get_card';
 
 const DEFAULT_NODE_DISPLAY_LIMIT = 30;
+const QUADRANT_VIEW_KEY = 'keywordNetworkQuadrantView';
+
+function readQuadrantPicture() {
+  try {
+    if (typeof window !== 'undefined' && window.__NKCN_QUADRANT_PICTURE
+      && window.__NKCN_QUADRANT_PICTURE.positions
+      && window.__NKCN_QUADRANT_PICTURE.frame) {
+      return window.__NKCN_QUADRANT_PICTURE;
+    }
+  } catch (e) { /* 忽略 */ }
+  try {
+    const direct = localStorage.getItem(QUADRANT_VIEW_KEY);
+    if (direct) {
+      const data = JSON.parse(direct);
+      if (data && data.positions && data.frame) return data;
+    }
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || key.indexOf('keywordNetworkQuadrantView') !== 0 || key === QUADRANT_VIEW_KEY) continue;
+      const data = JSON.parse(localStorage.getItem(key) || 'null');
+      if (data && data.positions && data.frame) return data;
+    }
+  } catch (e) { /* 读不到就当没有 */ }
+  return null;
+}
+
+function writeQuadrantPicture(picture) {
+  try {
+    if (typeof window !== 'undefined') window.__NKCN_QUADRANT_PICTURE = picture;
+  } catch (e) { /* 忽略 */ }
+  try {
+    localStorage.setItem(QUADRANT_VIEW_KEY, JSON.stringify(picture));
+    localStorage.setItem('keywordNetworkQuadrantMode', '1');
+  } catch (e) { /* 存不下时，这次页面里仍用内存里的那份 */ }
+}
+
+function clearQuadrantPicture() {
+  try {
+    if (typeof window !== 'undefined') window.__NKCN_QUADRANT_PICTURE = null;
+  } catch (e) { /* 忽略 */ }
+  try {
+    const doomed = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && (key.indexOf('keywordNetworkQuadrantView') === 0 || key.indexOf('keywordNetworkQuadrantMode') === 0)) {
+        doomed.push(key);
+      }
+    }
+    doomed.forEach((key) => localStorage.removeItem(key));
+  } catch (e) { /* 清不掉就留着 */ }
+}
+const MIN_NODE_DISPLAY_OPTION = 1;
 const MAX_NODE_DISPLAY_OPTION_DEFAULT = 100;
-const MAX_NODE_DISPLAY_OPTION_V2 = 150;
-const RECOMMENDED_NODE_LIMIT = 70;
+const MAX_NODE_DISPLAY_OPTION_V2 = 200;
+const RECOMMENDED_NODE_LIMIT = 100;
 const ANALYSIS_CARD_POOL_CAP = 60;
 const KEYWORD_PICK_STRATEGIES = {
   default: 'default',
@@ -1062,6 +1506,7 @@ export default {
     }
   },
   data() {
+    const cachedQuad = readQuadrantPicture();
     return {
       viewMode: 'network', // 'flat' 或 'network'
       svgWidth: 800,
@@ -1086,6 +1531,9 @@ export default {
       // 布局稳定性相关
       layoutSeed: 42, // 固定随机种子
       savedPositions: {}, // 保存的节点位置
+      quadrantPlaceMode: !!(cachedQuad && cachedQuad.frame),
+      quadrantFrame: (cachedQuad && cachedQuad.frame) || null,
+      forceLayoutSnapshot: (cachedQuad && cachedQuad.force) || null,
       // 工具提示防抖
       tooltipTimer: null,
       lastTooltipPosition: { x: 0, y: 0 },
@@ -1152,9 +1600,37 @@ export default {
       isRegeneratingOption: {}, // {index: bool} 是否正在单独重新生成某个选项
       nodeDisplayLimit: DEFAULT_NODE_DISPLAY_LIMIT,
       showNodeCountDialog: false,
+      showContourLinks: false,
+      hoveredContourId: null,
+      showLongitudeLinks: false,
+      hoveredLongitudeId: null,
       exportingNetworkPng: false,
+      showExportGraphDialog: false,
       keywordPickStrategy: KEYWORD_PICK_STRATEGIES.default,
       showKeywordPickStrategyDialog: false,
+      showPendingDialog: false,
+      pendingDialogNode: null,
+      pendingSelectedChoice: null,
+      pendingCustomText: '',
+      pendingConfirmSaving: false,
+      showTopReplaceDialog: false,
+      topReplaceTierKey: '',
+      topReplaceAltWord: '',
+      topReplaceCandidates: [],
+      topReplaceSelected: '',
+      topReplaceSaving: false,
+      showPanelEditDialog: false,
+      panelEditKind: '',
+      panelEditIndex: -1,
+      panelEditScaleKey: '',
+      panelEditItemKey: '',
+      panelEditItemName: '',
+      panelEditCurrent: '',
+      panelEditDraft: '',
+      panelEditPicked: '',
+      panelEditOptions: [],
+      panelEditLoading: false,
+      panelEditSaving: false,
     }
   },
   watch: {
@@ -1283,8 +1759,13 @@ export default {
                   }
                 });
                 
-                this.loadSavedPositions();
-                this.restorePositions();
+                if (this.quadrantPlaceMode || readQuadrantPicture()) {
+                  this.quadrantPlaceMode = true;
+                  this.restoreSavedQuadrantView();
+                } else {
+                  this.loadSavedPositions();
+                  this.restorePositions();
+                }
                 this.updateLinkPositions();
                 this.updateNodePositions();
               }
@@ -1336,6 +1817,9 @@ export default {
               this.loadSavedPositions();
               const isFirstLoad = !this.savedPositions || Object.keys(this.savedPositions).length === 0;
               
+              if (this.quadrantModeEnabled() || readQuadrantPicture()) {
+                return;
+              }
               if (isFirstLoad && this.nodes && this.nodes.length > 0) {
                 console.log('[KeywordNetworkGraph] 🔥 网络图显示且首次加载，将在2秒后自动执行重置布局');
                 
@@ -1394,6 +1878,343 @@ export default {
     isOntologyScopeMode() {
       return !!(String(this.ontologyScopeType || '').trim() && String(this.ontologyScopeId || '').trim());
     },
+    isV3Pipeline() {
+      return String(this.semanticReorganizeMeta?.pipeline || '').startsWith('v3');
+    },
+    showAuxLinkToggles() {
+      const meta = this.semanticReorganizeMeta || {};
+      return this.isV3Pipeline
+        || (Array.isArray(meta.hierarchy_links) && meta.hierarchy_links.length > 0)
+        || (Array.isArray(meta.longitude_chains) && meta.longitude_chains.length > 0);
+    },
+    visibleLinks() {
+      return (this.links || []).filter((link) => {
+        if (link.linkType === 'contour') return false;
+        if (link.linkType === 'longitude' && !this.showLongitudeLinks) return false;
+        return true;
+      });
+    },
+    contourRings() {
+      const byLabel = {};
+      (this.nodes || []).forEach((node) => {
+        if (node && node.label && node.x != null && node.y != null) byLabel[node.label] = node;
+      });
+      const childrenByParent = {};
+      (this.links || []).forEach((link) => {
+        if (link.linkType !== 'hierarchy') return;
+        const parent = link.parentKeyword;
+        const child = link.childKeyword;
+        if (!parent || !child || !byLabel[parent] || !byLabel[child]) return;
+        if (!childrenByParent[parent]) childrenByParent[parent] = [];
+        if (!childrenByParent[parent].includes(child)) childrenByParent[parent].push(child);
+      });
+      const rings = [];
+      Object.keys(childrenByParent).forEach((parent) => {
+        const pts = childrenByParent[parent]
+          .map((label) => byLabel[label])
+          .filter((node) => node && node.x != null && node.y != null)
+          .map((node) => ({
+            label: node.label,
+            x: node.x,
+            y: node.y,
+            r: node.radius || 10,
+          }));
+        if (pts.length < 3) return;
+        const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+        const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+        const dist = pts.map((p) => Math.hypot(p.x - cx, p.y - cy));
+        const sortedDist = [...dist].sort((a, b) => a - b);
+        const median = sortedDist[Math.floor(sortedDist.length / 2)] || 1;
+        const local = pts.filter((p, i) => dist[i] <= Math.max(90, median * 1.8));
+        if (local.length < 3) return;
+        const lcx = local.reduce((s, p) => s + p.x, 0) / local.length;
+        const lcy = local.reduce((s, p) => s + p.y, 0) / local.length;
+        const ordered = [...local].sort((a, b) => Math.atan2(a.y - lcy, a.x - lcx) - Math.atan2(b.y - lcy, b.x - lcx));
+        const expanded = ordered.map((p) => {
+          const dx = p.x - lcx;
+          const dy = p.y - lcy;
+          const len = Math.hypot(dx, dy) || 1;
+          const pad = (p.r || 10) + 18;
+          return { x: p.x + (dx / len) * pad, y: p.y + (dy / len) * pad };
+        });
+        const d = this.closedContourPath(expanded);
+        if (d) {
+          rings.push({
+            id: parent,
+            d,
+            members: [parent, ...local.map((p) => p.label)],
+          });
+        }
+      });
+      return rings;
+    },
+    hoveredContourFocus() {
+      if (!this.hoveredContourId) return null;
+      const ring = (this.contourRings || []).find((item) => item.id === this.hoveredContourId);
+      if (!ring || !Array.isArray(ring.members)) return null;
+      const set = {};
+      ring.members.forEach((label) => {
+        if (label) set[label] = true;
+      });
+      return set;
+    },
+    longitudeChainMap() {
+      const map = {};
+      (this.links || []).forEach((link) => {
+        if (link.linkType !== 'longitude' || !link.longitudeId) return;
+        if (!map[link.longitudeId]) map[link.longitudeId] = {};
+        const a = link.source && link.source.label;
+        const b = link.target && link.target.label;
+        if (a) map[link.longitudeId][a] = true;
+        if (b) map[link.longitudeId][b] = true;
+      });
+      return map;
+    },
+    visibleContourRings() {
+      const rings = this.contourRings || [];
+      if (this.showContourLinks && !(this.showLongitudeLinks && this.hoveredLongitudeId)) return rings;
+      if (this.showLongitudeLinks && this.hoveredLongitudeId) {
+        const chain = this.longitudeChainMap[this.hoveredLongitudeId] || {};
+        const related = rings.filter((ring) => (ring.members || []).some((label) => chain[label]));
+        if (this.showContourLinks) return rings;
+        return related;
+      }
+      if (this.showContourLinks) return rings;
+      return [];
+    },
+    activeFocus() {
+      if (this.showLongitudeLinks && this.hoveredLongitudeId) {
+        const chain = this.longitudeChainMap[this.hoveredLongitudeId] || {};
+        const nodes = { ...chain };
+        (this.contourRings || []).forEach((ring) => {
+          if ((ring.members || []).some((label) => chain[label])) {
+            (ring.members || []).forEach((label) => {
+              if (label) nodes[label] = true;
+            });
+          }
+        });
+        return { mode: 'longitude-hover', nodes };
+      }
+      if (this.hoveredContourFocus) return { mode: 'contour', nodes: this.hoveredContourFocus };
+      if (this.showLongitudeLinks) {
+        const nodes = {};
+        Object.keys(this.longitudeChainMap).forEach((id) => {
+          Object.keys(this.longitudeChainMap[id]).forEach((label) => {
+            nodes[label] = true;
+          });
+        });
+        if (Object.keys(nodes).length) return { mode: 'longitude', nodes };
+      }
+      return null;
+    },
+    v3Thermometer() {
+      const t = this.semanticReorganizeMeta?.thermometer;
+      return t && typeof t === 'object' ? t : null;
+    },
+    v3SpiralText() {
+      return String(this.v3Thermometer?.spiral || '').trim();
+    },
+    v3ThermometerSubjectReasonShort() {
+      const s = String(this.v3Thermometer?.subject_reason || '').trim();
+      return s.length > 48 ? `${s.slice(0, 48)}…` : s;
+    },
+    v3ThermometerOntologyReasonShort() {
+      const s = String(this.v3Thermometer?.ontology_reason || '').trim();
+      return s.length > 48 ? `${s.slice(0, 48)}…` : s;
+    },
+    v3CoreIssue() {
+      const meta = this.semanticReorganizeMeta || {};
+      const fromTop = meta.book_top_keywords?.core_issue;
+      return String(meta.core_issue || fromTop || '').trim();
+    },
+    v3SubIssues() {
+      const meta = this.semanticReorganizeMeta || {};
+      const list = meta.sub_issues || meta.book_top_keywords?.sub_issues;
+      return Array.isArray(list) ? list.map((x) => String(x).trim()).filter(Boolean) : [];
+    },
+    panelEditTitle() {
+      if (this.panelEditKind === 'sub_add') return '添加子问题';
+      if (this.panelEditKind === 'sub_edit') return '修改子问题';
+      if (this.panelEditKind === 'scale_edit') return `修改${this.panelEditItemName || '刻度'}说明`;
+      if (this.panelEditKind === 'quadrant_edit') return `修改${this.panelEditItemName || '象限'}内涵`;
+      return '修改';
+    },
+    panelEditLead() {
+      if (this.panelEditKind === 'quadrant_edit') {
+        return '下面是在这段原文上精修的修改稿，不是另写一条换掉它。点一条就填进下方，也可以再改。这一象限收哪些语义要留住。';
+      }
+      if (this.panelEditKind === 'scale_edit') {
+        return '下面是在这段原文上精修的修改稿，不是另写一条换掉它。点一条就填进下方，也可以再改。条目本身不能增删。';
+      }
+      if (this.panelEditKind === 'sub_edit') {
+        return '下面是在这句原文上精修的修改稿，不是另起一个问题替换它。点一条就填进下方，也可以再改。';
+      }
+      return '下面几条按本子现有内容来补。点一条就填进下方，也可以自己改。子问题请保持一句问话。';
+    },
+    v3CoreIssueAlternatives() {
+      const meta = this.semanticReorganizeMeta || {};
+      const list = meta.core_issue_alternatives || meta.book_top_keywords?.core_issue_alternatives;
+      return Array.isArray(list) ? list.map((x) => String(x).trim()).filter(Boolean) : [];
+    },
+    v3TopAlternativeTiers() {
+      const meta = this.semanticReorganizeMeta || {};
+      const tops = meta.book_top_keywords && typeof meta.book_top_keywords === 'object'
+        ? meta.book_top_keywords
+        : {};
+      const alts = tops.top_alternatives && typeof tops.top_alternatives === 'object'
+        ? tops.top_alternatives
+        : {};
+      const labels = { top1: 'Top1', top3: 'Top3', top5: 'Top5', top10: 'Top10' };
+      const asWords = (raw) => {
+        if (Array.isArray(raw)) return raw.map((x) => String(x).trim()).filter(Boolean);
+        if (raw != null && String(raw).trim()) return [String(raw).trim()];
+        return [];
+      };
+      return ['top1', 'top3', 'top5', 'top10'].map((key) => ({
+        key,
+        label: labels[key] || key,
+        current: asWords(tops[key]),
+        words: asWords(alts[key]),
+      })).filter((tier) => tier.current.length > 0 || tier.words.length > 0);
+    },
+    pendingDialogGroups() {
+      const buckets = {
+        know: [],
+        meaning: [],
+        conflict: [],
+        color: [],
+        dmt: [],
+        knowledge: [],
+      };
+      (this.pendingDialogOptionsList || []).forEach((opt) => {
+        const key = buckets[opt.bucket] ? opt.bucket : 'meaning';
+        buckets[key].push(opt);
+      });
+      const meta = [
+        { key: 'know', title: '你知不知道', note: '只回答你本人清不清楚，不改颜色和层级。' },
+        { key: 'meaning', title: '它在这里是什么意思', note: '选一句你认可的解释。' },
+        { key: 'conflict', title: '材料里对不上的地方', note: '这不是归类。材料自己打架，或没写清它在文里的作用。' },
+        { key: 'color', title: '四色', note: '只改颜色。红是事实，蓝是方法，紫是迁移，绿是规律。' },
+        { key: 'dmt', title: 'DMT 层级', note: '只改层级。D 是立足点，M 是方法，T 是迁移。' },
+        { key: 'knowledge', title: '知识类型', note: '只改它算传统、组织、部落，或更具体的哪一类实体。' },
+      ];
+      return meta
+        .filter((item) => buckets[item.key].length)
+        .map((item) => ({ ...item, items: buckets[item.key] }));
+    },
+    topReplaceTierLabel() {
+      const map = { top1: 'Top1', top3: 'Top3', top5: 'Top5', top10: 'Top10' };
+      return map[this.topReplaceTierKey] || this.topReplaceTierKey || 'Top';
+    },
+    v3ScaleSummaryLines() {
+      const scale = this.semanticReorganizeMeta?.scale_definitions;
+      if (!scale || typeof scale !== 'object') return [];
+      const altsRoot = scale.alternatives && typeof scale.alternatives === 'object' ? scale.alternatives : {};
+      const fmtItems = (obj, labels) => {
+        if (!obj || typeof obj !== 'object') return [];
+        return Object.keys(labels)
+          .map((k) => {
+            const v = obj[k];
+            if (!v) return null;
+            return { key: k, name: labels[k], text: String(v) };
+          })
+          .filter(Boolean);
+      };
+      const buildAltChips = (scaleKey, labelMap) => {
+        const block = altsRoot[scaleKey];
+        if (!block || typeof block !== 'object') return [];
+        return Object.entries(block).flatMap(([variantId, variantVal]) => {
+          if (!variantVal || typeof variantVal !== 'object') return [];
+          const label = Object.keys(labelMap)
+            .map((k) => (variantVal[k] ? `${labelMap[k]}:${variantVal[k]}` : ''))
+            .filter(Boolean)
+            .join(' ')
+            .slice(0, 72);
+          if (!label) return [];
+          return [{
+            id: String(variantId),
+            label: label || String(variantId),
+            onClick: () => this.saveV3IntentPreference({
+              preferred_scale_definitions: { [scaleKey]: variantVal },
+            }),
+          }];
+        });
+      };
+      return [
+        {
+          key: 'four_color',
+          title: '四色刻度',
+          items: fmtItems(scale.four_color, { R: '红', B: '蓝', P: '紫', G: '绿' }),
+          alternatives: buildAltChips('four_color', { R: '红', B: '蓝', P: '紫', G: '绿' }),
+        },
+        {
+          key: 'dmt',
+          title: 'DMT 刻度',
+          items: fmtItems(scale.dmt, { D: 'D', M: 'M', T: 'T' }),
+          alternatives: buildAltChips('dmt', { D: 'D', M: 'M', T: 'T' }),
+        },
+        {
+          key: 'knowledge',
+          title: '三类知识刻度',
+          items: fmtItems(scale.knowledge, { trad: '传统', org: '组织', trib: '部落' }),
+          alternatives: buildAltChips('knowledge', { trad: '传统', org: '组织', trib: '部落' }),
+        },
+      ].filter((line) => (line.items && line.items.length) || line.alternatives.length);
+    },
+    v3QuadrantMeaningLines() {
+      const pack = this.semanticReorganizeMeta?.quadrant_meaning;
+      const defs = pack && typeof pack.definitions === 'object' ? pack.definitions : null;
+      if (!defs) return [];
+      const names = { Q1: '共识区', Q2: '盲区', Q3: '未知区', Q4: '隐藏区' };
+      const rules = {
+        Q1: '规则：机知且人知。材料里站得住，人这边也清楚。',
+        Q2: '规则：机知且人不知。材料里站得住，人这边没掌握或说不清。',
+        Q3: '规则：机不知且人不知。材料里也没把握，人这边也没掌握。',
+        Q4: '规则：机不知且人知。人这边清楚，材料里还没立住。',
+      };
+      return ['Q1', 'Q2', 'Q3', 'Q4']
+        .map((key) => {
+          const raw = defs[key];
+          const text = raw && typeof raw === 'object'
+            ? String(raw.meaning || raw.text || '').trim()
+            : String(raw || '').trim();
+          if (!text) return null;
+          return { key, title: names[key], rule: rules[key], text };
+        })
+        .filter(Boolean);
+    },
+    pendingDialogOptionsList() {
+      const word = this.pendingDialogNode?.label;
+      if (!word) return [];
+      const quads = this.semanticReorganizeMeta?.quadrants || {};
+      const entry = quads[word] || {};
+      const fromMeta = Array.isArray(entry.pending_options) ? entry.pending_options : [];
+      const seen = new Set();
+      return fromMeta.map((opt) => {
+        if (opt && typeof opt === 'object') {
+          const id = String(opt.id || opt.label || '').trim();
+          const label = String(opt.label || opt.id || '').trim();
+          const item = {
+            id: id || label,
+            label: label || id,
+            preview: String(opt.preview || '').trim(),
+            human_know: opt.human_know,
+            kind: String(opt.kind || '').trim(),
+            attr_patch: (opt.attr_patch && typeof opt.attr_patch === 'object') ? opt.attr_patch : {},
+          };
+          item.bucket = this.pendingOptionBucket(item);
+          item.effect = this.pendingOptionEffect(item);
+          return item;
+        }
+        const s = String(opt).trim();
+        return { id: s, label: s, preview: '', human_know: undefined, kind: '', attr_patch: {}, bucket: 'meaning', effect: '' };
+      }).filter((o) => {
+        const k = o.id || o.label;
+        if (!k || seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    },
     /** 组本横轴：组知道/组不知道；个人本：我知道/我不知道 */
     isGroupNotebookAxis() {
       try {
@@ -1418,6 +2239,9 @@ export default {
     /** v2 精进梳理后：只用新处理过的卡片构建节点/词池；旧卡旧词不再进图 */
     effectiveCards() {
       const meta = this.semanticReorganizeMeta || {};
+      if (this.isV3Pipeline) {
+        return this.cards || [];
+      }
       const selected = meta.reorganize_selected_cids;
       if (
         meta.pipeline === 'v2_condense_hierarchy'
@@ -1442,6 +2266,15 @@ export default {
     graphKeywordPool() {
       const kws = this.keywords || [];
       const meta = this.semanticReorganizeMeta || {};
+      if (this.isV3Pipeline) {
+        const bookKw = meta.book_keywords;
+        if (Array.isArray(bookKw) && bookKw.length > 0) {
+          const list = bookKw.map((k) => String(k).trim()).filter(Boolean);
+          const allowed = new Set(kws);
+          const intersected = list.filter((k) => allowed.has(k));
+          return intersected.length > 0 ? intersected : list;
+        }
+      }
       const useSelectedOnly = (
         meta.pipeline === 'v2_condense_hierarchy'
         && Array.isArray(meta.reorganize_selected_cids)
@@ -1464,10 +2297,11 @@ export default {
       return this.graphKeywordPool.length;
     },
 
-    /** 做过 v2 本体语义梳理的本子：节点显示上限提到 150 */
+    /** 做过 v2/v3 本体语义梳理的本子：节点显示上限提到 200 */
     maxNodeDisplayOption() {
       const meta = this.semanticReorganizeMeta || {};
-      const isV2 = meta.pipeline === 'v2_condense_hierarchy'
+      const isV2 = this.isV3Pipeline
+        || meta.pipeline === 'v2_condense_hierarchy'
         || (Array.isArray(meta.reorganize_selected_cids) && meta.reorganize_selected_cids.length > 0)
         || (Array.isArray(meta.hierarchy_links) && meta.hierarchy_links.length > 0);
       return isV2 ? MAX_NODE_DISPLAY_OPTION_V2 : MAX_NODE_DISPLAY_OPTION_DEFAULT;
@@ -1489,9 +2323,10 @@ export default {
         }];
       }
 
-      const candidates = [DEFAULT, 50, 70, 80, 100, MAX_OPT].filter((n, i, arr) => arr.indexOf(n) === i);
+      const candidates = [1, 3, 5, 10, DEFAULT, 50, 100, 150, 200, MAX_OPT]
+        .filter((n, i, arr) => arr.indexOf(n) === i);
       const values = [...new Set(
-        candidates.filter(n => n >= DEFAULT && n <= cap),
+        candidates.filter(n => n >= MIN_NODE_DISPLAY_OPTION && n <= cap),
       )].sort((a, b) => a - b);
 
       if (total <= MAX_OPT && !values.includes(total)) {
@@ -1578,8 +2413,16 @@ export default {
     },
     
     computedViewBox() {
-      // 🔥 协作象限坐标轴：X轴 y=610，Y轴 x=60，原点 (60,610)
-      // viewBox 需包含象限底纹、轴标签与所有节点（节点位置仍为语义网络布局）
+      if (this.quadrantPlaceMode && this.quadrantFrame) {
+        const frame = this.quadrantFrame;
+        const pad = 6;
+        const minX = frame.minX - pad;
+        const minY = frame.minY - pad;
+        const width = Math.max(120, frame.maxX - frame.minX + pad * 2);
+        const height = Math.max(120, frame.maxY - frame.minY + pad * 2);
+        return `${minX} ${minY} ${width} ${height}`;
+      }
+      // 平时坐标轴固定：X轴 y=610，Y轴 x=60，原点 (60,610)
       const axisOriginX = 60;
       const axisOriginY = 610;
       const negativeSpace = 50;
@@ -1635,6 +2478,47 @@ export default {
       return `${Math.min(axisOriginX - negativeSpace, -28 - axisLabelPadX)} ${Math.min(axisOriginY - negativeSpace, 40 - axisLabelPadY)} ${this.svgWidth} ${this.svgHeight}`;
     },
     axisCanvas() {
+      if (this.quadrantPlaceMode && this.quadrantFrame) {
+        const frame = this.quadrantFrame;
+        const originX = frame.originX;
+        const originY = frame.originY;
+        const left = frame.minX;
+        const top = frame.minY;
+        const right = frame.maxX;
+        const bottom = frame.maxY;
+        const makeQuad = (x, y, w, h) => ({
+          x,
+          y,
+          w: Math.max(w, 0),
+          h: Math.max(h, 0),
+          cx: x + Math.max(w, 0) / 2,
+          cy: y + Math.max(h, 0) / 2,
+        });
+        const edge = 28;
+        return {
+          originX,
+          originY,
+          minX: left,
+          minY: top,
+          maxX: right,
+          maxY: bottom,
+          midX: (left + right) / 2,
+          q2: makeQuad(left, top, originX - left, originY - top),
+          q1: makeQuad(originX, top, right - originX, originY - top),
+          q3: makeQuad(left, originY, originX - left, bottom - originY),
+          q4: makeQuad(originX, originY, right - originX, bottom - originY),
+          labels: {
+            q2: { x: left + edge, y: top + 48 },
+            q1: { x: right - edge, y: top + 48 },
+            q3: { x: left + edge, y: bottom - 18 },
+            q4: { x: right - edge, y: bottom - 18 },
+            xNeg: { x: left + edge, y: originY - 10 },
+            xPos: { x: right - 18, y: originY - 10 },
+            yPos: { x: originX + 10, y: top + 46 },
+            yNeg: { x: originX + 10, y: bottom - 14 },
+          },
+        };
+      }
       const originX = 60;
       const originY = 610;
       const bleed = 4;
@@ -1768,6 +2652,7 @@ export default {
     try {
       // 加载保存的节点位置
       this.loadSavedPositions();
+      this.quadrantPlaceMode = this.quadrantModeEnabled();
       
       // 先获取容器宽度
       this.updateContainerWidth();
@@ -1785,6 +2670,9 @@ export default {
               this.loadSavedPositions();
               const isFirstLoad = !this.savedPositions || Object.keys(this.savedPositions).length === 0;
               
+              if (this.quadrantModeEnabled() || readQuadrantPicture()) {
+                return;
+              }
               if (isFirstLoad && this.nodes && this.nodes.length > 0) {
                 console.log('[KeywordNetworkGraph] 🔥 组件挂载且首次加载，将在2秒后自动执行重置布局');
                 
@@ -1853,8 +2741,13 @@ export default {
       console.error('[KeywordNetworkGraph] 错误堆栈:', error.stack);
     }
   },
-  beforeUnmount() {
-    // 保存节点位置
+    beforeUnmount() {
+      if (this.quadrantPlaceMode) {
+        this.saveQuadrantView();
+        this.persistQuadrantMode(true);
+      }
+      this.forceLayoutToken = (this.forceLayoutToken || 0) + 1;
+      // 保存节点位置
     this.savePositions();
     
     // 🔥 清除首次加载重置定时器
@@ -2211,15 +3104,41 @@ export default {
       
       // 🔥 恢复保存的位置（确保每次初始化都加载保存的位置）
       this.loadSavedPositions();
+
+      if (this.quadrantModeEnabled()) {
+        this.quadrantPlaceMode = true;
+        if (!this.restoreSavedQuadrantView()) {
+          if (!this.forceLayoutSnapshot || !Object.keys(this.forceLayoutSnapshot).length) {
+            const snap = {};
+            (this.nodes || []).forEach((node) => {
+              if (!node || node.label == null) return;
+              const saved = this.savedPositions && this.savedPositions[node.label];
+              const x = saved && saved.x != null ? saved.x : node.x;
+              const y = saved && saved.y != null ? saved.y : node.y;
+              if (x == null || y == null) return;
+              snap[node.label] = { x, y };
+            });
+            if (Object.keys(snap).length) this.forceLayoutSnapshot = snap;
+          }
+          this.applyQuadrantPlacement();
+        }
+        if (this.simulation) this.simulation.stop();
+        this.forceLayoutToken = (this.forceLayoutToken || 0) + 1;
+        this.updateContainerWidth();
+        this.$forceUpdate();
+        return;
+      }
       
       // 🔥 检测是否是首次加载（本子内纯首次加载，没有任何保存的位置）
       const isFirstLoad = !this.savedPositions || Object.keys(this.savedPositions).length === 0;
       
       // 初始化D3力导向布局（在恢复位置之前先初始化，确保布局能正确运行）
       this.$nextTick(() => {
+        this.quadrantPlaceMode = this.quadrantModeEnabled();
         if (isFirstLoad) {
           // 🔥 首次加载时，先执行一次布局（让节点先显示出来）
           this.restorePositions(false);
+          if (this.quadrantPlaceMode) this.showQuadrantNow();
           this.initializeForceLayout();
           
           // 🔥 注意：首次加载的自动重置布局现在由viewMode的watch来处理
@@ -2228,6 +3147,7 @@ export default {
         } else {
           // 非首次加载：先恢复位置（但不固定，让布局先运行）
           this.restorePositions(false);
+          if (this.quadrantPlaceMode) this.showQuadrantNow();
           // 然后初始化力导向布局
           this.initializeForceLayout();
         }
@@ -2500,7 +3420,7 @@ export default {
         if (!raw) return DEFAULT_NODE_DISPLAY_LIMIT;
         const n = parseInt(raw, 10);
         if (Number.isNaN(n)) return DEFAULT_NODE_DISPLAY_LIMIT;
-        return Math.min(Math.max(n, DEFAULT_NODE_DISPLAY_LIMIT), this.maxNodeDisplayOption);
+        return Math.min(Math.max(n, MIN_NODE_DISPLAY_OPTION), this.maxNodeDisplayOption);
       } catch (e) {
         return DEFAULT_NODE_DISPLAY_LIMIT;
       }
@@ -2515,7 +3435,7 @@ export default {
     },
 
     applyNodeDisplayLimit(limit) {
-      const nextLimit = Math.min(Math.max(limit, DEFAULT_NODE_DISPLAY_LIMIT), this.maxNodeDisplayOption);
+      const nextLimit = Math.min(Math.max(limit, MIN_NODE_DISPLAY_OPTION), this.maxNodeDisplayOption);
       if (nextLimit === this.nodeDisplayLimit) {
         this.showNodeCountDialog = false;
         return;
@@ -2535,6 +3455,9 @@ export default {
     },
 
     loadKeywordPickStrategyPreference() {
+      if (String(this.semanticReorganizeMeta?.pipeline || '').startsWith('v3')) {
+        return KEYWORD_PICK_STRATEGIES.default;
+      }
       try {
         const raw = localStorage.getItem(this.getKeywordPickStrategyPreferenceKey());
         if (raw === KEYWORD_PICK_STRATEGIES.top3 || raw === KEYWORD_PICK_STRATEGIES.top5) {
@@ -2553,6 +3476,9 @@ export default {
     },
 
     applyKeywordPickStrategy(strategy) {
+      if (this.isV3Pipeline) {
+        strategy = KEYWORD_PICK_STRATEGIES.default;
+      }
       const next = (
         strategy === KEYWORD_PICK_STRATEGIES.top3
         || strategy === KEYWORD_PICK_STRATEGIES.top5
@@ -2569,7 +3495,13 @@ export default {
 
     /** 统一入口：按当前取用策略决定展示哪些关键词 */
     getDisplayKeywords(keywords, maxCount = DEFAULT_NODE_DISPLAY_LIMIT) {
-      if (this.isOntologyScopeMode || this.keywordPickStrategy === KEYWORD_PICK_STRATEGIES.default) {
+      if (this.isV3Pipeline) {
+        return this.getV3DisplayKeywords(keywords, maxCount);
+      }
+      if (
+        this.isOntologyScopeMode
+        || this.keywordPickStrategy === KEYWORD_PICK_STRATEGIES.default
+      ) {
         return this.getSmartFilteredKeywords(keywords, maxCount);
       }
       const topN = this.keywordPickStrategy === KEYWORD_PICK_STRATEGIES.top5 ? 5 : 3;
@@ -2617,6 +3549,9 @@ export default {
      * 精选：优先高质卡，并尽量让前 N 词带来新词（多样性）。
      */
     getTopNKeywordsByCardStrategy(keywordsPool, maxCount, topN) {
+      if (this.isV3Pipeline) {
+        return this.getV3DisplayKeywords(keywordsPool, maxCount);
+      }
       const poolAllowed = new Set((keywordsPool || []).filter(Boolean));
       const cards = this.getAnalysisCardsPool();
       if (!cards.length || maxCount <= 0) {
@@ -2707,6 +3642,465 @@ export default {
       return result;
     },
 
+    flattenBookTopKeywords(meta) {
+      const tops = (meta && meta.book_top_keywords) || {};
+      const keys = ['top1', 'top3', 'top5', 'top10'];
+      const seen = new Set();
+      const out = [];
+      keys.forEach((key) => {
+        const raw = tops[key];
+        const arr = Array.isArray(raw)
+          ? raw
+          : (raw != null && String(raw).trim() !== '' ? [raw] : []);
+        arr.forEach((w) => {
+          const s = String(w).trim();
+          if (s && !seen.has(s)) {
+            seen.add(s);
+            out.push(s);
+          }
+        });
+      });
+      return out;
+    },
+
+    parseV3KeywordLevel(keyword, levels) {
+      const lvMap = levels || {};
+      let lv = lvMap[keyword];
+      if (lv == null || lv === '') {
+        const kwData = (this.keywordFourColorDMTData || {})[keyword] || {};
+        lv = kwData.level;
+      }
+      const s = String(lv ?? '').trim().toUpperCase();
+      const m = s.match(/^L?(\d+)$/);
+      if (m) return Number(m[1]);
+      return 99;
+    },
+
+    /** 解析 hierarchy_links → 邻接表（含强度分） */
+    buildV3HierarchyAdjacency(meta) {
+      const adj = {};
+      const strengthScore = { '强': 3, '强中': 2, '普通': 1 };
+      const links = Array.isArray(meta && meta.hierarchy_links) ? meta.hierarchy_links : [];
+      links.forEach((pair) => {
+        if (!pair || pair.length < 2) return;
+        const a = String(pair[0] || '').trim();
+        const b = String(pair[1] || '').trim();
+        if (!a || !b || a === b) return;
+        const s = String(pair[2] || '普通').trim() || '普通';
+        const sc = strengthScore[s] || 1;
+        if (!adj[a]) adj[a] = [];
+        if (!adj[b]) adj[b] = [];
+        adj[a].push({ other: b, score: sc });
+        adj[b].push({ other: a, score: sc });
+      });
+      Object.keys(adj).forEach((k) => {
+        adj[k].sort((x, y) => y.score - x.score || String(x.other).localeCompare(String(y.other), 'zh'));
+      });
+      return adj;
+    },
+
+    /**
+     * 个数档位允许的少量溢出。1–10 档不溢出；更大档位约为所选题数的一成，最多 18 个。
+     * 30→4，50→5，100→10，150→15，200→18。
+     * 只用来补「第二层上、度高、强关系成团，但被枢纽邻居名额挤掉」的局部枢纽及其强链。
+     */
+    v3DisplayOverflowBudget(maxCount) {
+      const n = Number(maxCount) || 0;
+      if (n <= 10) return 0;
+      const byCount = { 30: 4, 50: 5, 100: 10, 150: 15, 200: 18 };
+      return byCount[n] || 0;
+    },
+
+    /**
+     * 在已选集合之外追加局部枢纽。不替换已选词。
+     * 先补：和已入选的第零层或第一层节点有强/强中边、自身在第二层或更深、度≥8、还有至少 3 条未入选强或强中关系的词。
+     * 再补：没有挂上高层的同类枢纽。未入选强或强中邻居至少 5 条；若只有 4 条，则其中至少 1 条要是强。
+     * 每个枢纽最多再带 6 个强/强中邻居。已在集合里、强链却大多没进来的第二层枢纽，用剩余名额补齐。
+     */
+    appendV3LocalHubOverflow(selected, pool, poolSet, adj, levelOf, maxCount) {
+      const overflow = [];
+      const budget = this.v3DisplayOverflowBudget(maxCount);
+      if (!budget || !selected) return overflow;
+      const selectedSet = new Set(selected);
+      let added = 0;
+      const addWord = (w) => {
+        selected.push(w);
+        selectedSet.add(w);
+        overflow.push(w);
+        added += 1;
+      };
+      const degreeOf = (w) => (adj[w] ? adj[w].length : 0);
+      const strongHidden = (w) => (adj[w] || []).filter(
+        (x) => x.score >= 2 && poolSet.has(x.other) && !selectedSet.has(x.other)
+      );
+      const attachScore = (w) => {
+        let best = 0;
+        (adj[w] || []).forEach((x) => {
+          if (x.score >= 2 && selectedSet.has(x.other) && levelOf(x.other) <= 1) {
+            best = Math.max(best, x.score);
+          }
+        });
+        return best;
+      };
+      const chainScore = (w) => {
+        const names = strongHidden(w).map((x) => x.other);
+        const nameSet = new Set(names);
+        let n = 0;
+        names.forEach((other) => {
+          (adj[other] || []).forEach((x) => {
+            if (x.score >= 2 && nameSet.has(x.other) && String(x.other) > String(other)) n += 1;
+          });
+        });
+        return n;
+      };
+      const qualifies = (w) => {
+        if (!w || selectedSet.has(w) || !poolSet.has(w) || levelOf(w) < 2) return false;
+        if (degreeOf(w) < 8) return false;
+        const hiddenList = strongHidden(w);
+        const hidden = hiddenList.length;
+        if (attachScore(w) > 0) return hidden >= 3;
+        const strongN = hiddenList.filter((x) => x.score >= 3).length;
+        return hidden >= 5 || (hidden >= 4 && strongN >= 1);
+      };
+      const takeKids = (w) => {
+        const hidden = strongHidden(w);
+        const hiddenSet = new Set(hidden.map((x) => x.other));
+        const ranked = hidden.slice().sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          const aChain = (adj[a.other] || []).some((x) => x.score >= 2 && hiddenSet.has(x.other)) ? 1 : 0;
+          const bChain = (adj[b.other] || []).some((x) => x.score >= 2 && hiddenSet.has(x.other)) ? 1 : 0;
+          if (bChain !== aChain) return bChain - aChain;
+          return String(a.other).localeCompare(String(b.other), 'zh');
+        });
+        let kids = 0;
+        ranked.forEach((x) => {
+          if (added >= budget || kids >= 6 || selectedSet.has(x.other)) return;
+          addWord(x.other);
+          kids += 1;
+        });
+      };
+      const pullHubs = (onlyAttached, sortFn) => {
+        let guard = 0;
+        while (added < budget && guard < 12) {
+          guard += 1;
+          const rows = pool.filter((w) => qualifies(w) && (!onlyAttached || attachScore(w) > 0));
+          if (!rows.length) break;
+          rows.sort(sortFn);
+          const hub = rows[0];
+          addWord(hub);
+          takeKids(hub);
+        }
+      };
+      pullHubs(true, (a, b) => (
+        attachScore(b) - attachScore(a)
+        || chainScore(b) - chainScore(a)
+        || strongHidden(b).length - strongHidden(a).length
+        || degreeOf(b) - degreeOf(a)
+        || String(a).localeCompare(String(b), 'zh')
+      ));
+      pullHubs(false, (a, b) => (
+        chainScore(b) - chainScore(a)
+        || strongHidden(b).length - strongHidden(a).length
+        || degreeOf(b) - degreeOf(a)
+        || String(a).localeCompare(String(b), 'zh')
+      ));
+      if (added >= budget) return;
+      const hanging = selected.filter(
+        (w) => levelOf(w) >= 2 && degreeOf(w) >= 8 && strongHidden(w).length >= 3
+      );
+      hanging.sort((a, b) => (
+        attachScore(b) - attachScore(a)
+        || chainScore(b) - chainScore(a)
+        || strongHidden(b).length - strongHidden(a).length
+        || degreeOf(b) - degreeOf(a)
+      ));
+      hanging.forEach((w) => {
+        if (added < budget) takeKids(w);
+      });
+      return overflow;
+    },
+
+    /**
+     * 候选词对一整团词的字面匹配。
+     * 个数：候选词里出现了这团的多少个不同字。
+     * 词数：某个字在这团的几个词里出现过；出现的词越多，候选词只要带上这个字，加分越大（按词数平方）。
+     * 次数：这些字在这团里一共出现了几次。
+     * 最长连续字仍计入，但不再单独决定名次。
+     */
+    v3CharMatchScore(candidate, words) {
+      const cand = String(candidate || '');
+      const list = (words || []).map((w) => String(w || '')).filter(Boolean);
+      if (!cand || !list.length) return { score: 0, maxRun: 0, distinct: 0, wordSum: 0 };
+      const wordHits = {};
+      const freq = {};
+      list.forEach((w) => {
+        const seen = new Set();
+        String(w).split('').forEach((ch) => {
+          if (!ch.trim()) return;
+          freq[ch] = (freq[ch] || 0) + 1;
+          if (seen.has(ch)) return;
+          seen.add(ch);
+          wordHits[ch] = (wordHits[ch] || 0) + 1;
+        });
+      });
+      const candChars = new Set(cand.split('').filter((ch) => ch.trim() && wordHits[ch]));
+      let distinct = 0;
+      let wordSum = 0;
+      let freqSum = 0;
+      let hot = 0;
+      candChars.forEach((ch) => {
+        const hits = wordHits[ch] || 0;
+        distinct += 1;
+        wordSum += hits;
+        freqSum += freq[ch] || 0;
+        hot += hits * hits;
+      });
+      const longestRun = (a, b) => {
+        let best = 0;
+        for (let i = 0; i < a.length; i += 1) {
+          for (let j = 0; j < b.length; j += 1) {
+            let k = 0;
+            while (i + k < a.length && j + k < b.length && a[i + k] === b[j + k]) k += 1;
+            if (k > best) best = k;
+          }
+        }
+        return best;
+      };
+      let maxRun = 0;
+      let runSum = 0;
+      list.forEach((w) => {
+        const run = longestRun(cand, w);
+        if (run > maxRun) maxRun = run;
+        runSum += run;
+      });
+      const score = hot + freqSum + distinct * 2 + maxRun * maxRun * 4 + runSum;
+      return { score, maxRun, distinct, wordSum };
+    },
+
+    /**
+     * 主网 = 图上节点最多的那一团。
+     * 主网外不少于 3 个词的小团，从小团里边最多的词连到主图里综合最像的词。
+     */
+    buildV3OverflowBridgeLinks(displayed) {
+      const shown = (displayed || []).filter(Boolean);
+      const shownSet = new Set(shown);
+      const adj = this.buildV3HierarchyAdjacency(this.semanticReorganizeMeta || {});
+      const neighbors = (w) => (adj[w] || [])
+        .map((x) => x.other)
+        .filter((other) => shownSet.has(other));
+      const visited = new Set();
+      const components = [];
+      shown.forEach((start) => {
+        if (visited.has(start)) return;
+        const comp = [];
+        const pending = [start];
+        visited.add(start);
+        while (pending.length) {
+          const w = pending.pop();
+          comp.push(w);
+          neighbors(w).forEach((other) => {
+            if (visited.has(other)) return;
+            visited.add(other);
+            pending.push(other);
+          });
+        }
+        components.push(comp);
+      });
+      if (components.length < 2) return [];
+      let main = components[0];
+      components.forEach((comp) => {
+        if (comp.length > main.length) main = comp;
+      });
+      const mainSet = new Set(main);
+      const bridges = [];
+      components.forEach((comp) => {
+        if (comp === main || comp.length < 3) return;
+        const compSet = new Set(comp);
+        let best = null;
+        main.forEach((cand) => {
+          const scored = this.v3CharMatchScore(cand, comp);
+          if (!scored || scored.distinct < 1) return;
+          const tighter = best && scored.score === best.score && (
+            scored.wordSum > best.wordSum
+            || (scored.wordSum === best.wordSum && scored.maxRun > best.maxRun)
+            || (scored.wordSum === best.wordSum && scored.maxRun === best.maxRun && cand.length < best.word.length)
+          );
+          if (!best || scored.score > best.score || tighter) {
+            best = { word: cand, score: scored.score, maxRun: scored.maxRun, wordSum: scored.wordSum };
+          }
+        });
+        if (!best) return;
+        let hub = comp[0];
+        let hubDeg = -1;
+        comp.forEach((w) => {
+          const deg = neighbors(w).filter((other) => compSet.has(other)).length;
+          if (deg > hubDeg) {
+            hubDeg = deg;
+            hub = w;
+          }
+        });
+        if (!mainSet.has(best.word) || compSet.has(best.word) || hub === best.word) return;
+        bridges.push({ a: hub, b: best.word });
+      });
+      return bridges;
+    },
+
+    /**
+     * v3：连通优先选显（非卡片频率）。
+     * 必显 Top/部落 → 高层枢纽+强边 1 跳邻居 → 救孤立 → 层级/象限补齐。
+     * 名额用完后，按溢出额度补第二层局部枢纽及其强链，不替换已选词。
+     */
+    getV3DisplayKeywords(keywordsPool, maxCount = DEFAULT_NODE_DISPLAY_LIMIT) {
+      const pool = (keywordsPool || []).filter(Boolean);
+      if (!pool.length || maxCount <= 0) return [];
+      const poolSet = new Set(pool);
+      const meta = this.semanticReorganizeMeta || {};
+      const levels = meta.keyword_levels || {};
+      const tribalList = (this.tribalKeywords || []).filter((w) => poolSet.has(w));
+      const effectiveMax = maxCount + tribalList.length;
+      const forced = this.flattenBookTopKeywords(meta).filter((w) => poolSet.has(w));
+      const adj = this.buildV3HierarchyAdjacency(meta);
+
+      const coreIssue = String(meta.core_issue || '').trim();
+      const coreRelated = [];
+      if (coreIssue) {
+        pool.forEach((w) => {
+          if (w && (coreIssue.includes(w) || w.includes(coreIssue.slice(0, Math.min(6, coreIssue.length))))) {
+            coreRelated.push(w);
+          }
+        });
+      }
+
+      const mergeOrder = () => {
+        const selected = [];
+        const seen = new Set();
+        const push = (k) => {
+          if (!k || seen.has(k) || !poolSet.has(k)) return;
+          seen.add(k);
+          selected.push(k);
+        };
+        forced.forEach(push);
+        tribalList.forEach(push);
+        coreRelated.forEach(push);
+        pool.forEach(push);
+        return selected;
+      };
+
+      if (pool.length <= effectiveMax) {
+        this.v3OverflowWords = [];
+        this.v3DisplayBridgeLinks = [];
+        return mergeOrder().slice(0, effectiveMax);
+      }
+
+      const selected = [];
+      const selectedSet = new Set();
+      const take = (k) => {
+        if (!k || selectedSet.has(k) || !poolSet.has(k)) return false;
+        if (selected.length >= effectiveMax) return false;
+        selectedSet.add(k);
+        selected.push(k);
+        return true;
+      };
+
+      // 1) 必显
+      forced.forEach(take);
+      tribalList.forEach(take);
+      coreRelated.forEach(take);
+
+      const degreeOf = (w) => (adj[w] ? adj[w].length : 0);
+      const levelOf = (w) => this.parseV3KeywordLevel(w, levels);
+      const quadOf = (w) => {
+        const q = String(((this.keywordFourColorDMTData || {})[w] || {}).quadrant || '').toUpperCase();
+        return ['Q1', 'Q2', 'Q3', 'Q4'].includes(q) ? q : 'Q3';
+      };
+
+      // 2) 高层枢纽（L0/L1 且度高）先入，并带上最强 1 跳邻居
+      const hubs = pool
+        .filter((w) => !selectedSet.has(w) && levelOf(w) <= 1)
+        .sort((a, b) => {
+          const da = degreeOf(a);
+          const db = degreeOf(b);
+          if (db !== da) return db - da;
+          return levelOf(a) - levelOf(b) || pool.indexOf(a) - pool.indexOf(b);
+        });
+      hubs.forEach((hub) => {
+        if (selected.length >= effectiveMax) return;
+        take(hub);
+        const neigh = (adj[hub] || []).filter((x) => poolSet.has(x.other) && !selectedSet.has(x.other));
+        // 预算：枢纽邻居约占剩余名额的一半，避免星型占满
+        const budget = Math.max(2, Math.min(6, Math.floor((effectiveMax - selected.length) / 4)));
+        neigh.slice(0, budget).forEach((x) => take(x.other));
+      });
+
+      // 3) 继续按「层级低 + 度高」补骨架，并顺手拉 1 个最强邻居
+      const remainingSkeleton = pool
+        .filter((w) => !selectedSet.has(w))
+        .sort((a, b) => {
+          const la = levelOf(a);
+          const lb = levelOf(b);
+          if (la !== lb) return la - lb;
+          const da = degreeOf(a);
+          const db = degreeOf(b);
+          if (db !== da) return db - da;
+          return pool.indexOf(a) - pool.indexOf(b);
+        });
+      for (const w of remainingSkeleton) {
+        if (selected.length >= effectiveMax) break;
+        take(w);
+        const topNeigh = (adj[w] || []).find((x) => poolSet.has(x.other) && !selectedSet.has(x.other));
+        if (topNeigh && selected.length < effectiveMax) take(topNeigh.other);
+      }
+
+      // 4) 救孤立：当前子集内无边、但全局有边 → 拉最强未入选邻居
+      const hasEdgeInSelected = (w) =>
+        (adj[w] || []).some((x) => selectedSet.has(x.other));
+      let guard = 0;
+      while (selected.length < effectiveMax && guard < effectiveMax * 2) {
+        guard += 1;
+        const isolates = selected.filter((w) => degreeOf(w) > 0 && !hasEdgeInSelected(w));
+        if (!isolates.length) break;
+        let pulled = false;
+        for (const w of isolates) {
+          if (selected.length >= effectiveMax) break;
+          const cand = (adj[w] || []).find((x) => poolSet.has(x.other) && !selectedSet.has(x.other));
+          if (cand && take(cand.other)) {
+            pulled = true;
+            break;
+          }
+        }
+        if (!pulled) break;
+      }
+
+      // 5) 象限均衡补齐（仍优先有边的词）
+      if (selected.length < effectiveMax) {
+        const quadCount = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
+        selected.forEach((w) => { quadCount[quadOf(w)] = (quadCount[quadOf(w)] || 0) + 1; });
+        const rest = pool
+          .filter((w) => !selectedSet.has(w))
+          .sort((a, b) => {
+            const qa = quadOf(a);
+            const qb = quadOf(b);
+            const ca = quadCount[qa] || 0;
+            const cb = quadCount[qb] || 0;
+            if (ca !== cb) return ca - cb;
+            const da = degreeOf(a) > 0 ? 0 : 1;
+            const db = degreeOf(b) > 0 ? 0 : 1;
+            if (da !== db) return da - db;
+            return levelOf(a) - levelOf(b) || pool.indexOf(a) - pool.indexOf(b);
+          });
+        rest.forEach((w) => {
+          if (selected.length >= effectiveMax) return;
+          if (take(w)) quadCount[quadOf(w)] = (quadCount[quadOf(w)] || 0) + 1;
+        });
+      }
+
+      const base = selected.slice(0, effectiveMax);
+      const overflowWords = this.appendV3LocalHubOverflow(base, pool, poolSet, adj, levelOf, maxCount) || [];
+      this.v3OverflowWords = overflowWords;
+      this.v3DisplayBridgeLinks = this.buildV3OverflowBridgeLinks(base);
+      return base;
+    },
+
     getSmartFilteredKeywords(keywords, maxCount = DEFAULT_NODE_DISPLAY_LIMIT) {
       if (!keywords || keywords.length === 0) {
         return [];
@@ -2724,7 +4118,7 @@ export default {
         }
         // 超出上限时仍走下方智能筛选（按四色/DMT 均衡），但不要依赖卡片频率
       }
-      
+
       // 🔥 节点上限 = 原上限 + 部落知识关键词数，部落关键词必显
       const tribalList = this.tribalKeywords || [];
       const effectiveMax = maxCount + tribalList.length;
@@ -2732,11 +4126,11 @@ export default {
       if (keywords.length <= effectiveMax) {
         return keywords;
       }
-      
+
       // 🔥 如果设置了作者筛选，只考虑该作者有贡献的关键词
       const authorFilterText = (this.authorFilter || '').trim().toLowerCase();
       const hasAuthorFilter = authorFilterText.length > 0;
-      
+
       // 准备数据
       const keywordFourColorDMTData = this.keywordFourColorDMTData || {};
       const initialKeywordsSet = new Set();
@@ -3002,6 +4396,162 @@ export default {
       return Array.from(selected);
     },
     
+    /** 规范化短词，便于匹配 */
+    normalizeKeywordToken(text) {
+      return String(text || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[\s_\-·•、，,。.!！？?（）()【】\[\]「」""'']/g, '');
+    },
+
+    /** 最长连续公共子串长度（短词够用） */
+    longestCommonSubstringLen(a, b) {
+      if (!a || !b) return 0;
+      let best = 0;
+      for (let i = 0; i < a.length; i += 1) {
+        for (let j = 0; j < b.length; j += 1) {
+          let k = 0;
+          while (
+            i + k < a.length
+            && j + k < b.length
+            && a[i + k] === b[j + k]
+          ) {
+            k += 1;
+          }
+          if (k > best) best = k;
+        }
+      }
+      return best;
+    },
+
+    /**
+     * 节点词 ↔ 候选词（文档抽出词 / 卡片语义词）匹配度。
+     * 综合：完全相等、包含、最长连续公共子串占比、字符覆盖（出现与否）。
+     * 思路对齐卡片侧「重叠 + 部分匹配」的相似度，但面向短词。
+     */
+    computeKeywordMatchScore(nodeWord, candidateWord) {
+      const a = this.normalizeKeywordToken(nodeWord);
+      const b = this.normalizeKeywordToken(candidateWord);
+      if (!a || !b) return 0;
+      if (a === b) return 1;
+
+      const shorter = a.length <= b.length ? a : b;
+      const longer = a.length <= b.length ? b : a;
+      if (longer.includes(shorter)) {
+        return Math.max(0.72, shorter.length / longer.length);
+      }
+
+      const contig = this.longestCommonSubstringLen(a, b);
+      const contigRatio = contig / Math.max(a.length, 1);
+
+      // 节点词各字符是否在候选词中出现（覆盖率）
+      let hitChars = 0;
+      for (let i = 0; i < a.length; i += 1) {
+        if (b.includes(a[i])) hitChars += 1;
+      }
+      const charCoverage = hitChars / Math.max(a.length, 1);
+
+      // 2-gram 重叠（中文短词更稳）
+      let gramHit = 0;
+      let gramTotal = 0;
+      if (a.length >= 2 && b.length >= 2) {
+        const bGrams = new Set();
+        for (let i = 0; i < b.length - 1; i += 1) bGrams.add(b.slice(i, i + 2));
+        for (let i = 0; i < a.length - 1; i += 1) {
+          gramTotal += 1;
+          if (bGrams.has(a.slice(i, i + 2))) gramHit += 1;
+        }
+      }
+      const gramRatio = gramTotal > 0 ? gramHit / gramTotal : 0;
+
+      return Math.min(1, contigRatio * 0.5 + charCoverage * 0.2 + gramRatio * 0.3);
+    },
+
+    /** 节点词是否与候选词列表中任一词达到匹配阈值 */
+    keywordMatchesAny(nodeWord, candidates, threshold = 0.58) {
+      const list = Array.isArray(candidates) ? candidates : [];
+      for (let i = 0; i < list.length; i += 1) {
+        if (this.computeKeywordMatchScore(nodeWord, list[i]) >= threshold) return true;
+      }
+      return false;
+    },
+
+    isV3TopTierKeyword(keyword) {
+      const forced = this.flattenBookTopKeywords(this.semanticReorganizeMeta || {});
+      const target = String(keyword || '').trim();
+      return forced.some((w) => String(w).trim() === target);
+    },
+
+    hasExactPermanentKeywordCard(keyword) {
+      if (this.isOntologyScopeMode || !this.effectiveCards || !Array.isArray(this.effectiveCards)) {
+        return false;
+      }
+      const keywordTrimmed = String(keyword || '').trim();
+      if (!keywordTrimmed) return false;
+      return this.effectiveCards.some((card) => {
+        const cardKeyWords = (card.keyWords || '').trim();
+        return card.title === '关键词神经元永久卡'
+          && cardKeyWords === keywordTrimmed
+          && card.four_color_type;
+      });
+    },
+
+    /** v3：文档命中数（直接 sources + 各文档词表模糊匹配） */
+    countV3DocHits(keyword) {
+      const meta = this.semanticReorganizeMeta || {};
+      const perDoc = (meta.per_doc_keywords && typeof meta.per_doc_keywords === 'object')
+        ? meta.per_doc_keywords
+        : {};
+      const kwData = (this.keywordFourColorDMTData || {})[keyword] || {};
+      const exactSources = Array.isArray(kwData.sources)
+        ? kwData.sources.map((s) => String(s).trim()).filter(Boolean)
+        : [];
+      const exactSet = new Set(exactSources);
+
+      const fileNames = Object.keys(perDoc).length > 0
+        ? Object.keys(perDoc)
+        : (Array.isArray(meta.source_files)
+          ? meta.source_files.map((s) => String(s).trim()).filter(Boolean)
+          : exactSources);
+
+      if (!fileNames.length) {
+        // 旧本子尚未写入 per_doc_keywords：至少用 sources 长度兜底
+        return exactSources.length;
+      }
+
+      let hits = 0;
+      fileNames.forEach((fn) => {
+        if (exactSet.has(fn)) {
+          hits += 1;
+          return;
+        }
+        const words = perDoc[fn] || [];
+        if (this.keywordMatchesAny(keyword, words)) {
+          hits += 1;
+        }
+      });
+      return hits;
+    },
+
+    /** v3：卡片命中数（卡片语义词与节点词达匹配阈值则 +1） */
+    countV3CardHits(keyword, authorFilterText = '') {
+      const hasAuthorFilter = !!(authorFilterText || '').trim();
+      const filter = (authorFilterText || '').trim().toLowerCase();
+      return (this.effectiveCards || []).filter((card) => {
+        if (!card || !card.keyWords) return false;
+        if (card.title === '关键词神经元永久卡') return false;
+        if (hasAuthorFilter) {
+          const cardWriter = (card.writer || '').toLowerCase();
+          if (!cardWriter.includes(filter)) return false;
+        }
+        const cardKeywords = String(card.keyWords)
+          .split(/[,，]/)
+          .map((k) => k.trim())
+          .filter(Boolean);
+        return this.keywordMatchesAny(keyword, cardKeywords);
+      }).length;
+    },
+
     // 根据卡片数量和选中状态计算节点颜色
     getNodeColors(keyword, cardCount, minCount, maxCount, isSelected) {
       
@@ -3044,26 +4594,21 @@ export default {
         
         // 🔥 检查是否有对应的深色永久卡（title="关键词神经元永久卡"且keyWords=keyword）
         // 大本体无本子永久卡：仍用浅色四色（与「无永久卡」一致），避免过深
-        let hasPermanentCard = false;
-        if (!this.isOntologyScopeMode && this.effectiveCards && Array.isArray(this.effectiveCards)) {
-          const keywordTrimmed = (keyword || '').trim();
-          hasPermanentCard = this.effectiveCards.some(card => {
-            const cardKeyWords = (card.keyWords || '').trim();
-            return card.title === '关键词神经元永久卡' && 
-                   cardKeyWords === keywordTrimmed && 
-                   card.four_color_type; // 必须有四色属性（深色卡）
-          });
-        }
+        const hasPermanentCard = this.hasExactPermanentKeywordCard(keyword);
+        // v3：Top1/3/5/10 或永久卡完全匹配 → 偏深；其余偏浅
+        const useDeep = this.isV3Pipeline
+          ? (this.isV3TopTierKeyword(keyword) || hasPermanentCard)
+          : hasPermanentCard;
         
-        // 🔥 根据是否有永久卡调整颜色深浅（加大对比度）
+        // 🔥 根据是否深色档调整颜色深浅（加大对比度）
         let r, g, b;
-        if (hasPermanentCard) {
-          // 有永久卡：使用较深的颜色（baseColor * 0.65）
+        if (useDeep) {
+          // 偏深：baseColor * 0.65
           r = Math.round(baseColor.r * 0.65);
           g = Math.round(baseColor.g * 0.65);
           b = Math.round(baseColor.b * 0.65);
         } else {
-          // 无永久卡 / 大本体：使用很浅的颜色（baseColor * 0.45 + white * 0.55）
+          // 偏浅：baseColor * 0.45 + white * 0.55
           r = Math.round(baseColor.r * 0.45 + 255 * 0.55);
           g = Math.round(baseColor.g * 0.45 + 255 * 0.55);
           b = Math.round(baseColor.b * 0.45 + 255 * 0.55);
@@ -3151,14 +4696,334 @@ export default {
       };
     },
     
+    getV3KeywordAttrs(keyword) {
+      const meta = this.semanticReorganizeMeta || {};
+      const levels = meta.keyword_levels || {};
+      const quads = meta.quadrants || {};
+      const kwData = (this.keywordFourColorDMTData || {})[keyword] || {};
+      let level = levels[keyword];
+      if (level == null || level === '') level = kwData.level;
+      const qEntry = quads[keyword] || {};
+      const quadrant = String(qEntry.quadrant || kwData.quadrant || '').trim();
+      const pendingList = qEntry.pending;
+      const pendingFaded = !!(qEntry.pending_faded || kwData.pending_faded || kwData.status === 'soft_pending');
+      const pendingRaw = (Array.isArray(pendingList) && pendingList.length > 0) || kwData.status === 'pending';
+      // 淡化虚线不再当可点 pending（仍显示淡框）
+      const pending = !!pendingRaw && !pendingFaded;
+      return { level, quadrant, pending, pendingFaded };
+    },
+
+    hashStringToUnit(str) {
+      let h = 0;
+      const s = String(str || '');
+      for (let i = 0; i < s.length; i += 1) {
+        h = ((h << 5) - h) + s.charCodeAt(i);
+        h |= 0;
+      }
+      return (Math.abs(h) % 1000) / 1000;
+    },
+
+    /** 连线轻微弯曲，减少直线完全重合 */
+    linkCurve(link) {
+      const s = link && link.source;
+      const t = link && link.target;
+      if (!s || !t || s.x == null || t.x == null) return '';
+      if (this.quadrantPlaceMode && this.quadrantFrame && this.quadrantFrame.exits) {
+        const qs = this.quadrantOfNode(s);
+        const qt = this.quadrantOfNode(t);
+        if (qs !== qt && link.linkType !== 'contour' && link.linkType !== 'longitude') {
+          const routed = this.quadrantGutterPath(s, t, qs, qt);
+          if (routed) return routed;
+        }
+      }
+      const x1 = s.x;
+      const y1 = s.y;
+      const x2 = t.x;
+      const y2 = t.y;
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const bend = (this.hashStringToUnit(`${s.label}|${t.label}`) - 0.5) * Math.min(36, len * 0.18);
+      const mx = (x1 + x2) / 2 + (-dy / len) * bend;
+      const my = (y1 + y2) / 2 + (dx / len) * bend;
+      return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`;
+    },
+
+    quadrantLinkOpacity(link) {
+      const base = link && link.opacity != null ? link.opacity : 0.7;
+      if (!this.quadrantPlaceMode || !link || !link.source || !link.target) return base;
+      if (link.linkType === 'contour' || link.linkType === 'longitude') return base;
+      if (this.quadrantOfNode(link.source) === this.quadrantOfNode(link.target)) return base;
+      return Math.min(base, 0.22);
+    },
+
+    quadrantGutterPath(s, t, qs, qt) {
+      const frame = this.quadrantFrame;
+      const exits = frame && frame.exits;
+      const es = exits && exits[qs];
+      const et = exits && exits[qt];
+      if (!es || !et) return '';
+      const port = (node, exit, qKey) => {
+        const box = exit.bbox;
+        const innerLeft = qKey === 'Q1' || qKey === 'Q4';
+        const innerTop = qKey === 'Q3' || qKey === 'Q4';
+        const vx = innerLeft ? box.minX : box.maxX;
+        const hy = innerTop ? box.minY : box.maxY;
+        const portV = { x: vx, y: Math.min(box.maxY, Math.max(box.minY, node.y)) };
+        const portH = { x: Math.min(box.maxX, Math.max(box.minX, node.x)), y: hy };
+        return Math.abs(node.x - vx) <= Math.abs(node.y - hy) ? portV : portH;
+      };
+      const ps = port(s, es, qs);
+      const pt = port(t, et, qt);
+      const diagonal = (qs === 'Q1' && qt === 'Q3') || (qs === 'Q3' && qt === 'Q1')
+        || (qs === 'Q2' && qt === 'Q4') || (qs === 'Q4' && qt === 'Q2');
+      const raw = [{ x: s.x, y: s.y }, ps, es.corner];
+      if (diagonal) raw.push({ x: frame.originX, y: frame.originY });
+      raw.push(et.corner, pt, { x: t.x, y: t.y });
+      const pts = [];
+      raw.forEach((p) => {
+        const prev = pts[pts.length - 1];
+        if (prev && Math.abs(prev.x - p.x) < 1.5 && Math.abs(prev.y - p.y) < 1.5) return;
+        pts.push(p);
+      });
+      if (pts.length < 2) return '';
+      let d = `M ${pts[0].x} ${pts[0].y}`;
+      for (let i = 1; i < pts.length; i += 1) d += ` L ${pts[i].x} ${pts[i].y}`;
+      return d;
+    },
+
+    /** 象限内安全矩形（内缩边距，保证节点落在象限内且不太贴边） */
+    getV3PaddedQuadRect(quadrant) {
+      const ac = this.axisCanvas;
+      const qKey = String(quadrant || '').toUpperCase();
+      const raw = { Q1: ac.q1, Q2: ac.q2, Q3: ac.q3, Q4: ac.q4 }[qKey];
+      if (!raw || !raw.w || !raw.h) return null;
+      const padX = Math.min(28, raw.w * 0.08);
+      const padY = Math.min(28, raw.h * 0.08);
+      return {
+        x: raw.x + padX,
+        y: raw.y + padY,
+        w: Math.max(24, raw.w - padX * 2),
+        h: Math.max(24, raw.h - padY * 2),
+        cx: raw.x + raw.w / 2,
+        cy: raw.y + raw.h / 2,
+        // 朝向整图中心（轴附近）的「内角」——同象限内 L0/Top 优先靠这里，层次往外散开
+        innerX: qKey === 'Q1' || qKey === 'Q4' ? raw.x + padX + raw.w * 0.22 : raw.x + raw.w - padX - raw.w * 0.22,
+        innerY: qKey === 'Q1' || qKey === 'Q2' ? raw.y + raw.h - padY - raw.h * 0.22 : raw.y + padY + raw.h * 0.22,
+      };
+    },
+
+    clampPointToV3Quad(x, y, quadrant) {
+      const rect = this.getV3PaddedQuadRect(quadrant);
+      const ac = this.axisCanvas;
+      if (!rect) {
+        return { x: ac.midX, y: (ac.minY + ac.maxY) / 2 };
+      }
+      return {
+        x: Math.min(rect.x + rect.w, Math.max(rect.x, x)),
+        y: Math.min(rect.y + rect.h, Math.max(rect.y, y)),
+      };
+    },
+
+    getV3QuadBiasPosition(keyword, quadrant, quadCounter) {
+      const rect = this.getV3PaddedQuadRect(quadrant);
+      const ac = this.axisCanvas;
+      if (!rect) {
+        return { x: ac.midX, y: (ac.minY + ac.maxY) / 2 };
+      }
+      const qKey = String(quadrant || 'Q3').toUpperCase() || 'Q3';
+      if (!quadCounter[qKey]) quadCounter[qKey] = 0;
+      const idx = quadCounter[qKey];
+      quadCounter[qKey] += 1;
+      const cols = Math.max(1, Math.ceil(Math.sqrt(idx + 2)));
+      const rows = Math.max(1, Math.ceil((idx + 1) / cols));
+      const row = Math.floor(idx / cols);
+      const col = idx % cols;
+      const jx = (this.hashStringToUnit(`${keyword}:x`) - 0.5) * Math.min(rect.w * 0.08, 20);
+      const jy = (this.hashStringToUnit(`${keyword}:y2`) - 0.5) * Math.min(rect.h * 0.08, 20);
+      return this.clampPointToV3Quad(
+        rect.x + ((col + 0.5) / cols) * rect.w + jx,
+        rect.y + ((row + 0.5) / rows) * rect.h + jy,
+        qKey
+      );
+    },
+
+    /**
+     * v3 布局：节点必须落在所属象限内；象限内按 L 层次相对父节点散开并尽量均匀可读。
+     * 等高线不要求标准圆/椭圆——围着同一上级、不挤压即可。
+     */
+    computeV3LayoutPositions(keywords) {
+      const meta = this.semanticReorganizeMeta || {};
+      const levels = meta.keyword_levels || {};
+      const hierarchyLinks = Array.isArray(meta.hierarchy_links) ? meta.hierarchy_links : [];
+      const keywordSet = new Set((keywords || []).filter(Boolean));
+      const childrenByParent = {};
+      const parentByChild = {};
+      hierarchyLinks.forEach((pair) => {
+        if (!pair || pair.length < 2) return;
+        const parent = String(pair[0] || '').trim();
+        const child = String(pair[1] || '').trim();
+        if (!parent || !child || parent === child) return;
+        if (!keywordSet.has(parent) || !keywordSet.has(child)) return;
+        parentByChild[child] = parent;
+        if (!childrenByParent[parent]) childrenByParent[parent] = [];
+        if (!childrenByParent[parent].includes(child)) {
+          childrenByParent[parent].push(child);
+        }
+      });
+
+      const tops = meta.book_top_keywords || {};
+      const top1Raw = tops.top1;
+      const top1Word = Array.isArray(top1Raw) ? top1Raw[0] : top1Raw;
+      const top1 = top1Word ? String(top1Word).trim() : '';
+
+      const quadOf = (kw) => {
+        const q = String(this.getV3KeywordAttrs(kw).quadrant || '').toUpperCase();
+        return ['Q1', 'Q2', 'Q3', 'Q4'].includes(q) ? q : 'Q3';
+      };
+
+      const positions = {};
+      const placed = new Set();
+
+      // 按象限分组，象限内再按层级铺开
+      const byQuad = { Q1: [], Q2: [], Q3: [], Q4: [] };
+      [...keywordSet].forEach((k) => {
+        byQuad[quadOf(k)].push(k);
+      });
+
+      Object.keys(byQuad).forEach((qKey) => {
+        const list = byQuad[qKey];
+        if (!list.length) return;
+        const rect = this.getV3PaddedQuadRect(qKey);
+        if (!rect) return;
+
+        // 同象限内：Top1 / L0 靠内角；其余相对父节点或网格散开
+        const sorted = [...list].sort((a, b) => {
+          const la = this.parseV3KeywordLevel(a, levels);
+          const lb = this.parseV3KeywordLevel(b, levels);
+          if (a === top1) return -1;
+          if (b === top1) return 1;
+          if (la !== lb) return la - lb;
+          return a.localeCompare(b, 'zh');
+        });
+
+        sorted.forEach((kw) => {
+          const lv = this.parseV3KeywordLevel(kw, levels);
+          const parent = parentByChild[kw];
+          const parentSameQuad = parent && quadOf(parent) === qKey && positions[parent];
+
+          let x;
+          let y;
+          if (kw === top1 || lv === 0) {
+            const n0 = sorted.filter((k) => k === top1 || this.parseV3KeywordLevel(k, levels) === 0).length || 1;
+            const i0 = sorted
+              .filter((k) => k === top1 || this.parseV3KeywordLevel(k, levels) === 0)
+              .indexOf(kw);
+            const ang = (2 * Math.PI * Math.max(0, i0)) / n0 - Math.PI / 2;
+            const r0 = 18 + Math.min(36, n0 * 4);
+            x = rect.innerX + Math.cos(ang) * r0;
+            y = rect.innerY + Math.sin(ang) * r0;
+          } else if (parentSameQuad) {
+            const siblings = (childrenByParent[parent] || []).filter(
+              (s) => keywordSet.has(s) && quadOf(s) === qKey
+                && this.parseV3KeywordLevel(s, levels) === lv
+            );
+            const idx = Math.max(0, siblings.indexOf(kw));
+            const n = Math.max(1, siblings.length);
+            const outwardX = rect.cx - rect.innerX;
+            const outwardY = rect.cy - rect.innerY;
+            const baseAng = Math.atan2(outwardY || 0.01, outwardX || 0.01);
+            const spread = Math.min(Math.PI * 0.85, 0.35 + n * 0.22);
+            const ang = baseAng - spread / 2 + (n <= 1 ? 0 : (spread * idx) / (n - 1));
+            const dist = 36 + lv * 28 + (n > 4 ? 8 : 0);
+            x = positions[parent].x + Math.cos(ang) * dist;
+            y = positions[parent].y + Math.sin(ang) * dist;
+          } else {
+            const rest = sorted.filter((k) => !(k === top1 || this.parseV3KeywordLevel(k, levels) === 0));
+            const ri = Math.max(0, rest.indexOf(kw));
+            const cols = Math.max(2, Math.ceil(Math.sqrt(Math.max(rest.length, 1))));
+            const rows = Math.max(1, Math.ceil(rest.length / cols));
+            const col = ri % cols;
+            const row = Math.floor(ri / cols);
+            const tCol = (col + 0.5) / cols;
+            const tRow = (row + 0.55) / rows;
+            x = rect.x + rect.w * (0.28 + 0.64 * tCol);
+            y = rect.y + rect.h * (0.22 + 0.68 * tRow);
+            if (parent && positions[parent]) {
+              x = 0.72 * x + 0.28 * positions[parent].x;
+              y = 0.72 * y + 0.28 * positions[parent].y;
+            }
+          }
+
+          const jx = (this.hashStringToUnit(`${kw}:jx`) - 0.5) * 10;
+          const jy = (this.hashStringToUnit(`${kw}:jy`) - 0.5) * 10;
+          positions[kw] = this.clampPointToV3Quad(x + jx, y + jy, qKey);
+          placed.add(kw);
+        });
+
+        for (let pass = 0; pass < 3; pass += 1) {
+          for (let i = 0; i < list.length; i += 1) {
+            for (let j = i + 1; j < list.length; j += 1) {
+              const a = list[i];
+              const b = list[j];
+              const pa = positions[a];
+              const pb = positions[b];
+              if (!pa || !pb) continue;
+              const dx = pb.x - pa.x;
+              const dy = pb.y - pa.y;
+              const dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
+              const minDist = 34;
+              if (dist >= minDist) continue;
+              const push = (minDist - dist) / 2;
+              const ux = dx / dist;
+              const uy = dy / dist;
+              positions[a] = this.clampPointToV3Quad(pa.x - ux * push, pa.y - uy * push, qKey);
+              positions[b] = this.clampPointToV3Quad(pb.x + ux * push, pb.y + uy * push, qKey);
+            }
+          }
+        }
+      });
+
+      return positions;
+    },
+
+    getV3InitialPosition(keyword, quadrant, quadCounter, layoutPositions) {
+      const k = String(keyword || '').trim();
+      if (layoutPositions && layoutPositions[k]) {
+        return layoutPositions[k];
+      }
+      return this.getV3QuadBiasPosition(keyword, quadrant, quadCounter);
+    },
+
     calculateNodes(keywords) {
+      const quadView = readQuadrantPicture();
+      this._quadrantPosForCalc = quadView && quadView.positions ? quadView.positions : null;
+      if (quadView && quadView.frame) {
+        this.quadrantPlaceMode = true;
+        this.quadrantFrame = quadView.frame;
+        if (quadView.force && (!this.forceLayoutSnapshot || !Object.keys(this.forceLayoutSnapshot).length)) {
+          this.forceLayoutSnapshot = quadView.force;
+        }
+      }
       // 🔥 如果设置了作者筛选，只统计该作者有贡献的关键词
       const authorFilterText = (this.authorFilter || '').trim().toLowerCase();
       const hasAuthorFilter = authorFilterText.length > 0;
+      const useV3Layout = this.isV3Pipeline;
       
-      // 统计每个关键词关联的卡片数量
+      // 统计每个关键词关联数量：
+      // v2 = 卡片精确命中；v3 = 文档匹配命中 + 卡片模糊命中
       const cardCounts = {};
+      const docHitCounts = {};
+      const cardHitCounts = {};
       keywords.forEach(keyword => {
+        if (useV3Layout) {
+          const docHits = this.countV3DocHits(keyword);
+          const cardHits = this.countV3CardHits(keyword, hasAuthorFilter ? authorFilterText : '');
+          docHitCounts[keyword] = docHits;
+          cardHitCounts[keyword] = cardHits;
+          cardCounts[keyword] = docHits + cardHits;
+          return;
+        }
         const matchingCards = this.effectiveCards.filter(card => {
           if (!card.keyWords) return false;
           const cardKeywords = card.keyWords.split(/[,，]/).map(k => k.trim());
@@ -3174,6 +5039,8 @@ export default {
         });
         
         cardCounts[keyword] = matchingCards.length;
+        docHitCounts[keyword] = 0;
+        cardHitCounts[keyword] = matchingCards.length;
       });
       
       // 计算最小和最大卡片数（用于缩放和颜色计算）
@@ -3200,6 +5067,8 @@ export default {
       // 创建节点
       return keywords.map((keyword, index) => {
         const cardCount = cardCounts[keyword] || 0;
+        const docHitCount = docHitCounts[keyword] || 0;
+        const cardHitCount = cardHitCounts[keyword] || 0;
         
         // 🔥 获取关键词的四色/DMT属性
         const keywordDMTData = this.keywordFourColorDMTData || {};
@@ -3237,6 +5106,9 @@ export default {
         let keywordCards = this.effectiveCards.filter(card => {
           if (!card.keyWords) return false;
           const cardKeywords = card.keyWords.split(/[,，]/).map(k => k.trim());
+          if (useV3Layout) {
+            return this.keywordMatchesAny(keyword, cardKeywords);
+          }
           return cardKeywords.includes(keyword);
         });
         
@@ -3275,14 +5147,26 @@ export default {
         
         // 根据重要性计算颜色（优先使用关键词四色类型）
         const colors = this.getNodeColors(keyword, cardCount, minCount, maxCount, isSelected);
+        const v3Attrs = useV3Layout
+          ? this.getV3KeywordAttrs(keyword)
+          : { level: null, quadrant: '', pending: false, pendingFaded: false };
         
         // 计算节点内数字的字体大小（根据节点半径自适应）
         const finalRadius = Math.max(radius, 5);
         const countFontSize = Math.max(8, Math.min(finalRadius * 0.6, 12));
+
+        let nodeX = savedPos ? savedPos.x : (centerX + offsetX);
+        let nodeY = savedPos ? savedPos.y : (centerY + offsetY);
+        const quadPos = this._quadrantPosForCalc && this._quadrantPosForCalc[keyword];
+        if (quadPos && quadPos.x != null && quadPos.y != null) {
+          nodeX = quadPos.x;
+          nodeY = quadPos.y;
+        }
         
         // 🔥 如果设置了作者筛选且该关键词没有该作者的卡片，跳过此节点（部落关键词必显不跳过）
+        // v3：词来自文档，作者筛只影响数字，不因无卡隐藏节点
         const isTribalKw = (this.tribalKeywords || []).includes(keyword) || knowledgeType === 'trib';
-        if (hasAuthorFilter && !isTribalKw) {
+        if (hasAuthorFilter && !isTribalKw && !useV3Layout) {
           const keywordCardsForAuthor = this.effectiveCards.filter(card => {
             if (!card.keyWords) return false;
             const cardKeywords = card.keyWords.split(/[,，]/).map(k => k.trim());
@@ -3295,24 +5179,38 @@ export default {
           }
         }
         
+        const v3Lv = useV3Layout ? this.parseV3KeywordLevel(keyword, (this.semanticReorganizeMeta || {}).keyword_levels || {}) : null;
+        const labelFontSize = !useV3Layout ? 10 : (v3Lv != null && v3Lv <= 0 ? 13 : (v3Lv === 1 ? 11 : 9));
+        const labelWeight = useV3Layout && v3Lv != null && v3Lv <= 1 ? 650 : 400;
+
         return {
           id: index,
           label: keyword,
           cardCount: cardCount,
+          docHitCount,
+          cardHitCount,
           radius: finalRadius,
-          fontSize: 10,
+          fontSize: labelFontSize,
+          labelFontSize,
+          labelWeight,
+          v3Level: v3Lv,
+          v3ChildCount: 0,
           countFontSize: countFontSize,
           countTextColor: '#ffffff',
-          x: savedPos ? savedPos.x : (centerX + offsetX),
-          y: savedPos ? savedPos.y : (centerY + offsetY),
-          fx: savedPos ? savedPos.x : undefined,
-          fy: savedPos ? savedPos.y : undefined,
+          x: nodeX,
+          y: nodeY,
+          fx: quadPos ? quadPos.x : (savedPos ? savedPos.x : undefined),
+          fy: quadPos ? quadPos.y : (savedPos ? savedPos.y : undefined),
           color: colors.color,
           dmtLevel: dmtLevel,
           knowledgeType: knowledgeType,
           stroke: colors.stroke,
           strokeWidth: colors.strokeWidth,
           textColor: '#333',
+          level: v3Attrs.level,
+          quadrant: v3Attrs.quadrant,
+          pending: v3Attrs.pending,
+          pendingFaded: !!v3Attrs.pendingFaded,
           // 保存用于颜色更新的数据
           minCount: minCount,
           maxCount: maxCount,
@@ -3343,12 +5241,430 @@ export default {
       return 30;
     },
     
+    handleNodeClick(node, event) {
+      if (this.isV3Pipeline && node && node.pending) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        this.openPendingDialog(node);
+        return;
+      }
+      this.toggleKeywordSelection(node.label);
+    },
+
+    openPendingDialog(node) {
+      this.closeContextMenu();
+      this.pendingDialogNode = node;
+      this.pendingSelectedChoice = null;
+      this.pendingCustomText = '';
+      this.showPendingDialog = true;
+    },
+
+    pendingOptionBucket(opt) {
+      const label = String((opt && opt.label) || '');
+      const id = String((opt && opt.id) || '');
+      const patch = (opt && opt.attr_patch && typeof opt.attr_patch === 'object') ? opt.attr_patch : {};
+      if ((opt && opt.kind === 'quadrant') || /^(verify_|direct_)/.test(id)) return 'know';
+      if (/不一致|矛盾|对不上|纪要/.test(label)) return 'conflict';
+      if (patch.four_color_type || /四色/.test(label)) return 'color';
+      if (/^DMT|DMT归为|DMT改为/.test(label) || (patch.dmt_level && !/^(知道|认可|我知道)/.test(label))) return 'dmt';
+      if (patch.knowledge_type || /知识类型|属性改为/.test(label)) return 'knowledge';
+      if (/^(知道|认可)[：:]|^我知道|^我能准确/.test(label)) return 'meaning';
+      if (/不了解|我不清楚|不清楚|不知道|不确定|说不清|需要补充/.test(label)) return 'know';
+      if (patch.dmt_level) return 'dmt';
+      return 'meaning';
+    },
+
+    pendingOptionEffect(opt) {
+      const id = String((opt && opt.id) || '');
+      if (id === 'verify_true_know' || id === 'direct_know') return '确认后按「你知道」归位，虚线去掉。';
+      if (id === 'verify_false_know' || id === 'direct_unknow') return '确认后按「你还不确定」归位，虚线去掉。';
+      if (id === 'verify_partial') return '确认后先按「还没完全知道」归位，以后还能改属性。';
+      if (opt && opt.kind === 'quadrant' && opt.human_know === true) return '确认后按「你知道」归位，虚线去掉。';
+      if (opt && opt.kind === 'quadrant' && opt.human_know === false) return '确认后按「你还不确定」归位，虚线去掉。';
+      return '';
+    },
+
+    closePendingDialog() {
+      this.showPendingDialog = false;
+      this.pendingDialogNode = null;
+      this.pendingSelectedChoice = null;
+      this.pendingCustomText = '';
+    },
+
+    openPanelEdit(payload) {
+      const p = payload || {};
+      this.panelEditKind = p.kind || '';
+      this.panelEditIndex = Number.isInteger(p.index) ? p.index : -1;
+      this.panelEditScaleKey = p.scaleKey || '';
+      this.panelEditItemKey = p.itemKey || '';
+      this.panelEditItemName = p.itemName || '';
+      this.panelEditCurrent = String(p.current || '');
+      this.panelEditDraft = this.panelEditCurrent;
+      this.panelEditPicked = '';
+      this.panelEditOptions = [];
+      this.showPanelEditDialog = true;
+      this.fetchPanelEditOptions();
+    },
+
+    closePanelEditDialog() {
+      if (this.panelEditSaving) return;
+      this.showPanelEditDialog = false;
+      this.panelEditLoading = false;
+    },
+
+    pickPanelEditOption(text) {
+      const value = String(text || '').trim();
+      this.panelEditPicked = value;
+      this.panelEditDraft = value;
+    },
+
+    async fetchPanelEditOptions() {
+      const username = (localStorage.getItem('userId') || '').trim();
+      if (!username) return;
+      this.panelEditLoading = true;
+      try {
+        const data = await semantic_panel_suggest({
+          username,
+          scene_name: this.getSceneName() || this.sceneName || '',
+          kind: this.panelEditKind,
+          current: this.panelEditCurrent,
+          scale_key: this.panelEditScaleKey,
+          item_key: this.panelEditItemKey,
+          item_name: this.panelEditItemName,
+        });
+        if (data.error_num !== 0) throw new Error(data.msg || '生成失败');
+        const opts = Array.isArray(data.options) ? data.options.map((x) => String(x).trim()).filter(Boolean) : [];
+        if (this.showPanelEditDialog) this.panelEditOptions = opts;
+      } catch (e) {
+        console.error('[KeywordNetworkGraph] fetchPanelEditOptions', e);
+        if (this.showPanelEditDialog) this.panelEditOptions = [];
+      } finally {
+        this.panelEditLoading = false;
+      }
+    },
+
+    async deleteV3SubIssue(index) {
+      const list = this.v3SubIssues.slice();
+      if (index < 0 || index >= list.length) return;
+      const removed = list[index];
+      if (!window.confirm('删掉这条子问题？')) return;
+      list.splice(index, 1);
+      await this.saveV3IntentPreference({
+        preferred_sub_issues: list,
+        panel_edit: { action: '删除子问题', target: removed },
+      });
+    },
+
+    async confirmPanelEdit() {
+      const draft = String(this.panelEditDraft || '').trim();
+      if (!draft) return;
+      this.panelEditSaving = true;
+      try {
+        let ok = false;
+        if (this.panelEditKind === 'scale_edit') {
+          ok = await this.saveV3IntentPreference({
+            preferred_scale_definitions: {
+              [this.panelEditScaleKey]: { [this.panelEditItemKey]: draft },
+            },
+            panel_edit: {
+              action: '修改刻度说明',
+              target: `${this.panelEditItemName || this.panelEditItemKey}`,
+            },
+          });
+        } else if (this.panelEditKind === 'quadrant_edit') {
+          ok = await this.saveV3IntentPreference({
+            preferred_quadrant_definitions: {
+              [this.panelEditItemKey]: draft,
+            },
+            panel_edit: {
+              action: '修改象限内涵',
+              target: `${this.panelEditItemName || this.panelEditItemKey}`,
+            },
+          });
+        } else {
+          const list = this.v3SubIssues.slice();
+          const action = this.panelEditKind === 'sub_add' ? '添加子问题' : '修改子问题';
+          if (this.panelEditKind === 'sub_add') list.push(draft);
+          else if (this.panelEditIndex >= 0 && this.panelEditIndex < list.length) list.splice(this.panelEditIndex, 1, draft);
+          else {
+            this.panelEditSaving = false;
+            return;
+          }
+          ok = await this.saveV3IntentPreference({
+            preferred_sub_issues: list,
+            panel_edit: { action, target: draft.slice(0, 40) },
+          });
+        }
+        this.panelEditSaving = false;
+        if (ok) this.closePanelEditDialog();
+      } catch (e) {
+        this.panelEditSaving = false;
+      }
+    },
+
+    async saveV3IntentPreference(patch) {
+      const username = (localStorage.getItem('userId') || '').trim();
+      if (!username) {
+        this.$message.error('未登录，无法保存偏好');
+        return;
+      }
+      try {
+        const data = await semantic_intent_preference({
+          username,
+          scene_name: this.getSceneName() || this.sceneName || '',
+          patch: patch || {},
+        });
+        if (data.error_num !== 0) {
+          throw new Error(data.msg || '保存失败');
+        }
+        this.applyV3IntentPatchToMeta(patch);
+        this.$message.success('已保存偏好');
+        this.$emit('intent-preference-saved', patch);
+        return true;
+      } catch (e) {
+        console.error('[KeywordNetworkGraph] saveV3IntentPreference', e);
+        this.$message.error(`保存失败：${e.message || '未知错误'}`);
+        return false;
+      }
+    },
+
+    applyV3IntentPatchToMeta(patch) {
+      if (!patch || !this.semanticReorganizeMeta) return;
+      const meta = this.semanticReorganizeMeta;
+      if (patch.preferred_core_issue) {
+        meta.core_issue = patch.preferred_core_issue;
+      }
+      if (Array.isArray(patch.preferred_sub_issues)) {
+        const subs = patch.preferred_sub_issues.map((x) => String(x).trim()).filter(Boolean);
+        this.$set(meta, 'sub_issues', subs);
+        if (meta.book_top_keywords && typeof meta.book_top_keywords === 'object') {
+          this.$set(meta.book_top_keywords, 'sub_issues', subs.slice());
+        }
+      }
+      if (patch.preferred_top && patch.preferred_top.top1) {
+        const tops = meta.book_top_keywords && typeof meta.book_top_keywords === 'object'
+          ? { ...meta.book_top_keywords }
+          : {};
+        tops.top1 = [patch.preferred_top.top1];
+        meta.book_top_keywords = tops;
+      }
+      if (patch.preferred_scale_definitions && typeof patch.preferred_scale_definitions === 'object') {
+        const scale = meta.scale_definitions && typeof meta.scale_definitions === 'object'
+          ? JSON.parse(JSON.stringify(meta.scale_definitions))
+          : {};
+        Object.keys(patch.preferred_scale_definitions).forEach((key) => {
+          const val = patch.preferred_scale_definitions[key];
+          if (val && typeof val === 'object') {
+            scale[key] = { ...(scale[key] || {}), ...val };
+          }
+        });
+        meta.scale_definitions = scale;
+      }
+      if (patch.preferred_quadrant_definitions && typeof patch.preferred_quadrant_definitions === 'object') {
+        const pack = meta.quadrant_meaning && typeof meta.quadrant_meaning === 'object'
+          ? JSON.parse(JSON.stringify(meta.quadrant_meaning))
+          : { definitions: {} };
+        const defs = pack.definitions && typeof pack.definitions === 'object' ? { ...pack.definitions } : {};
+        Object.keys(patch.preferred_quadrant_definitions).forEach((key) => {
+          const val = String(patch.preferred_quadrant_definitions[key] || '').trim();
+          if (val) defs[key] = val;
+        });
+        pack.definitions = defs;
+        this.$set(meta, 'quadrant_meaning', pack);
+      }
+    },
+
+    /** 打开 Top 备选替换对话框：由用户点选该档中要被替换的词，可取消 */
+    applyV3TopAlternative(tierKey, altWord) {
+      const tier = String(tierKey || '').trim();
+      const word = String(altWord || '').trim();
+      if (!tier || !word) return;
+      const meta = this.semanticReorganizeMeta || {};
+      const tops = meta.book_top_keywords || {};
+      const raw = tops[tier];
+      let current = Array.isArray(raw)
+        ? raw.map((x) => String(x).trim()).filter(Boolean)
+        : (raw ? [String(raw).trim()] : []);
+      if (!current.length) {
+        const n = { top1: 1, top3: 3, top5: 5, top10: 10 }[tier] || 3;
+        current = (meta.book_keywords || []).map((x) => String(x).trim()).filter(Boolean).slice(0, n);
+      }
+      if (!current.length) {
+        this.$message.warning(`当前没有可替换的 ${tier} 词`);
+        return;
+      }
+      this.topReplaceTierKey = tier;
+      this.topReplaceAltWord = word;
+      this.topReplaceCandidates = current;
+      this.topReplaceSelected = current.length === 1 ? current[0] : '';
+      this.topReplaceSaving = false;
+      this.showTopReplaceDialog = true;
+    },
+
+    closeTopReplaceDialog() {
+      this.showTopReplaceDialog = false;
+      this.topReplaceTierKey = '';
+      this.topReplaceAltWord = '';
+      this.topReplaceCandidates = [];
+      this.topReplaceSelected = '';
+      this.topReplaceSaving = false;
+    },
+
+    /** 用户确认后：用备选替换其点选的该档现有词，并同步属性/层次/展示 */
+    async confirmV3TopAlternativeReplace() {
+      const username = (localStorage.getItem('userId') || '').trim();
+      if (!username) {
+        this.$message.error('未登录');
+        return;
+      }
+      const tier = String(this.topReplaceTierKey || '').trim();
+      const word = String(this.topReplaceAltWord || '').trim();
+      const replaceWord = String(this.topReplaceSelected || '').trim();
+      if (!tier || !word || !replaceWord) {
+        this.$message.warning('请先选择要替换的词');
+        return;
+      }
+      this.topReplaceSaving = true;
+      try {
+        const data = await semantic_top_alternative_replace({
+          username,
+          scene_name: this.getSceneName() || this.sceneName || '',
+          tier,
+          alt_word: word,
+          replace_word: replaceWord,
+        });
+        if (data.error_num !== 0) {
+          throw new Error(data.msg || '替换失败');
+        }
+        const oldWord = String(data.old || replaceWord).trim();
+        const newWord = String(data.new || word).trim();
+        if (this.semanticReorganizeMeta) {
+          const meta = this.semanticReorganizeMeta;
+          if (data.book_top_keywords) meta.book_top_keywords = data.book_top_keywords;
+          if (data.hierarchy_links) meta.hierarchy_links = data.hierarchy_links;
+          if (data.keyword_levels) meta.keyword_levels = data.keyword_levels;
+          if (data.quadrants) meta.quadrants = data.quadrants;
+          if (data.book_keywords) meta.book_keywords = data.book_keywords;
+        }
+        if (data.keyword_map && typeof data.keyword_map === 'object') {
+          this.keywordFourColorDMTData = { ...data.keyword_map };
+        } else if (oldWord && newWord && oldWord !== newWord) {
+          const local = { ...(this.keywordFourColorDMTData || {}) };
+          if (local[oldWord] && !local[newWord]) {
+            local[newWord] = { ...local[oldWord] };
+            delete local[oldWord];
+          }
+          this.keywordFourColorDMTData = local;
+        }
+        if (oldWord && newWord && oldWord !== newWord) {
+          (this.nodes || []).forEach((n) => {
+            if (n && n.label === oldWord) n.label = newWord;
+          });
+        }
+        this.$message.success(
+          oldWord && oldWord !== newWord
+            ? `已用「${newWord}」替换「${oldWord}」（${tier}）`
+            : `已更新 ${tier}`,
+        );
+        this.$emit('top-alternative-replaced', {
+          tier, old: oldWord, new: newWord,
+          book_top_keywords: data.book_top_keywords,
+          book_keywords: data.book_keywords,
+          keyword_map: data.keyword_map,
+        });
+        this.closeTopReplaceDialog();
+        this.$nextTick(() => {
+          try {
+            this.refreshNodeVisualFromAttrs();
+            if (typeof this.calculateLinks === 'function' && this.nodes) {
+              const labels = this.nodes.map((n) => n.label).filter(Boolean);
+              this.links = this.calculateLinks(labels);
+            }
+          } catch (e) {
+            console.warn('[KeywordNetworkGraph] refresh after top replace', e);
+          }
+        });
+      } catch (e) {
+        console.error('[KeywordNetworkGraph] confirmV3TopAlternativeReplace', e);
+        this.$message.error(`替换失败：${e.message || '未知错误'}`);
+      } finally {
+        this.topReplaceSaving = false;
+      }
+    },
+
+    async confirmPendingChoice() {
+      const node = this.pendingDialogNode;
+      if (!node || this.pendingConfirmSaving) return;
+      const word = String(node.label || '').trim();
+      const custom = String(this.pendingCustomText || '').trim();
+      const opt = this.pendingSelectedChoice;
+      const choice = opt && opt.id ? String(opt.id).trim() : '';
+      if (!choice && !custom) {
+        this.$message.warning('请选择或填写一项');
+        return;
+      }
+      const username = (localStorage.getItem('userId') || '').trim();
+      if (!username) {
+        this.$message.error('未登录');
+        return;
+      }
+      this.pendingConfirmSaving = true;
+      try {
+        const previewApplied = (opt && opt.id)
+          ? { option_id: opt.id, human_know: opt.human_know }
+          : undefined;
+        const data = await semantic_confirm_pending({
+          username,
+          scene_name: this.getSceneName() || this.sceneName || '',
+          word,
+          choice: choice || 'custom',
+          custom_text: custom,
+          preview_applied: previewApplied,
+        });
+        if (data.error_num !== 0) {
+          throw new Error(data.msg || '确认失败');
+        }
+        this.applyPendingConfirmLocally(word, data);
+        this.$message.success('已确认');
+        this.closePendingDialog();
+        this.initializeNetwork();
+      } catch (e) {
+        console.error('[KeywordNetworkGraph] confirmPendingChoice', e);
+        this.$message.error(`确认失败：${e.message || '未知错误'}`);
+      } finally {
+        this.pendingConfirmSaving = false;
+      }
+    },
+
+    applyPendingConfirmLocally(word, data) {
+      const kwEntry = data.keyword && typeof data.keyword === 'object' ? data.keyword : {};
+      const quadEntry = data.quadrant && typeof data.quadrant === 'object' ? data.quadrant : {};
+      if (!this.keywordFourColorDMTData) this.keywordFourColorDMTData = {};
+      this.keywordFourColorDMTData[word] = {
+        ...(this.keywordFourColorDMTData[word] || {}),
+        ...kwEntry,
+      };
+      if (this.semanticReorganizeMeta) {
+        const quads = this.semanticReorganizeMeta.quadrants && typeof this.semanticReorganizeMeta.quadrants === 'object'
+          ? { ...this.semanticReorganizeMeta.quadrants }
+          : {};
+        quads[word] = { ...(quads[word] || {}), ...quadEntry };
+        this.semanticReorganizeMeta.quadrants = quads;
+      }
+    },
+
     // 🔥 处理右键点击（显示菜单）
     handleRightClick(node, event) {
       event.preventDefault();
       event.stopPropagation();
-      
+
       this.closeLinkContextMenu();
+      if (this.isV3Pipeline && node && node.pending) {
+        this.openPendingDialog(node);
+        return;
+      }
       // 🔥 显示右键菜单
       this.contextMenuNode = node;
       this.contextMenuPosition = {
@@ -3357,7 +5673,7 @@ export default {
       };
       this.contextMenuVisible = true;
     },
-    
+
     // 🔥 关闭右键菜单
     closeContextMenu() {
       this.contextMenuVisible = false;
@@ -3445,10 +5761,16 @@ export default {
           throw new Error(data.msg || '保存失败');
         }
 
-        const strengthWidth = { '强': 5.5, '强中': 3.3, '普通': 1.0 };
-        // Vue3 无 $set，直接赋值即可触发响应式
+        const strengthStyle = {
+          '强': { width: 3.6, opacity: 0.92, color: '#35286e' },
+          '强中': { width: 2.6, opacity: 0.78, color: '#5a4a92' },
+          '普通': { width: 1.7, opacity: 0.62, color: '#6d628c' },
+        };
+        const style = strengthStyle[strength] || strengthStyle['普通'];
         link.linkStrength = strength;
-        link.width = strengthWidth[strength] || 1.0;
+        link.width = style.width;
+        link.opacity = style.opacity;
+        link.color = style.color;
 
         // 同步 meta.hierarchy_links（跳过 deep watch 的整图重初始化）
         this._skipSemanticMetaReinit = true;
@@ -4329,6 +6651,12 @@ export default {
           console.error('[KeywordNetworkGraph] updateKeywordFourColorDMTViaAPI: keyword参数无效', keyword);
           return;
         }
+        // 先记下改前属性，供意图跟随（须在本地数据被覆盖前）
+        const prevAttrsSnapshot = {
+          four_color_type: ((this.keywordFourColorDMTData || {})[keyword] || {}).four_color_type || '',
+          dmt_level: ((this.keywordFourColorDMTData || {})[keyword] || {}).dmt_level || '',
+          knowledge_type: ((this.keywordFourColorDMTData || {})[keyword] || {}).knowledge_type || '',
+        };
         
         const apiBaseUrl = this.getApiBaseUrl();
         const useOntologyApi = this.isOntologyScopeMode;
@@ -4368,6 +6696,28 @@ export default {
         
         const data = await response.json();
         if (data.error_num === 0) {
+          if (this.isV3Pipeline && !useOntologyApi) {
+            try {
+              await semantic_intent_preference({
+                username: localStorage.getItem('userId'),
+                scene_name: this.getSceneName(),
+                patch: {
+                  locked_attr_words: [String(keyword).trim()],
+                  attr_edits: [{
+                    word: String(keyword).trim(),
+                    before: prevAttrsSnapshot,
+                    after: {
+                      four_color_type: fourColorType ? String(fourColorType).trim() : '',
+                      dmt_level: dmtLevel ? String(dmtLevel).trim() : '',
+                      knowledge_type: knowledgeType ? String(knowledgeType).trim() : '',
+                    },
+                  }],
+                },
+              });
+            } catch (lockErr) {
+              console.warn('[KeywordNetworkGraph] locked_attr_words', lockErr);
+            }
+          }
           // 大本体：同步父级 attrs 对象
           if (useOntologyApi && data.keywordFourColorDMT) {
             Object.keys(data.keywordFourColorDMT).forEach((k) => {
@@ -4763,8 +7113,12 @@ export default {
       const hierarchyLinks = Array.isArray(meta.hierarchy_links) ? meta.hierarchy_links : [];
       const useHierarchy = hierarchyLinks.length > 0;
 
-      if (useHierarchy) {
-        const strengthWidth = { '强': 5.5, '强中': 3.3, '普通': 1.0 };
+        if (useHierarchy) {
+        const strengthStyle = {
+          '强': { width: 3.6, opacity: 0.92, color: '#35286e' },
+          '强中': { width: 2.6, opacity: 0.78, color: '#5a4a92' },
+          '普通': { width: 1.7, opacity: 0.62, color: '#6d628c' },
+        };
         const seen = {};
         hierarchyLinks.forEach((pair) => {
           if (!pair || pair.length < 2) return;
@@ -4782,13 +7136,14 @@ export default {
             const strength = (strengthRaw === '强' || strengthRaw === '强中' || strengthRaw === '普通')
               ? strengthRaw
               : '普通';
+            const style = strengthStyle[strength];
             links.push({
               source: source,
               target: target,
               value: 1,
-              width: strengthWidth[strength],
-              opacity: 0.75,
-              color: '#493d8b',
+              width: style.width,
+              opacity: style.opacity,
+              color: style.color,
               linkType: 'hierarchy',
               linkStrength: strength,
               parentKeyword: kw1,
@@ -4796,6 +7151,67 @@ export default {
             });
           }
         });
+
+        this.buildV3OverflowBridgeLinks(keywords).forEach((pair) => {
+          const kw1 = pair && pair.a;
+          const kw2 = pair && pair.b;
+          if (!kw1 || !kw2 || !keywords.includes(kw1) || !keywords.includes(kw2)) return;
+          const key = [kw1, kw2].sort().join('|');
+          if (seen[key]) return;
+          seen[key] = true;
+          const source = nodeMap[kw1];
+          const target = nodeMap[kw2];
+          if (!source || !target) return;
+          const style = strengthStyle['强中'];
+          links.push({
+            source,
+            target,
+            value: 1,
+            width: style.width,
+            opacity: style.opacity,
+            color: style.color,
+            linkType: 'hierarchy',
+            linkStrength: '强中',
+            bridge: true,
+            parentKeyword: kw2,
+            childKeyword: kw1,
+          });
+        });
+
+        const lonColorMap = { R: '#dc143c', B: '#1e90ff', P: '#9370db', G: '#3cb371' };
+        const chains = Array.isArray(meta.longitude_chains) ? meta.longitude_chains : [];
+        chains.forEach((chain, chainIndex) => {
+          if (!chain || !Array.isArray(chain.nodes)) return;
+          const colorKey = String(chain.color || '').trim().toUpperCase().slice(0, 1);
+          const stroke = lonColorMap[colorKey] || '#c45c26';
+          const nodes = chain.nodes.map((n) => String(n || '').trim()).filter(Boolean);
+          for (let i = 0; i < nodes.length - 1; i += 1) {
+            const kw1 = nodes[i];
+            const kw2 = nodes[i + 1];
+            if (!keywords.includes(kw1) || !keywords.includes(kw2)) continue;
+            const lonKey = `lon|${kw1}|${kw2}`;
+            if (seen[lonKey]) continue;
+            seen[lonKey] = true;
+            const source = nodeMap[kw1];
+            const target = nodeMap[kw2];
+            if (source && target) {
+              links.push({
+                source,
+                target,
+                value: 1,
+                width: 3.2,
+                opacity: 0.95,
+                color: stroke,
+                dasharray: '8,4',
+                linkType: 'longitude',
+                longitudeId: `lon-${chainIndex}`,
+              });
+            }
+          }
+        });
+
+      } else if (this.isV3Pipeline) {
+        // v3 无层次数据时不绘制共现边
       } else {
         // 兼容旧逻辑：共现连线（同卡出现且频次>=2）
         const cooccurrenceMatrix = {};
@@ -4869,10 +7285,35 @@ export default {
         });
       }
       
-      return links;
+      return links.sort((a, b) => {
+        const rank = { longitude: 1, hierarchy: 2, cooccurrence: 2, fusion: 3, tribal_semantic: 3, contour: 4 };
+        const sa = a.linkStrength === '普通' ? 0 : (a.linkStrength === '强中' ? 1 : (a.linkStrength === '强' ? 2 : 1));
+        const sb = b.linkStrength === '普通' ? 0 : (b.linkStrength === '强中' ? 1 : (b.linkStrength === '强' ? 2 : 1));
+        return (rank[a.linkType] || 2) - (rank[b.linkType] || 2) || (sa - sb);
+      });
     },
     
     initializeForceLayout() {
+      this.forceLayoutToken = (this.forceLayoutToken || 0) + 1;
+      const token = this.forceLayoutToken;
+      if (this.quadrantModeEnabled()) {
+        this.quadrantPlaceMode = true;
+        if (this.simulation) this.simulation.stop();
+        this.showQuadrantNow();
+        return;
+      }
+      if (this.isV3Pipeline) {
+        const childCount = {};
+        (this.links || []).forEach((link) => {
+          if (link.linkType !== 'hierarchy') return;
+          const parent = link.parentKeyword;
+          if (!parent) return;
+          childCount[parent] = (childCount[parent] || 0) + 1;
+        });
+        this.nodes.forEach((node) => {
+          node.v3ChildCount = childCount[node.label] || 0;
+        });
+      }
       if (!this.$refs.networkSvg) return;
       
       // 停止之前的模拟
@@ -4888,16 +7329,20 @@ export default {
         return seed / 233280;
       };
       
+      // 等高、经度只是叠层，不参与力导向
+      const simLinks = (this.links || []).filter((link) => (
+        link.linkType !== 'longitude' && link.linkType !== 'contour'
+      ));
       // 使用 D3 v3 API 创建力导向布局（平衡紧凑性和间距）
       this.simulation = d3.layout.force()
         .nodes(this.nodes)
-        .links(this.links)
+        .links(simLinks)
         .size([this.svgWidth, this.svgHeight])
-        .linkDistance(120) // 适中的连接距离，避免拥挤
-        .linkStrength(0.7) // 适中的连接强度
-        .charge(-400) // 适中的排斥力，保持节点间距
-        .gravity(0.08) // 适中的重力，保持中心集中但不过度
-        .friction(0.9) // 增加摩擦力，让布局更稳定
+        .linkDistance(120)
+        .linkStrength(0.7)
+        .charge(-400)
+        .gravity(0.08)
+        .friction(0.9)
         .on('tick', () => {
           // 只在模拟运行时更新位置
           if (this.simulation && this.simulation.alpha() > 0.001) {
@@ -4922,14 +7367,32 @@ export default {
       const self = this;
       
       const tick = () => {
+        if (token !== self.forceLayoutToken) return;
+        if (self.quadrantModeEnabled()) {
+          self.quadrantPlaceMode = true;
+          if (self.simulation) self.simulation.stop();
+          self.showQuadrantNow();
+          return;
+        }
         if (iterations < maxIterations && self.simulation && self.simulation.alpha() > 0.001) {
           self.simulation.tick();
           iterations++;
           requestAnimationFrame(tick);
         } else {
+          if (token !== self.forceLayoutToken) return;
           // 恢复原始随机函数
           Math.random = originalRandom;
           
+          if (self.quadrantModeEnabled()) {
+            self.quadrantPlaceMode = true;
+            self.showQuadrantNow();
+            if (self.simulation) {
+              self.simulation.stop();
+              self.simulation.on('tick', null);
+            }
+            return;
+          }
+
           // 模拟结束，固定所有节点位置（如果用户没有拖拽过）
           self.nodes.forEach(node => {
             // 🔥 如果节点已经有保存的位置但之前没有固定，现在固定它
@@ -4952,7 +7415,11 @@ export default {
           // 🔥 更新视图并保存位置
           self.updateLinkPositions();
           self.updateNodePositions();
-          self.savePositions();
+          self.savePositions(undefined, { keepForceLayout: true });
+          if (self.quadrantPlaceMode) {
+            if (!self.forceLayoutSnapshot) self.captureForceSnapshot();
+            self.applyQuadrantPlacement();
+          }
           
           // 更新容器宽度，用于计算容器高度
           self.updateContainerWidth();
@@ -5101,9 +7568,14 @@ export default {
             data: {
               label: node.label,
               cardCount: node.cardCount,
+              docHitCount: node.docHitCount || 0,
+              cardHitCount: node.cardHitCount || 0,
               contributors: contributors,
               isMultiWriter: isMultiWriter,
-              coOccurrences: coOccurrences
+              coOccurrences: coOccurrences,
+              level: node.level,
+              quadrant: node.quadrant,
+              pending: node.pending,
             },
             style: {
               left: tooltipX + 'px',
@@ -5294,6 +7766,8 @@ export default {
         const map = { '强': '强', '强中': '中', '普通': '普' };
         return map[link.linkStrength] || '普';
       }
+      if (link.linkType === 'longitude') return '经';
+      if (link.linkType === 'contour') return '廓';
       return link.value;
     },
 
@@ -5581,8 +8055,8 @@ export default {
           this.$nextTick(() => {
             this.confirmFusion();
           });
-        } else {
-          // 没有重合，正常保存位置
+          } else if (!this.quadrantPlaceMode) {
+          // 没有重合，正常保存位置。象限模式里的坐标不能写进力导向存档。
           if (this.draggedNode.fx !== undefined && this.draggedNode.fy !== undefined) {
             // 🔥 确保位置精确（保留2位小数）
             const savedX = Math.round(this.draggedNode.fx * 100) / 100;
@@ -5633,13 +8107,466 @@ export default {
       // 🔥 不重新启动模拟，保持所有节点固定位置
     },
     
+    graphNodeDimmed(node) {
+      const focus = this.activeFocus;
+      if (!focus || !node) return false;
+      return !focus.nodes[node.label];
+    },
+
+    longitudeNodeBreathing(node) {
+      if (!this.showLongitudeLinks || !this.hoveredLongitudeId || !node || !node.label) return false;
+      const chain = this.longitudeChainMap[this.hoveredLongitudeId] || {};
+      return !!chain[node.label];
+    },
+
+    longitudeBreathColor() {
+      const id = this.hoveredLongitudeId;
+      const link = (this.links || []).find((item) => item.linkType === 'longitude' && item.longitudeId === id);
+      return (link && link.color) || '#c45c26';
+    },
+
+    graphLinkDimmed(link) {
+      const focus = this.activeFocus;
+      if (!focus || !link) return false;
+      if (link.linkType === 'longitude') {
+        if (focus.mode === 'longitude') return false;
+        if (focus.mode === 'longitude-hover') return link.longitudeId !== this.hoveredLongitudeId;
+      }
+      if (focus.mode === 'longitude') return true;
+      const a = link.source && link.source.label;
+      const b = link.target && link.target.label;
+      return !(focus.nodes[a] && focus.nodes[b]);
+    },
+
+    contourRingHot(ring) {
+      if (!ring) return false;
+      if (this.hoveredContourId && this.hoveredContourId === ring.id) return true;
+      if (this.showLongitudeLinks && this.hoveredLongitudeId) {
+        const chain = this.longitudeChainMap[this.hoveredLongitudeId] || {};
+        return (ring.members || []).some((label) => chain[label]);
+      }
+      return false;
+    },
+
+    contourRingDim(ring) {
+      if (!ring) return false;
+      if (this.contourRingHot(ring)) return false;
+      if (this.hoveredContourId) return true;
+      if (this.showLongitudeLinks && this.hoveredLongitudeId) return true;
+      if (this.showLongitudeLinks && this.showContourLinks) return true;
+      return false;
+    },
+
+    clearGraphHover() {
+      this.hoveredContourId = null;
+      this.hoveredLongitudeId = null;
+    },
+
+    onNetworkMouseMove(event) {
+      if (!this.showContourLinks && !this.showLongitudeLinks) {
+        this.clearGraphHover();
+        return;
+      }
+      const svg = this.$refs.networkSvg;
+      if (!svg || !svg.createSVGPoint) return;
+      const pt = svg.createSVGPoint();
+      pt.x = event.clientX;
+      pt.y = event.clientY;
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return;
+      const loc = pt.matrixTransform(ctm.inverse());
+      let lonHit = null;
+      if (this.showLongitudeLinks) {
+        (this.links || []).some((link) => {
+          if (link.linkType !== 'longitude' || !link.source || !link.target) return false;
+          const dist = this.pointToLinkCurveDistance(loc.x, loc.y, link);
+          if (dist < 16) {
+            lonHit = link.longitudeId;
+            return true;
+          }
+          return false;
+        });
+      }
+      if (lonHit !== this.hoveredLongitudeId) this.hoveredLongitudeId = lonHit;
+      if (lonHit) {
+        if (this.hoveredContourId) this.hoveredContourId = null;
+        return;
+      }
+      if (!this.showContourLinks) {
+        if (this.hoveredContourId) this.hoveredContourId = null;
+        return;
+      }
+      const paths = svg.querySelectorAll('path.contour-ring');
+      let best = null;
+      let bestArea = Infinity;
+      paths.forEach((el) => {
+        if (typeof el.isPointInFill !== 'function' || !el.isPointInFill(loc)) return;
+        const box = el.getBBox();
+        const area = (box.width || 0) * (box.height || 0);
+        if (area < bestArea) {
+          bestArea = area;
+          best = el.getAttribute('data-contour-id');
+        }
+      });
+      if (best !== this.hoveredContourId) this.hoveredContourId = best;
+    },
+
+    pointToLinkCurveDistance(px, py, link) {
+      const s = link && link.source;
+      const t = link && link.target;
+      if (!s || !t || s.x == null || t.x == null) return Infinity;
+      const x1 = s.x;
+      const y1 = s.y;
+      const x2 = t.x;
+      const y2 = t.y;
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const bend = (this.hashStringToUnit(`${s.label}|${t.label}`) - 0.5) * Math.min(36, len * 0.18);
+      const mx = (x1 + x2) / 2 + (-dy / len) * bend;
+      const my = (y1 + y2) / 2 + (dx / len) * bend;
+      let best = Infinity;
+      for (let i = 0; i <= 12; i += 1) {
+        const u = i / 12;
+        const o = 1 - u;
+        const x = o * o * x1 + 2 * o * u * mx + u * u * x2;
+        const y = o * o * y1 + 2 * o * u * my + u * u * y2;
+        const d = Math.hypot(px - x, py - y);
+        if (d < best) best = d;
+      }
+      return best;
+    },
+
+    closedContourPath(points) {
+      const n = points.length;
+      if (n < 3) return '';
+      let d = `M ${points[0].x} ${points[0].y}`;
+      for (let i = 0; i < n; i += 1) {
+        const p0 = points[(i - 1 + n) % n];
+        const p1 = points[i];
+        const p2 = points[(i + 1) % n];
+        const p3 = points[(i + 2) % n];
+        const c1x = p1.x + (p2.x - p0.x) / 6;
+        const c1y = p1.y + (p2.y - p0.y) / 6;
+        const c2x = p2.x - (p3.x - p1.x) / 6;
+        const c2y = p2.y - (p3.y - p1.y) / 6;
+        d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2.x} ${p2.y}`;
+      }
+      return `${d} Z`;
+    },
+
+    toggleQuadrantPlaceMode() {
+      if (!this.isV3Pipeline || !this.nodes || !this.nodes.length) return;
+      if (this.quadrantPlaceMode) {
+        const saved = this.loadQuadrantView();
+        if (saved && saved.force && (!this.forceLayoutSnapshot || !Object.keys(this.forceLayoutSnapshot).length)) {
+          this.forceLayoutSnapshot = saved.force;
+        }
+        this.clearQuadrantView();
+        this.quadrantPlaceMode = false;
+        this.persistQuadrantMode(false);
+        this.quadrantFrame = null;
+        this.restoreForceSnapshot();
+        this.$forceUpdate();
+        return;
+      }
+      this.captureForceSnapshot();
+      this.quadrantPlaceMode = true;
+      this.persistQuadrantMode(true);
+      this.applyQuadrantPlacement();
+    },
+
+    captureForceSnapshot() {
+      const snap = {};
+      (this.nodes || []).forEach((node) => {
+        if (!node || node.label == null || node.x == null || node.y == null) return;
+        snap[node.label] = { x: node.x, y: node.y };
+      });
+      this.forceLayoutSnapshot = snap;
+    },
+
+    restoreForceSnapshot() {
+      const snap = this.forceLayoutSnapshot || {};
+      (this.nodes || []).forEach((node) => {
+        const pos = snap[node.label];
+        if (!pos) return;
+        node.x = pos.x;
+        node.y = pos.y;
+        node.fx = pos.x;
+        node.fy = pos.y;
+      });
+    },
+
+    quadrantOfNode(node) {
+      const q = String((node && node.quadrant) || this.getV3KeywordAttrs(node && node.label).quadrant || '').toUpperCase();
+      return ['Q1', 'Q2', 'Q3', 'Q4'].includes(q) ? q : 'Q3';
+    },
+
+    /**
+     * 四个象限各自做一次力导向，团落在靠外的一侧，靠轴线留出空档。
+     * 跨象限的线不穿团，改沿轴线走。
+     */
+    applyQuadrantPlacement() {
+      const snap = this.forceLayoutSnapshot || {};
+      const nodes = (this.nodes || []).filter((node) => node && snap[node.label]);
+      if (!nodes.length) return;
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      nodes.forEach((node) => {
+        const pos = snap[node.label];
+        minX = Math.min(minX, pos.x);
+        minY = Math.min(minY, pos.y);
+        maxX = Math.max(maxX, pos.x);
+        maxY = Math.max(maxY, pos.y);
+      });
+      const pad = 86;
+      const frameMinX = minX - pad;
+      const frameMinY = minY - pad;
+      const frameMaxX = Math.max(maxX + pad, frameMinX + 460);
+      const frameMaxY = Math.max(maxY + pad, frameMinY + 380);
+      const width = frameMaxX - frameMinX;
+      const height = frameMaxY - frameMinY;
+      const counts = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
+      nodes.forEach((node) => {
+        counts[this.quadrantOfNode(node)] += 1;
+      });
+      const total = nodes.length || 1;
+      const clampShare = (part) => Math.min(0.78, Math.max(0.22, part / total));
+      const leftShare = clampShare(counts.Q2 + counts.Q3);
+      const topShare = clampShare(counts.Q1 + counts.Q2);
+      const originX = frameMinX + width * leftShare;
+      const originY = frameMinY + height * topShare;
+      this.quadrantFrame = {
+        minX: frameMinX,
+        minY: frameMinY,
+        maxX: frameMaxX,
+        maxY: frameMaxY,
+        originX,
+        originY,
+      };
+      const rectOf = {
+        Q2: { x: frameMinX, y: frameMinY, w: originX - frameMinX, h: originY - frameMinY },
+        Q1: { x: originX, y: frameMinY, w: frameMaxX - originX, h: originY - frameMinY },
+        Q3: { x: frameMinX, y: originY, w: originX - frameMinX, h: frameMaxY - originY },
+        Q4: { x: originX, y: originY, w: frameMaxX - originX, h: frameMaxY - originY },
+      };
+      const endNode = (end) => (end && typeof end === 'object' && end.label != null ? end : null);
+      const contentOf = (qKey, rect) => {
+        const gutter = Math.max(36, Math.min(78, Math.min(rect.w, rect.h) * 0.2));
+        const outer = 18;
+        let x = rect.x;
+        let y = rect.y;
+        let w = rect.w;
+        let h = rect.h;
+        if (qKey === 'Q1') {
+          x += gutter; w -= gutter + outer; y += outer; h -= gutter + outer;
+        } else if (qKey === 'Q2') {
+          x += outer; w -= gutter + outer; y += outer; h -= gutter + outer;
+        } else if (qKey === 'Q3') {
+          x += outer; w -= gutter + outer; y += gutter; h -= gutter + outer;
+        } else {
+          x += gutter; w -= gutter + outer; y += gutter; h -= gutter + outer;
+        }
+        if (w < 64) { x = rect.x + 10; w = Math.max(64, rect.w - 20); }
+        if (h < 64) { y = rect.y + 10; h = Math.max(64, rect.h - 20); }
+        return { x, y, w, h };
+      };
+      const clampTo = (x, y, box) => ({
+        x: Math.min(box.x + box.w, Math.max(box.x, x)),
+        y: Math.min(box.y + box.h, Math.max(box.y, y)),
+      });
+      const byQuad = { Q1: [], Q2: [], Q3: [], Q4: [] };
+      nodes.forEach((node) => {
+        byQuad[this.quadrantOfNode(node)].push(node);
+      });
+      const indexByLabel = {};
+      nodes.forEach((node) => {
+        indexByLabel[node.label] = node;
+      });
+      const exits = {};
+      Object.keys(byQuad).forEach((qKey) => {
+        const list = byQuad[qKey];
+        const territory = rectOf[qKey];
+        const box = contentOf(qKey, territory);
+        if (!list.length) return;
+        const n = list.length;
+        const cols = Math.max(1, Math.ceil(Math.sqrt(n * (box.w / Math.max(box.h, 1)))));
+        const rows = Math.max(1, Math.ceil(n / cols));
+        const ordered = list.slice().sort((a, b) => String(a.label).localeCompare(String(b.label), 'zh'));
+        const state = ordered.map((node, index) => {
+          const col = index % cols;
+          const row = Math.floor(index / cols);
+          return {
+            node,
+            x: box.x + ((col + 0.5) / cols) * box.w,
+            y: box.y + ((row + 0.5) / rows) * box.h,
+          };
+        });
+        const at = {};
+        state.forEach((item, index) => {
+          at[item.node.label] = index;
+        });
+        const pairs = [];
+        (this.links || []).forEach((link) => {
+          if (!link || link.linkType === 'contour' || link.linkType === 'longitude') return;
+          const a = endNode(link.source);
+          const b = endNode(link.target);
+          if (!a || !b || a.label === b.label) return;
+          if (!indexByLabel[a.label] || !indexByLabel[b.label]) return;
+          if (this.quadrantOfNode(a) !== qKey || this.quadrantOfNode(b) !== qKey) return;
+          const i = at[a.label];
+          const j = at[b.label];
+          if (i == null || j == null || i === j) return;
+          pairs.push([i, j]);
+        });
+        const ideal = Math.max(58, Math.min(112, Math.sqrt((box.w * box.h) / n) * 0.78));
+        const anchorX = box.x + box.w * (qKey === 'Q1' || qKey === 'Q4' ? 0.64 : 0.36);
+        const anchorY = box.y + box.h * (qKey === 'Q1' || qKey === 'Q2' ? 0.36 : 0.64);
+        const iterations = 170;
+        for (let step = 0; step < iterations; step += 1) {
+          const cool = 0.35 + 0.65 * (1 - step / iterations);
+          const move = state.map(() => ({ x: 0, y: 0 }));
+          for (let i = 0; i < state.length; i += 1) {
+            for (let j = i + 1; j < state.length; j += 1) {
+              let dx = state[j].x - state[i].x;
+              let dy = state[j].y - state[i].y;
+              let dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < 0.8) {
+                dx = (i + j) % 2 === 0 ? 1 : -1;
+                dy = (i + j) % 2 === 0 ? 0.4 : -0.4;
+                dist = Math.sqrt(dx * dx + dy * dy);
+              }
+              const reach = ideal * 1.55;
+              if (dist >= reach) continue;
+              const push = ((reach - dist) / reach) * 16 * cool;
+              const ux = dx / dist;
+              const uy = dy / dist;
+              move[i].x -= ux * push;
+              move[i].y -= uy * push;
+              move[j].x += ux * push;
+              move[j].y += uy * push;
+            }
+          }
+          pairs.forEach(([i, j]) => {
+            const dx = state[j].x - state[i].x;
+            const dy = state[j].y - state[i].y;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const pull = (dist - ideal) * 0.09 * cool;
+            const ux = dx / dist;
+            const uy = dy / dist;
+            move[i].x += ux * pull;
+            move[i].y += uy * pull;
+            move[j].x -= ux * pull;
+            move[j].y -= uy * pull;
+          });
+          state.forEach((item, index) => {
+            move[index].x += (anchorX - item.x) * 0.045 * cool;
+            move[index].y += (anchorY - item.y) * 0.045 * cool;
+            const mx = move[index].x;
+            const my = move[index].y;
+            const mlen = Math.sqrt(mx * mx + my * my);
+            const cap = 14;
+            const scale = mlen > cap ? cap / mlen : 1;
+            const next = clampTo(item.x + mx * scale, item.y + my * scale, box);
+            item.x = next.x;
+            item.y = next.y;
+          });
+        }
+        const halfW = (node) => Math.min(40, Math.max((node.radius || 9) + 8, String(node.label || '').length * 4.4));
+        const needYOf = (node) => (node.radius || 9) + (node.labelFontSize || 10) + 8;
+        for (let pass = 0; pass < 10; pass += 1) {
+          for (let i = 0; i < state.length; i += 1) {
+            for (let j = i + 1; j < state.length; j += 1) {
+              const a = state[i];
+              const b = state[j];
+              const dx = b.x - a.x;
+              const dy = b.y - a.y;
+              const needX = halfW(a.node) + halfW(b.node);
+              const needY = needYOf(a.node) + (b.node.radius || 9);
+              if (Math.abs(dx) >= needX || Math.abs(dy) >= needY) continue;
+              const ux = Math.abs(dx) < 0.5 ? ((i + j) % 2 === 0 ? 1 : -1) : dx / Math.abs(dx);
+              const uy = Math.abs(dy) < 0.5 ? 1 : dy / Math.abs(dy);
+              const pushX = (needX - Math.abs(dx)) / 2;
+              const pushY = (needY - Math.abs(dy)) / 2;
+              const nextA = clampTo(a.x - ux * pushX, a.y - uy * pushY, box);
+              const nextB = clampTo(b.x + ux * pushX, b.y + uy * pushY, box);
+              a.x = nextA.x;
+              a.y = nextA.y;
+              b.x = nextB.x;
+              b.y = nextB.y;
+            }
+          }
+        }
+        let bMinX = Infinity;
+        let bMinY = Infinity;
+        let bMaxX = -Infinity;
+        let bMaxY = -Infinity;
+        state.forEach((item) => {
+          item.node.x = item.x;
+          item.node.y = item.y;
+          const pad = (item.node.radius || 9) + 4;
+          bMinX = Math.min(bMinX, item.x - pad);
+          bMinY = Math.min(bMinY, item.y - pad);
+          bMaxX = Math.max(bMaxX, item.x + pad);
+          bMaxY = Math.max(bMaxY, item.y + pad);
+        });
+        const corner = qKey === 'Q1'
+          ? { x: originX + 12, y: originY - 12 }
+          : qKey === 'Q2'
+            ? { x: originX - 12, y: originY - 12 }
+            : qKey === 'Q3'
+              ? { x: originX - 12, y: originY + 12 }
+              : { x: originX + 12, y: originY + 12 };
+        exits[qKey] = {
+          bbox: { minX: bMinX, minY: bMinY, maxX: bMaxX, maxY: bMaxY },
+          corner,
+        };
+      });
+      this.quadrantFrame = {
+        minX: frameMinX,
+        minY: frameMinY,
+        maxX: frameMaxX,
+        maxY: frameMaxY,
+        originX,
+        originY,
+        exits,
+      };
+      nodes.forEach((node) => {
+        node.fx = node.x;
+        node.fy = node.y;
+      });
+      this.saveQuadrantView();
+      this.$forceUpdate();
+    },
+
+    toggleAuxLinks(kind) {
+      if (kind === 'contour') {
+        this.showContourLinks = !this.showContourLinks;
+        if (!this.showContourLinks) this.hoveredContourId = null;
+      } else {
+        this.showLongitudeLinks = !this.showLongitudeLinks;
+        if (!this.showLongitudeLinks) this.hoveredLongitudeId = null;
+      }
+      const h = this.highlightedLink;
+      if (!h) return;
+      if (h.linkType === 'contour' && !this.showContourLinks) this.highlightedLink = null;
+      if (h.linkType === 'longitude' && !this.showLongitudeLinks) this.highlightedLink = null;
+    },
+
     resetLayout() {
+      this.quadrantPlaceMode = false;
+      this.persistQuadrantMode(false);
+      this.clearQuadrantView();
+      this.quadrantFrame = null;
+      this.forceLayoutSnapshot = null;
       // 清除当前档位保存的位置
       this.savedPositions = {};
       localStorage.removeItem(this.getPositionsStorageKeyForLimit(this.getActiveNodeLimit()));
       
-      // 保留基准viewBox范围，确保重置后显示大小一致
-      // this.baseViewBoxBounds 保持不变
+      // 象限排法留下的画布范围会把力导向结果缩得很小，重置时清掉
+      this.baseViewBoxBounds = null;
       
       // 重置所有节点的固定位置
       this.nodes.forEach(node => {
@@ -5651,22 +8578,141 @@ export default {
       this.initializeNetwork();
     },
     
-    savePositions(limitOverride) {
-      // 🔥 保存节点位置到 localStorage（按本子 + 显示数量档位独立保存）
+    quadrantModeStorageKey() {
+      return `keywordNetworkQuadrantMode_${this.getStorageKey()}`;
+    },
+
+    persistQuadrantMode(on) {
+      const keys = [this.quadrantModeStorageKey(), 'keywordNetworkQuadrantMode'];
+      try {
+        keys.forEach((key) => {
+          if (on) localStorage.setItem(key, '1');
+          else localStorage.removeItem(key);
+        });
+      } catch (e) { /* 记不住开关时，重新打开就回到力导向 */ }
+    },
+
+    quadrantModeEnabled() {
+      if (this.quadrantPlaceMode) return true;
+      if (readQuadrantPicture()) return true;
+      try {
+        if (localStorage.getItem(this.quadrantModeStorageKey()) === '1') return true;
+        if (localStorage.getItem('keywordNetworkQuadrantMode') === '1') return true;
+        if (localStorage.getItem(this.quadrantViewStorageKey())) return true;
+      } catch (e) {
+        return false;
+      }
+      return false;
+    },
+
+    quadrantViewStorageKey() {
+      return `keywordNetworkQuadrantView_${this.getStorageKey()}_n${this.getActiveNodeLimit()}`;
+    },
+
+    loadQuadrantView() {
+      return readQuadrantPicture();
+    },
+
+    saveQuadrantView() {
+      if (!this.quadrantFrame) return;
       const positions = {};
-      this.nodes.forEach(node => {
-        // 🔥 优先使用fx/fy（固定位置），如果没有则使用x/y
-        const posX = node.fx !== undefined ? node.fx : (node.x !== undefined ? node.x : null);
-        const posY = node.fy !== undefined ? node.fy : (node.y !== undefined ? node.y : null);
-        
-        if (posX !== null && posY !== null) {
-          positions[node.label] = {
-            x: Math.round(posX * 100) / 100, // 保留2位小数
-            y: Math.round(posY * 100) / 100
-          };
-        }
+      (this.nodes || []).forEach((node) => {
+        if (!node || node.label == null || node.x == null || node.y == null) return;
+        positions[node.label] = {
+          x: Math.round(node.x * 100) / 100,
+          y: Math.round(node.y * 100) / 100,
+        };
       });
-      
+      if (!Object.keys(positions).length) return;
+      const picture = {
+        positions,
+        frame: this.quadrantFrame,
+        force: this.forceLayoutSnapshot || null,
+      };
+      writeQuadrantPicture(picture);
+      try {
+        localStorage.setItem(this.quadrantViewStorageKey(), JSON.stringify(picture));
+      } catch (e) { /* 分档那份写不进去不影响，固定键已经写过 */ }
+      this.persistQuadrantMode(true);
+    },
+
+    clearQuadrantView() {
+      clearQuadrantPicture();
+      this._quadrantPosForCalc = null;
+    },
+
+    restoreSavedQuadrantView() {
+      const data = this.loadQuadrantView();
+      if (!data) return false;
+      let hit = 0;
+      (this.nodes || []).forEach((node) => {
+        const pos = data.positions[node.label];
+        if (!pos || pos.x == null || pos.y == null) return;
+        node.x = pos.x;
+        node.y = pos.y;
+        node.fx = pos.x;
+        node.fy = pos.y;
+        hit += 1;
+      });
+      if (!hit) return false;
+      this.quadrantFrame = data.frame;
+      if (data.force) this.forceLayoutSnapshot = data.force;
+      this.quadrantPlaceMode = true;
+      this.$forceUpdate();
+      return true;
+    },
+
+    showQuadrantNow() {
+      this.quadrantPlaceMode = true;
+      if (this.restoreSavedQuadrantView()) {
+        this.updateContainerWidth();
+        return;
+      }
+      if (!this.forceLayoutSnapshot || !Object.keys(this.forceLayoutSnapshot).length) {
+        const snap = {};
+        (this.nodes || []).forEach((node) => {
+          if (!node || node.label == null) return;
+          const saved = this.savedPositions && this.savedPositions[node.label];
+          const x = saved && saved.x != null ? saved.x : node.x;
+          const y = saved && saved.y != null ? saved.y : node.y;
+          if (x == null || y == null) return;
+          snap[node.label] = { x, y };
+        });
+        if (Object.keys(snap).length) this.forceLayoutSnapshot = snap;
+      }
+      this.applyQuadrantPlacement();
+      this.updateContainerWidth();
+    },
+
+    savePositions(limitOverride, opts) {
+      const keepForce = !!(opts && opts.keepForceLayout);
+      if (this.quadrantPlaceMode && !keepForce) return;
+      const snap = keepForce && this.quadrantPlaceMode ? this.forceLayoutSnapshot : null;
+      if (this.quadrantPlaceMode && keepForce && (!snap || !Object.keys(snap).length)) return;
+      // 象限模式里只允许写入力导向快照，避免把象限坐标覆盖成平时布局
+      const positions = {};
+      if (snap) {
+        Object.keys(snap).forEach((label) => {
+          const pos = snap[label];
+          if (!pos || pos.x == null || pos.y == null) return;
+          positions[label] = {
+            x: Math.round(pos.x * 100) / 100,
+            y: Math.round(pos.y * 100) / 100
+          };
+        });
+      } else {
+        this.nodes.forEach(node => {
+          const posX = node.fx !== undefined ? node.fx : (node.x !== undefined ? node.x : null);
+          const posY = node.fy !== undefined ? node.fy : (node.y !== undefined ? node.y : null);
+          if (posX !== null && posY !== null) {
+            positions[node.label] = {
+              x: Math.round(posX * 100) / 100,
+              y: Math.round(posY * 100) / 100
+            };
+          }
+        });
+      }
+
       const limit = limitOverride != null ? limitOverride : this.getActiveNodeLimit();
       const storageKey = this.getPositionsStorageKeyForLimit(limit);
       if (Object.keys(positions).length > 0) {
@@ -5704,6 +8750,11 @@ export default {
     },
     
     restorePositions(shouldFix = true) {
+      if (this.quadrantPlaceMode || readQuadrantPicture()) {
+        this.quadrantPlaceMode = true;
+        this.restoreSavedQuadrantView();
+        return;
+      }
       // 🔥 恢复保存的位置到节点（在初始化网络图后调用）
       // shouldFix: 是否立即固定节点位置，false表示只恢复初始位置，让布局先运行
       let restoredCount = 0;
@@ -5985,86 +9036,178 @@ export default {
       return { minX, minY, maxX, maxY };
     },
 
-    /** 复制整图高清 PNG 到剪贴板（按完整 viewBox，3× 像素） */
-    async exportFullNetworkPng() {
+    /** 把当前网络图画成高清画布（完整 viewBox，3×） */
+    async _rasterizeNetworkSvg() {
+      const svg = this.$refs.networkSvg;
+      if (!svg) throw new Error('找不到网络图');
+      const vbRaw = (svg.getAttribute('viewBox') || this.computedViewBox || '0 0 800 600').trim();
+      const parts = vbRaw.split(/\s+/).map(Number);
+      const minX = Number.isFinite(parts[0]) ? parts[0] : 0;
+      const minY = Number.isFinite(parts[1]) ? parts[1] : 0;
+      const vbW = Math.max(1, Number.isFinite(parts[2]) ? parts[2] : 800);
+      const vbH = Math.max(1, Number.isFinite(parts[3]) ? parts[3] : 600);
+      const scale = Math.min(3, 8192 / vbW, 8192 / vbH);
+      const clone = svg.cloneNode(true);
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+      clone.setAttribute('width', String(vbW));
+      clone.setAttribute('height', String(vbH));
+      clone.setAttribute('viewBox', `${minX} ${minY} ${vbW} ${vbH}`);
+      const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      bg.setAttribute('x', String(minX));
+      bg.setAttribute('y', String(minY));
+      bg.setAttribute('width', String(vbW));
+      bg.setAttribute('height', String(vbH));
+      bg.setAttribute('fill', '#fafafa');
+      clone.insertBefore(bg, clone.firstChild);
+      let svgStr = new XMLSerializer().serializeToString(clone);
+      if (!svgStr.includes('xmlns=')) {
+        svgStr = svgStr.replace(/<svg\b/, '<svg xmlns="http://www.w3.org/2000/svg"');
+      }
+      const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      try {
+        const img = await new Promise((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = (e) => reject(e || new Error('SVG 转图片失败'));
+          image.src = url;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(vbW * scale);
+        canvas.height = Math.ceil(vbH * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('无法创建画布');
+        ctx.fillStyle = '#fafafa';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        return canvas;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    },
+
+    _unlockBottomPanel(panel) {
+      if (!panel) return;
+      panel.style.maxHeight = 'none';
+      panel.style.overflow = 'visible';
+      panel.style.height = 'auto';
+    },
+
+    async _captureVisibleSheet() {
+      const el = this.$refs.networkViewWrapper;
+      if (!el) throw new Error('找不到要截的区域');
+      const panel = el.querySelector('.v3-bottom-panel');
+      const prevPanel = panel
+        ? {
+            maxHeight: panel.style.maxHeight,
+            overflow: panel.style.overflow,
+            height: panel.style.height,
+          }
+        : null;
+      this._unlockBottomPanel(panel);
+      await this.$nextTick();
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const liveSvg = el.querySelector('.network-svg');
+      const box = liveSvg ? liveSvg.getBoundingClientRect() : null;
+      const rect = el.getBoundingClientRect();
+      const fullHeight = Math.ceil(Math.max(el.scrollHeight, rect.height));
+      const windowHeight = Math.ceil(rect.top + window.pageYOffset + fullHeight + 48);
+      try {
+        return await html2canvas(el, {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          useCORS: true,
+          logging: false,
+          foreignObjectRendering: false,
+          height: fullHeight,
+          windowHeight,
+          onclone(doc, cloned) {
+            const root = cloned || doc.querySelector('.network-view-wrapper');
+            const clonedPanel = root && root.querySelector
+              ? root.querySelector('.v3-bottom-panel')
+              : doc.querySelector('.v3-bottom-panel');
+            if (clonedPanel) {
+              clonedPanel.style.maxHeight = 'none';
+              clonedPanel.style.overflow = 'visible';
+              clonedPanel.style.height = 'auto';
+            }
+            const svg = root && root.querySelector
+              ? root.querySelector('.network-svg')
+              : doc.querySelector('.network-svg');
+            if (!svg || !box || box.width < 2 || box.height < 2) return;
+            const w = String(Math.round(box.width));
+            const h = String(Math.round(box.height));
+            svg.setAttribute('width', w);
+            svg.setAttribute('height', h);
+            svg.style.width = `${w}px`;
+            svg.style.height = `${h}px`;
+          },
+        });
+      } finally {
+        if (panel && prevPanel) {
+          panel.style.maxHeight = prevPanel.maxHeight;
+          panel.style.overflow = prevPanel.overflow;
+          panel.style.height = prevPanel.height;
+        }
+      }
+    },
+
+    _downloadCanvas(canvas) {
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = '语义关键词空间.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    },
+
+    async _deliverCanvas(canvas, label) {
+      const pngBlob = await new Promise((resolve, reject) => {
+        canvas.toBlob((b) => {
+          if (b) resolve(b);
+          else reject(new Error('PNG 生成失败'));
+        }, 'image/png');
+      });
+      try {
+        if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+          throw new Error('clipboard-unavailable');
+        }
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': pngBlob }),
+        ]);
+        this.$message?.success?.(`已复制${label}到剪贴板（${canvas.width}×${canvas.height}），可直接粘贴`);
+      } catch (err) {
+        console.warn('[KeywordNetworkGraph] 剪贴板未写入，改为下载', err);
+        this._downloadCanvas(canvas);
+        this.$message?.success?.(`图已生成。剪贴板没有接住，已下载到本地（${canvas.width}×${canvas.height}）`);
+      }
+    },
+
+    /** 复制整图高清 PNG。withSurroundings 为真时带上上下左右说明。 */
+    async exportFullNetworkPng(withSurroundings = false) {
       if (this.exportingNetworkPng) return;
       const svg = this.$refs.networkSvg;
       if (!svg || this.viewMode !== 'network') {
         this.$message?.warning?.('请先切换到网络图视图再复制');
         return;
       }
+      this.showExportGraphDialog = false;
       this.exportingNetworkPng = true;
       try {
         await this.$nextTick();
-        const vbRaw = (svg.getAttribute('viewBox') || this.computedViewBox || '0 0 800 600').trim();
-        const parts = vbRaw.split(/\s+/).map(Number);
-        const minX = Number.isFinite(parts[0]) ? parts[0] : 0;
-        const minY = Number.isFinite(parts[1]) ? parts[1] : 0;
-        const vbW = Math.max(1, Number.isFinite(parts[2]) ? parts[2] : 800);
-        const vbH = Math.max(1, Number.isFinite(parts[3]) ? parts[3] : 600);
-        const scale = 3;
-
-        const clone = svg.cloneNode(true);
-        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-        clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
-        clone.setAttribute('width', String(vbW));
-        clone.setAttribute('height', String(vbH));
-        clone.setAttribute('viewBox', `${minX} ${minY} ${vbW} ${vbH}`);
-
-        const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        bg.setAttribute('x', String(minX));
-        bg.setAttribute('y', String(minY));
-        bg.setAttribute('width', String(vbW));
-        bg.setAttribute('height', String(vbH));
-        bg.setAttribute('fill', '#fafafa');
-        clone.insertBefore(bg, clone.firstChild);
-
-        let svgStr = new XMLSerializer().serializeToString(clone);
-        if (!svgStr.includes('xmlns=')) {
-          svgStr = svgStr.replace(/<svg\b/, '<svg xmlns="http://www.w3.org/2000/svg"');
+        if (withSurroundings) {
+          const sheet = await this._captureVisibleSheet();
+          await this._deliverCanvas(sheet, '带上下左右信息的完整大图');
+          return;
         }
-
-        const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        try {
-          const img = new Image();
-          await new Promise((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = (e) => reject(e || new Error('SVG 转图片失败'));
-            img.src = url;
-          });
-
-          const canvas = document.createElement('canvas');
-          canvas.width = Math.ceil(vbW * scale);
-          canvas.height = Math.ceil(vbH * scale);
-          const ctx = canvas.getContext('2d');
-          if (!ctx) throw new Error('无法创建画布');
-          ctx.fillStyle = '#fafafa';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-          const pngBlob = await new Promise((resolve, reject) => {
-            canvas.toBlob((b) => {
-              if (b) resolve(b);
-              else reject(new Error('PNG 生成失败'));
-            }, 'image/png');
-          });
-
-          if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
-            throw new Error('当前浏览器不支持图片剪贴板');
-          }
-          await navigator.clipboard.write([
-            new ClipboardItem({ 'image/png': pngBlob }),
-          ]);
-          this.$message?.success?.(`已复制高清整图到剪贴板（${scale}×，${canvas.width}×${canvas.height}），可直接粘贴`);
-        } finally {
-          URL.revokeObjectURL(url);
-        }
+        const graphCanvas = await this._rasterizeNetworkSvg();
+        await this._deliverCanvas(graphCanvas, '网络图');
       } catch (e) {
-        console.error('[KeywordNetworkGraph] 复制整图失败:', e);
-        this.$message?.error?.('复制整图失败：请用 Chrome/Edge，并允许剪贴板权限后重试');
+        console.error('[KeywordNetworkGraph] 截图失败:', e);
+        this.$message?.error?.(`截图没有完成：${(e && e.message) || '请再试一次'}`);
       } finally {
         this.exportingNetworkPng = false;
       }
@@ -6137,6 +9280,12 @@ export default {
 .node-count-btn:hover {
   background: #f0f0f0;
   border-color: #999;
+}
+
+.node-count-btn.active {
+  background: #efe8f8;
+  border-color: #6f559f;
+  color: #3f3478;
 }
 
 .keyword-pick-strategy-btn {
@@ -6406,6 +9555,28 @@ export default {
 .node-group.highlighted .node-circle {
   stroke-width: 4;
   filter: drop-shadow(0 0 4px rgba(111, 85, 159, 0.6));
+}
+
+.node-group.longitude-breath .node-circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: longitude-node-breath 1.5s ease-in-out infinite;
+}
+
+.longitude-breath-halo {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: longitude-halo-breath 1.5s ease-in-out infinite;
+}
+
+@keyframes longitude-node-breath {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.14); }
+}
+
+@keyframes longitude-halo-breath {
+  0%, 100% { opacity: 0.15; transform: scale(0.82); }
+  50% { opacity: 0.95; transform: scale(1.42); }
 }
 
 .node-count-text {
@@ -6849,6 +10020,591 @@ export default {
 .network-view-wrapper {
   position: relative;
   width: 100%;
+}
+
+.network-svg-container {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  gap: 8px;
+}
+
+.network-svg-container.is-v3 .network-view-container {
+  flex: 1;
+  min-width: 0;
+}
+
+.v3-spiral-banner {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #4a3d7a;
+  background: linear-gradient(90deg, #f5f0ff 0%, #eef6ff 100%);
+  border: 1px solid #ddd5f0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+
+.v3-thermo {
+  width: 52px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  font-size: 11px;
+  color: #555;
+}
+
+.v3-thermo-track {
+  position: relative;
+  width: 10px;
+  height: 120px;
+  background: #ececec;
+  border-radius: 4px;
+  margin: 6px 0;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+
+.v3-thermo-fill {
+  width: 100%;
+  background: linear-gradient(180deg, #6f559f 0%, #493d8b 100%);
+  border-radius: 3px 3px 0 0;
+  transition: height 0.25s ease;
+}
+
+.v3-thermo-fill-ontology {
+  background: linear-gradient(180deg, #3d8b6f 0%, #2e6b52 100%);
+}
+
+.v3-thermo-score {
+  font-weight: 700;
+  color: #333;
+}
+
+.v3-thermo-reason {
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.3;
+  color: #777;
+  text-align: center;
+  max-width: 48px;
+  word-break: break-all;
+}
+
+.v3-bottom-panel {
+  margin-top: 10px;
+  padding: 14px 16px 8px;
+  border: 1px solid #e6e0f2;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fcfbfe 0%, #f7f4fb 100%);
+  font-size: 12.5px;
+  line-height: 1.55;
+  max-height: 420px;
+  overflow: auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.v3-issue {
+  margin-bottom: 14px;
+}
+
+.v3-bottom-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.v3-bottom-label {
+  display: block;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #3f3478;
+  margin-bottom: 6px;
+}
+
+.v3-bottom-text {
+  color: #333;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.v3-sub-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: v3sub;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.v3-sub-list li {
+  counter-increment: v3sub;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+  background: #fff;
+  border: 1px solid #efeaf6;
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: #333;
+  word-break: break-word;
+}
+
+.v3-sub-list li::before {
+  content: counter(v3sub);
+  flex: 0 0 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: #efe8f8;
+  color: #5a4d8a;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.v3-bottom-scales {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+  align-items: stretch;
+}
+
+.v3-quadrant-panel {
+  margin-bottom: 12px;
+}
+
+.v3-quadrant-scales {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 8px;
+}
+
+.v3-quadrant-rule {
+  margin: 6px 0 8px;
+  color: #5a4d8a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.v3-scale-block {
+  background: #fff;
+  border: 1px solid #ece8f2;
+  border-radius: 10px;
+  padding: 10px 12px 8px;
+  box-shadow: 0 1px 2px rgba(73, 61, 139, 0.04);
+  min-width: 0;
+}
+
+.v3-scale-title {
+  font-weight: 700;
+  color: #3f3478;
+  margin: -10px -12px 10px;
+  padding: 8px 12px;
+  border-radius: 10px 10px 0 0;
+  background: #f4f0fa;
+  border-bottom: 1px solid #ece8f2;
+}
+
+.v3-scale-four_color .v3-scale-title { background: #f8f1f4; }
+.v3-scale-dmt .v3-scale-title { background: #f1f5fb; }
+.v3-scale-knowledge .v3-scale-title { background: #f2f7f3; }
+
+.v3-scale-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #efeaf6;
+}
+
+.v3-scale-item:last-of-type {
+  border-bottom: none;
+  margin-bottom: 4px;
+  padding-bottom: 0;
+}
+
+.v3-sub-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.v3-row-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.v3-scale-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.v3-mini-btn {
+  border: 1px solid #d9d0ea;
+  background: #fff;
+  color: #5c4d86;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.v3-mini-btn:hover {
+  background: #f6f2fb;
+}
+
+.v3-mini-add {
+  margin-top: 8px;
+}
+
+.v3-panel-draft {
+  width: 100%;
+  resize: vertical;
+  min-height: 72px;
+}
+
+.v3-scale-badge {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #fff;
+  background: #7a6aad;
+}
+
+.badge-R { background: #dc143c; }
+.badge-B { background: #1e90ff; }
+.badge-P { background: #9370db; }
+.badge-G { background: #3cb371; }
+.badge-D { background: #5b7cfa; }
+.badge-M { background: #7a5af5; }
+.badge-T { background: #2f9e8f; }
+.badge-trad { background: #6b7280; }
+.badge-org { background: #3d6f9c; }
+.badge-trib { background: #3d7a5c; }
+
+.v3-scale-desc {
+  color: #3a3a3a;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.6;
+}
+
+.v3-top-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.v3-top-row {
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #efeaf6;
+}
+
+.v3-top-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.v3-top-row .v3-bottom-label {
+  margin-bottom: 2px;
+}
+
+.v3-top-row .v3-chip-row {
+  margin-top: 4px;
+}
+
+.v3-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.v3-chip-hint {
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 11px;
+  color: #8a7eaa;
+}
+
+.v3-chip {
+  border: 1px solid #d9d0e8;
+  background: #fff;
+  color: #493d8b;
+  border-radius: 8px;
+  padding: 3px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+  word-break: break-word;
+}
+
+.v3-chip:hover {
+  background: #f3eefb;
+  border-color: #c3b6dc;
+}
+
+.v3-chip.v3-chip-current {
+  cursor: default;
+  background: #efe8f8;
+  border-color: #c9bddf;
+  font-weight: 600;
+}
+
+.v3-chip.v3-chip-current:hover {
+  background: #efe8f8;
+  border-color: #c9bddf;
+}
+
+.contour-ring {
+  fill: rgba(217, 119, 6, 0.035);
+  stroke: #e8c9a4;
+  stroke-width: 1.4;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.contour-ring.is-hot {
+  fill: rgba(217, 119, 6, 0.14);
+  stroke: #d97706;
+  stroke-width: 2;
+  opacity: 1;
+}
+
+.contour-ring.is-dim {
+  opacity: 0.12;
+}
+
+.node-group.contour-dim,
+.link-line.contour-dim,
+.link-hit-area.contour-dim {
+  opacity: 0.12;
+}
+
+.legend-longitude-dash {
+  display: inline-block;
+  width: 28px;
+  height: 0;
+  border-top: 2px dashed #c45c26;
+  vertical-align: middle;
+  margin: 0 4px;
+}
+
+.v3-pending-dialog {
+  width: min(640px, calc(100vw - 48px));
+  max-width: 640px;
+  max-height: min(82vh, 760px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.v3-pending-dialog .dialog-header h3 {
+  line-height: 1.4;
+  word-break: break-word;
+  padding-right: 8px;
+}
+
+.v3-pending-dialog .dialog-content {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 14px;
+  overflow: auto;
+  padding: 16px 18px 8px;
+}
+
+.v3-pending-lead {
+  margin: 0;
+  width: 100%;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #555;
+}
+
+.v3-pending-group {
+  width: 100%;
+  min-width: 0;
+}
+
+.v3-pending-group + .v3-pending-group {
+  padding-top: 4px;
+  border-top: 1px solid #efeaf6;
+}
+
+.v3-pending-group-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #493d8b;
+}
+
+.v3-pending-group-note {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #7a738c;
+}
+
+.v3-pending-options {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.v3-pending-dialog .v3-pending-option-btn {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  text-align: left;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  white-space: normal;
+  word-break: break-word;
+  height: auto;
+  padding: 10px 12px;
+  background: #fff;
+  color: #2c2c2c;
+  border: 1px solid #e4dff0;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.v3-pending-dialog .v3-pending-option-btn:hover {
+  background: #f7f4fb;
+  border-color: #c9bddf;
+  opacity: 1;
+}
+
+.v3-pending-dialog .v3-pending-option-btn.selected {
+  background: #f3eefb;
+  border-color: #493d8b;
+  box-shadow: none;
+}
+
+.v3-pending-option-index {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: #efeaf8;
+  color: #493d8b;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.v3-pending-option-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.v3-pending-option-label {
+  font-weight: 600;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.v3-pending-option-preview {
+  font-size: 12px;
+  color: #6b6280;
+  font-weight: 400;
+  line-height: 1.45;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.v3-pending-preview-highlight {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #f3f0fa;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #493d8b;
+  line-height: 1.45;
+}
+
+.v3-top-replace-hint {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #666;
+}
+
+.v3-pending-dialog .v3-pending-custom {
+  margin-top: 0;
+  width: 100%;
+}
+
+.v3-pending-dialog .v3-pending-custom label {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.v3-pending-dialog .v3-pending-custom .keyword-edit-input {
+  width: 100%;
+  height: auto;
+  min-height: 36px;
+  text-align: left;
+}
+
+.v3-pending-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 18px 16px;
+  border-top: 1px solid #eee;
+  background: #fff;
+}
+
+.v3-pending-actions .dialog-option-btn {
+  width: auto;
+  white-space: nowrap;
+  background: #f4f1f8;
+  color: #3d3558;
+  border: 1px solid #e4dff0;
+}
+
+.v3-pending-actions .v3-pending-confirm {
+  background: #493d8b;
+  color: #fff;
+  border-color: #493d8b;
+}
+
+.v3-pending-actions .v3-pending-confirm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 </style>
 

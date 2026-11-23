@@ -687,6 +687,64 @@ def _card_recency_key(card: Card) -> Tuple[float, int]:
     return (0.0, int(card.cid or 0))
 
 
+def _load_v3_disk_extras(username: str, meta: Dict[str, Any]) -> Dict[str, Any]:
+    """从 cardCondense 旁路 JSON 补齐 v3 展示字段（meta 缺省时）。"""
+    extras: Dict[str, Any] = {}
+    try:
+        from app_chat import semantic_source_v3_pipeline as v3
+    except Exception:
+        return extras
+
+    def _read_json(path: str) -> Any:
+        if not path or not os.path.isfile(path):
+            return None
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return None
+
+    if not meta.get('book_top_keywords'):
+        data = _read_json(v3.book_top_keywords_path(username))
+        if isinstance(data, dict):
+            extras['book_top_keywords'] = {
+                k: data.get(k)
+                for k in ('top1', 'top3', 'top5', 'top10', 'top_alternatives', 'reasons')
+            }
+            for k in ('core_issue', 'core_issue_alternatives', 'sub_issues'):
+                if data.get(k) is not None and k not in meta:
+                    extras[k] = data.get(k)
+    if not meta.get('scale_definitions'):
+        data = _read_json(v3.book_scale_definitions_path(username))
+        if isinstance(data, dict):
+            extras['scale_definitions'] = data
+    if not meta.get('keyword_levels'):
+        data = _read_json(v3.book_levels_path(username))
+        if isinstance(data, dict) and isinstance(data.get('levels'), dict):
+            extras['keyword_levels'] = data['levels']
+    if not meta.get('longitude_chains'):
+        data = _read_json(v3.book_longitude_links_path(username))
+        if isinstance(data, dict) and isinstance(data.get('chains'), list):
+            extras['longitude_chains'] = data['chains']
+    if not meta.get('quadrants'):
+        data = _read_json(v3.book_quadrant_path(username))
+        if isinstance(data, dict):
+            extras['quadrants'] = data
+    if not meta.get('thermometer'):
+        data = _read_json(v3.book_thermometer_path(username))
+        if isinstance(data, dict):
+            extras['thermometer'] = data
+    if not meta.get('quadrant_meaning'):
+        data = _read_json(v3.book_quadrant_meaning_path(username))
+        if isinstance(data, dict):
+            extras['quadrant_meaning'] = data
+    try:
+        extras['intent_memory'] = v3.load_intent_memory(username)
+    except Exception:
+        pass
+    return extras
+
+
 def semantic_reorganize_meta_for_api(
     notebook: Optional[UserNotebook],
     full_username: Optional[str] = None,
@@ -727,7 +785,8 @@ def semantic_reorganize_meta_for_api(
         and processed
     ):
         selected = [int(x) for x in processed]
-    return {
+
+    out: Dict[str, Any] = {
         'processed_cids': [int(x) for x in processed],
         'reorganize_selected_cids': selected,
         'sampled': sampled,
@@ -736,6 +795,32 @@ def semantic_reorganize_meta_for_api(
         'hierarchy_links': hierarchy_links,
         'pipeline': meta.get('pipeline') or '',
     }
+    # v3 扩展字段透传
+    for key in (
+        'longitude_chains',
+        'keyword_levels',
+        'book_top_keywords',
+        'core_issue',
+        'core_issue_alternatives',
+        'sub_issues',
+        'scale_definitions',
+        'quadrants',
+        'quadrant_meaning',
+        'machine_know_threshold',
+        'thermometer',
+        'book_keywords',
+        'per_doc_keywords',
+        'source_files',
+        'extract_failures',
+    ):
+        if key in meta and meta.get(key) is not None:
+            out[key] = meta.get(key)
+    if full_username and str(meta.get('pipeline') or '').startswith('v3'):
+        extras = _load_v3_disk_extras(full_username, meta)
+        for k, v in extras.items():
+            if k not in out or out.get(k) in (None, '', {}, []):
+                out[k] = v
+    return out
 
 
 def _select_semantic_reorganize_cards(
@@ -819,14 +904,42 @@ def _merge_keyword_attrs(
     return merged
 
 
+_V3_PHASE_PROGRESS = {
+    'source_backfill': 4,
+    'card_condense': 8,
+    'source_extract': None,  # 动态
+    'aggregate_top': 42,
+    'scale_definitions': 50,
+    'hierarchy_levels': 60,
+    'longitude_links': 68,
+    'quadrant_guide': 74,
+    'quadrant_machine': 78,
+    'quadrant_human': 86,
+    'quadrant_revise': 89,
+    'thermometer': 92,
+}
+
+
 def _compute_progress_percent(job: Dict[str, Any]) -> int:
     if not job.get('running'):
         if job.get('phase') == 'completed':
             return 100
         return 0
+    # 任务内已显式写入则优先
+    explicit = job.get('progress_percent')
+    if isinstance(explicit, (int, float)) and explicit > 0:
+        return max(1, min(99, int(explicit)))
     phase = job.get('phase')
     if phase == 'preparing':
         return 1
+    if phase in _V3_PHASE_PROGRESS:
+        if phase == 'source_extract':
+            total = job.get('total_cards') or 0
+            idx = job.get('current_index') or 0
+            if total <= 0:
+                return 10
+            return min(40, 5 + int(idx / total * 35))
+        return int(_V3_PHASE_PROGRESS.get(phase) or 10)
     if phase in ('extract', 'extract_condense'):
         total = job.get('total_cards') or 0
         idx = job.get('current_index') or 0
@@ -852,6 +965,34 @@ def _phase_label(job: Dict[str, Any]) -> str:
     phase = job.get('phase')
     if phase == 'preparing':
         return '准备中…'
+    if phase == 'source_backfill':
+        return job.get('last_action') or '补齐全部文档源头…'
+    if phase == 'card_condense':
+        return job.get('last_action') or '卡片浓缩（人主体标记）…'
+    if phase == 'source_extract':
+        total = job.get('total_cards') or 0
+        idx = job.get('current_index') or 0
+        detail = (job.get('last_action_detail') or '').strip()
+        base = f'按文档抽词+属性 {idx}/{total}' if total else '按文档抽词+属性'
+        return f'{base} - {detail}' if detail else base
+    if phase == 'aggregate_top':
+        return '汇总本子词表与 Top1/3/5/10…'
+    if phase == 'scale_definitions':
+        return '本子刻度（四色/DMT/三类）具体化…'
+    if phase == 'hierarchy_levels':
+        return '关联强度与 L 层级…'
+    if phase == 'longitude_links':
+        return '同色跨层连线…'
+    if phase == 'quadrant_guide':
+        return '本子四象限内涵与比例…'
+    if phase == 'quadrant_machine':
+        return '按文档定象限…'
+    if phase == 'quadrant_human':
+        return '象限小幅修正…'
+    if phase == 'quadrant_revise':
+        return '象限核对…'
+    if phase == 'thermometer':
+        return '温度计与螺旋…'
     if phase in ('extract', 'extract_condense'):
         total = job.get('total_cards') or 0
         idx = job.get('current_index') or 0
@@ -876,7 +1017,7 @@ def _phase_label(job: Dict[str, Any]) -> str:
     if phase == 'error':
         return '失败'
     if job.get('running'):
-        return '准备中…'
+        return (job.get('last_action') or '准备中…')
     return '空闲'
 
 
@@ -964,160 +1105,239 @@ def _set_job(username: str, **kwargs) -> None:
         job.update(kwargs)
 
 
-def _run_reorganize_job(
+def _run_v3_reorganize_job(
     username: str,
     scene_name: Optional[str],
     incremental: bool,
 ) -> None:
-    try:
-        from app_chat.semantic_reorganize_pipeline import (
-            run_full_pipeline,
-            select_reorganize_cards,
-        )
+    from app_chat.semantic_source_v3_pipeline import PIPELINE_ID, run_source_v3_pipeline
 
-        notebook = _load_notebook(username, scene_name)
-        notebook_desc = (notebook.bookdescription if notebook else '') or ''
-
-        semantic_meta = _load_semantic_meta(notebook)
-        processed_cids: Set[int] = set(int(x) for x in (semantic_meta.get('processed_cids') or []))
-        prior_selected_cids: List[int] = [
-            int(x) for x in (semantic_meta.get('reorganize_selected_cids') or [])
-        ]
-        # 兼容旧 meta：无 reorganize_selected_cids 时，用 processed_cids 作为已梳理选中集
-        if not prior_selected_cids and semantic_meta.get('pipeline') == 'v2_condense_hierarchy':
-            prior_selected_cids = sorted(processed_cids)
-
-        existing_map: Dict[str, Dict[str, str]] = {}
-        keyword_pool: List[str] = []
-
-        if not incremental:
+    notebook = _load_notebook(username, scene_name)
+    notebook_desc = (notebook.bookdescription if notebook else '') or ''
+    notebook_name = ''
+    if notebook is not None:
+        notebook_name = str(getattr(notebook, 'bookName', '') or '').strip()
+    if not notebook_name and scene_name:
+        notebook_name = str(scene_name).strip()
+    # 全量/迭代都带上旧属性图：仍在的词默认保持原属性（用户未改=认可）
+    existing_map: Dict[str, Dict[str, str]] = {}
+    if notebook and notebook.keywordFourColorDMT:
+        try:
+            existing_map = json.loads(notebook.keywordFourColorDMT)
+        except Exception:
             existing_map = {}
-            keyword_pool = []
-            processed_cids = set()
-            prior_selected_cids = []
-        else:
-            # 迭代备选池：只用来自「此前新梳理选中卡」的关键词，绝不混入未梳理旧卡旧词
-            if notebook and notebook.keywordFourColorDMT:
-                try:
-                    existing_map = json.loads(notebook.keywordFourColorDMT)
-                except Exception:
-                    existing_map = {}
-            if prior_selected_cids:
-                from app_chat.semantic_reorganize_pipeline import load_card_rows_by_cids
-                prior_rows = load_card_rows_by_cids(username, prior_selected_cids)
-                seen_kw: Set[str] = set()
-                for row in prior_rows:
-                    for kw in row.get('keywords') or []:
-                        if kw and kw not in seen_kw:
-                            seen_kw.add(kw)
-                            keyword_pool.append(kw)
-                # 属性库也裁到新语义空间，避免旧词属性残留参与合并
-                if existing_map:
-                    existing_map = {k: v for k, v in existing_map.items() if k in seen_kw}
-            else:
-                # 尚无 v2 选中集：备选池保持空，从零按新流程长
-                keyword_pool = []
-                existing_map = {}
-            print(
-                f'[semantic_reorganize] 迭代备选池仅含历史新梳理词 '
-                f'prior_selected={len(prior_selected_cids)} pool={len(keyword_pool)}',
-                flush=True,
-            )
+    print(
+        f'[semantic_reorganize] 启动源头流水线 v3 '
+        f'mode={"incremental" if incremental else "full"} username={username} '
+        f'book={notebook_name or "-"}',
+        flush=True,
+    )
+    result = run_source_v3_pipeline(
+        username=username,
+        scene_name=scene_name,
+        notebook_description=notebook_desc,
+        incremental=incremental,
+        existing_map=existing_map,
+        set_job_fn=_set_job,
+        track_fn=_track_llm_call,
+        is_running_fn=_is_job_running,
+        notebook_name=notebook_name,
+    )
+    meta_partial = result.get('meta_partial') or {}
+    all_cards = _ordered_cards(username)
+    meta = dict(meta_partial)
+    meta['pipeline'] = PIPELINE_ID
+    meta['processed_cids'] = sorted({int(c.cid) for c in all_cards})
+    meta['reorganize_selected_cids'] = meta.get('reorganize_selected_cids') or []
+    meta['sampled'] = False
+    meta['last_mode'] = 'incremental' if incremental else 'full'
+    meta['last_completed_at'] = meta.get('last_completed_at') or datetime.now().isoformat(
+        timespec='seconds'
+    )
+    final_map = result.get('final_map') or {}
+    extract_failures = result.get('extract_failures') or meta.get('extract_failures') or []
+    if notebook:
+        _save_notebook_semantic_state(notebook, final_map, meta)
+    _set_job(
+        username,
+        running=False,
+        phase='completed',
+        pipeline=PIPELINE_ID,
+        total_keywords=int(result.get('keyword_count') or len(final_map)),
+        cards_processed=0,
+        completed_at=meta['last_completed_at'],
+        hierarchy_link_count=len(meta.get('hierarchy_links') or []),
+        reorganize_selected_count=0,
+        progress_percent=100,
+        extract_failures=extract_failures,
+    )
+    print(
+        f'[semantic_reorganize] 完成 v3 keywords={result.get("keyword_count")} '
+        f'links={len(meta.get("hierarchy_links") or [])} '
+        f'extract_failures={len(extract_failures)}',
+        flush=True,
+    )
 
-        preserved_keyword_map: Dict[str, Dict[str, str]] = {}
-        if not incremental and notebook and notebook.keywordFourColorDMT:
+
+def _run_v2_reorganize_job(
+    username: str,
+    scene_name: Optional[str],
+    incremental: bool,
+) -> None:
+    from app_chat.semantic_reorganize_pipeline import (
+        run_full_pipeline,
+        select_reorganize_cards,
+    )
+
+    notebook = _load_notebook(username, scene_name)
+    notebook_desc = (notebook.bookdescription if notebook else '') or ''
+
+    semantic_meta = _load_semantic_meta(notebook)
+    processed_cids: Set[int] = set(int(x) for x in (semantic_meta.get('processed_cids') or []))
+    prior_selected_cids: List[int] = [
+        int(x) for x in (semantic_meta.get('reorganize_selected_cids') or [])
+    ]
+    if not prior_selected_cids and semantic_meta.get('pipeline') == 'v2_condense_hierarchy':
+        prior_selected_cids = sorted(processed_cids)
+
+    existing_map: Dict[str, Dict[str, str]] = {}
+    keyword_pool: List[str] = []
+
+    if not incremental:
+        existing_map = {}
+        keyword_pool = []
+        processed_cids = set()
+        prior_selected_cids = []
+    else:
+        if notebook and notebook.keywordFourColorDMT:
             try:
-                preserved_keyword_map = json.loads(notebook.keywordFourColorDMT)
+                existing_map = json.loads(notebook.keywordFourColorDMT)
             except Exception:
-                preserved_keyword_map = {}
-
-        all_cards = _ordered_cards(username)
-        if incremental:
-            candidate_cards = [c for c in all_cards if c.cid not in processed_cids]
+                existing_map = {}
+        if prior_selected_cids:
+            from app_chat.semantic_reorganize_pipeline import load_card_rows_by_cids
+            prior_rows = load_card_rows_by_cids(username, prior_selected_cids)
+            seen_kw: Set[str] = set()
+            for row in prior_rows:
+                for kw in row.get('keywords') or []:
+                    if kw and kw not in seen_kw:
+                        seen_kw.add(kw)
+                        keyword_pool.append(kw)
+            if existing_map:
+                existing_map = {k: v for k, v in existing_map.items() if k in seen_kw}
         else:
-            candidate_cards = all_cards
-
-        cards, selection_stats = select_reorganize_cards(candidate_cards)
+            keyword_pool = []
+            existing_map = {}
         print(
-            f'[semantic_reorganize] 启动精进流水线 v2 '
-            f'mode={"incremental" if incremental else "full"} '
-            f'candidates={selection_stats.get("total_candidates")} '
-            f'selected={selection_stats.get("selected")} '
-            f'prior_selected={len(prior_selected_cids)} '
-            f'initial_pool={len(keyword_pool) if incremental else 0}(full恒为0)',
+            f'[semantic_reorganize] 迭代备选池仅含历史新梳理词 '
+            f'prior_selected={len(prior_selected_cids)} pool={len(keyword_pool)}',
             flush=True,
         )
 
-        result = run_full_pipeline(
-            username=username,
-            scene_name=scene_name,
-            notebook_description=notebook_desc,
-            cards=cards,
-            selection_stats=selection_stats,
-            incremental=incremental,
-            existing_map=existing_map,
-            preserved_keyword_map=preserved_keyword_map,
-            all_cards=all_cards,
-            # 重新梳理：备选池从空开始；迭代：仅历史新梳理词
-            initial_pool=keyword_pool if incremental else [],
-            prior_selected_cids=prior_selected_cids if incremental else [],
-            set_job_fn=_set_job,
-            track_fn=_track_llm_call,
-            is_running_fn=_is_job_running,
-            save_state_fn=_save_notebook_semantic_state,
-            notebook=notebook,
-        )
+    preserved_keyword_map: Dict[str, Dict[str, str]] = {}
+    if not incremental and notebook and notebook.keywordFourColorDMT:
+        try:
+            preserved_keyword_map = json.loads(notebook.keywordFourColorDMT)
+        except Exception:
+            preserved_keyword_map = {}
 
-        newly_processed_cids = result.get('newly_processed_cids') or []
-        selected_union = result.get('reorganize_selected_cids') or newly_processed_cids
+    all_cards = _ordered_cards(username)
+    if incremental:
+        candidate_cards = [c for c in all_cards if c.cid not in processed_cids]
+    else:
+        candidate_cards = all_cards
 
-        if incremental:
-            # 覆盖集：旧覆盖 ∪ 本轮实际处理；选中集：历史已梳理 ∪ 本轮
-            processed_cids.update(newly_processed_cids)
-            # 本轮候选中未抽中的也不再反复迭代（与全量覆盖语义一致）
-            for c in candidate_cards:
-                processed_cids.add(int(c.cid))
+    cards, selection_stats = select_reorganize_cards(candidate_cards)
+    print(
+        f'[semantic_reorganize] 启动精进流水线 v2 '
+        f'mode={"incremental" if incremental else "full"} '
+        f'candidates={selection_stats.get("total_candidates")} '
+        f'selected={selection_stats.get("selected")} '
+        f'prior_selected={len(prior_selected_cids)} '
+        f'initial_pool={len(keyword_pool) if incremental else 0}(full恒为0)',
+        flush=True,
+    )
+
+    result = run_full_pipeline(
+        username=username,
+        scene_name=scene_name,
+        notebook_description=notebook_desc,
+        cards=cards,
+        selection_stats=selection_stats,
+        incremental=incremental,
+        existing_map=existing_map,
+        preserved_keyword_map=preserved_keyword_map,
+        all_cards=all_cards,
+        initial_pool=keyword_pool if incremental else [],
+        prior_selected_cids=prior_selected_cids if incremental else [],
+        set_job_fn=_set_job,
+        track_fn=_track_llm_call,
+        is_running_fn=_is_job_running,
+        save_state_fn=_save_notebook_semantic_state,
+        notebook=notebook,
+    )
+
+    newly_processed_cids = result.get('newly_processed_cids') or []
+    selected_union = result.get('reorganize_selected_cids') or newly_processed_cids
+
+    if incremental:
+        processed_cids.update(newly_processed_cids)
+        for c in candidate_cards:
+            processed_cids.add(int(c.cid))
+    else:
+        processed_cids = {int(c.cid) for c in all_cards}
+
+    prev_sampled = bool(semantic_meta.get('sampled')) if incremental else False
+    meta_partial = result.get('meta_partial') or {}
+    meta = {
+        'processed_cids': sorted(processed_cids),
+        'reorganize_selected_cids': sorted({int(x) for x in selected_union}),
+        'last_completed_at': meta_partial.get('last_completed_at')
+        or datetime.now().isoformat(timespec='seconds'),
+        'last_mode': 'incremental' if incremental else 'full',
+        'sampled': prev_sampled or bool(selection_stats.get('sampled')),
+        'card_selection': selection_stats,
+        'hierarchy_links': result.get('hierarchy_links') or meta_partial.get('hierarchy_links') or [],
+        'pipeline': 'v2_condense_hierarchy',
+        'book_key_issue_path': meta_partial.get('book_key_issue_path') or '',
+        'book_kw_connect_path': meta_partial.get('book_kw_connect_path') or '',
+    }
+
+    final_map = result.get('final_map') or {}
+    if notebook:
+        _save_notebook_semantic_state(notebook, final_map, meta)
+
+    _set_job(
+        username,
+        running=False,
+        phase='completed',
+        total_keywords=int(result.get('keyword_count') or len(final_map)),
+        cards_processed=len(newly_processed_cids),
+        completed_at=meta['last_completed_at'],
+        hierarchy_link_count=len(meta.get('hierarchy_links') or []),
+        reorganize_selected_count=len(meta.get('reorganize_selected_cids') or []),
+    )
+    print(
+        f'[semantic_reorganize] 完成 v2 cards={len(newly_processed_cids)} '
+        f'selected_union={len(meta.get("reorganize_selected_cids") or [])} '
+        f'keywords={result.get("keyword_count")} '
+        f'links={len(meta.get("hierarchy_links") or [])}',
+        flush=True,
+    )
+
+
+def _run_reorganize_job(
+    username: str,
+    scene_name: Optional[str],
+    incremental: bool,
+    *,
+    pipeline: str = 'auto',
+) -> None:
+    try:
+        if pipeline == 'v3_source_document':
+            _run_v3_reorganize_job(username, scene_name, incremental)
         else:
-            # 全量：覆盖集=当前本子全部卡，避免迭代去啃未抽样旧卡冲掉全书结果
-            processed_cids = {int(c.cid) for c in all_cards}
-
-        prev_sampled = bool(semantic_meta.get('sampled')) if incremental else False
-        meta_partial = result.get('meta_partial') or {}
-        meta = {
-            'processed_cids': sorted(processed_cids),
-            'reorganize_selected_cids': sorted({int(x) for x in selected_union}),
-            'last_completed_at': meta_partial.get('last_completed_at')
-            or datetime.now().isoformat(timespec='seconds'),
-            'last_mode': 'incremental' if incremental else 'full',
-            'sampled': prev_sampled or bool(selection_stats.get('sampled')),
-            'card_selection': selection_stats,
-            'hierarchy_links': result.get('hierarchy_links') or meta_partial.get('hierarchy_links') or [],
-            'pipeline': 'v2_condense_hierarchy',
-            'book_key_issue_path': meta_partial.get('book_key_issue_path') or '',
-            'book_kw_connect_path': meta_partial.get('book_kw_connect_path') or '',
-        }
-
-        final_map = result.get('final_map') or {}
-        if notebook:
-            _save_notebook_semantic_state(notebook, final_map, meta)
-
-        _set_job(
-            username,
-            running=False,
-            phase='completed',
-            total_keywords=int(result.get('keyword_count') or len(final_map)),
-            cards_processed=len(newly_processed_cids),
-            completed_at=meta['last_completed_at'],
-            hierarchy_link_count=len(meta.get('hierarchy_links') or []),
-            reorganize_selected_count=len(meta.get('reorganize_selected_cids') or []),
-        )
-        print(
-            f'[semantic_reorganize] 完成 v2 cards={len(newly_processed_cids)} '
-            f'selected_union={len(meta.get("reorganize_selected_cids") or [])} '
-            f'keywords={result.get("keyword_count")} '
-            f'links={len(meta.get("hierarchy_links") or [])}',
-            flush=True,
-        )
+            _run_v2_reorganize_job(username, scene_name, incremental)
     except Exception as exc:
         traceback.print_exc()
         _set_job(
@@ -1135,6 +1355,8 @@ def start_semantic_reorganize(
     username: str,
     scene_name: Optional[str] = None,
     incremental: bool = False,
+    *,
+    force_v2: bool = False,
 ) -> Dict[str, Any]:
     key = _job_key(username)
     with _LOCK:
@@ -1145,6 +1367,73 @@ def start_semantic_reorganize(
     notebook = _load_notebook(username, scene_name)
     if not notebook:
         return {'ok': False, 'msg': '未找到本子'}
+
+    from app_chat.semantic_source_v3_pipeline import (
+        assess_source_readiness,
+        ensure_all_document_sources,
+    )
+
+    readiness = assess_source_readiness(username)
+    pipeline = 'v2_condense_hierarchy'
+    if force_v2:
+        pipeline = 'v2_condense_hierarchy'
+    elif readiness.get('reason') == 'no_documents':
+        # 无文档：旧链路
+        pipeline = 'v2_condense_hierarchy'
+    elif readiness.get('ok') and not readiness.get('needs_backfill'):
+        pipeline = 'v3_source_document'
+    else:
+        # 有缺项就先补。补不上时：有 PreImageSummary 可代替 Presummary；
+        # 有摘要且 DocStructure、Skill 至少有一个，就继续。仍达不到才停止。
+        _set_job(
+            username,
+            running=True,
+            phase='source_backfill',
+            mode='incremental' if incremental else 'full',
+            last_action='补齐全部文档源头',
+            last_action_detail=readiness.get('message') or '',
+            progress_percent=2,
+            error='',
+        )
+        try:
+            readiness = ensure_all_document_sources(username, set_job_fn=_set_job)
+        except Exception as exc:
+            traceback.print_exc()
+            if readiness.get('ok'):
+                print(
+                    f'[semantic_reorganize] 补齐异常但已有可继续材料，继续梳理: {exc}',
+                    flush=True,
+                )
+            else:
+                _set_job(username, running=False, phase='idle', error=str(exc))
+                return {
+                    'ok': False,
+                    'source_incomplete': True,
+                    'readiness': readiness,
+                    'msg': (
+                        f'自动补齐源头失败：{exc}。'
+                        '已停止，不会改走旧卡片链路。'
+                        '每份文档需要有 Presummary 或 PreImageSummary，并且有 DocStructure 或 Skill。'
+                    ),
+                }
+        if readiness.get('ok'):
+            pipeline = 'v3_source_document'
+        else:
+            _set_job(username, running=False, phase='idle')
+            return {
+                'ok': False,
+                'source_incomplete': True,
+                'readiness': readiness,
+                'msg': readiness.get('message')
+                or (
+                    f"本子共 {readiness.get('total') or '?'} 份文档，"
+                    f"{readiness.get('ready_count') or 0} 份可以梳理。"
+                    '仍有文档没有可用摘要（Presummary 或 PreImageSummary），'
+                    '或者 DocStructure 与 Skill 都没有。'
+                    '已停止，不会改走旧卡片链路，也不会只分析已可梳理的文档。'
+                ),
+            }
+
     mode_label = 'incremental' if incremental else 'full'
     try:
         _create_semantic_backup(notebook, username, mode_label)
@@ -1157,6 +1446,7 @@ def start_semantic_reorganize(
         running=True,
         phase='preparing',
         mode=mode_label,
+        pipeline=pipeline,
         current_index=0,
         total_cards=0,
         total_keywords=0,
@@ -1166,17 +1456,28 @@ def start_semantic_reorganize(
         last_action='准备中',
         last_action_detail='已创建回退备份，即将开始梳理…',
         error='',
+        progress_percent=1,
         started_at=datetime.now().isoformat(timespec='seconds'),
     )
-    print(f'[semantic_reorganize] 启动 {mode_label} username={username}', flush=True)
+    print(
+        f'[semantic_reorganize] 启动 {mode_label} pipeline={pipeline} username={username}',
+        flush=True,
+    )
 
     thread = threading.Thread(
         target=_run_reorganize_job,
         args=(username, scene_name, incremental),
+        kwargs={'pipeline': pipeline},
         daemon=True,
     )
     thread.start()
-    return {'ok': True, 'msg': 'started', 'mode': 'incremental' if incremental else 'full'}
+    return {
+        'ok': True,
+        'msg': 'started',
+        'mode': 'incremental' if incremental else 'full',
+        'pipeline': pipeline,
+        'readiness': readiness,
+    }
 
 
 def update_hierarchy_link_strength(
@@ -1267,4 +1568,726 @@ def update_hierarchy_link_strength(
         'child': child_out,
         'strength': strength_norm,
         'hierarchy_links': new_meta['hierarchy_links'],
+    }
+
+
+def _derive_attr_edit_intent_hint(before: Dict[str, Any], after: Dict[str, Any], word: str) -> str:
+    """从一次属性改动提炼可跟随的意图短句（给人读、也喂给下次模型）。"""
+    color_name = {'R': '红/专业业务', 'B': '蓝/工具手段', 'P': '紫/思维框架', 'G': '绿/简单深刻'}
+    dmt_name = {'D': 'D/细节', 'M': 'M/中间结构', 'T': 'T/顶层总括'}
+    kt_name = {'trad': '传统/显性', 'org': '组织/半隐', 'trib': '部落/隐性'}
+    parts: List[str] = []
+    bf = str(before.get('four_color_type') or '').upper()[:1]
+    af = str(after.get('four_color_type') or '').upper()[:1]
+    if af and af != bf:
+        parts.append(
+            f'把「{word}」四色从{color_name.get(bf, bf or "空")}改为{color_name.get(af, af)}'
+            f'——更强调{color_name.get(af, af)}视角'
+        )
+    bd = str(before.get('dmt_level') or '').upper()[:1]
+    ad = str(after.get('dmt_level') or '').upper()[:1]
+    if ad and ad != bd:
+        parts.append(
+            f'把「{word}」DMT从{dmt_name.get(bd, bd or "空")}改为{dmt_name.get(ad, ad)}'
+            f'——更按{dmt_name.get(ad, ad)}定位'
+        )
+    bk = str(before.get('knowledge_type') or '').lower()
+    ak = str(after.get('knowledge_type') or '').lower()
+    if ak and ak != bk:
+        parts.append(
+            f'把「{word}」三类知识从{kt_name.get(bk, bk or "空")}改为{kt_name.get(ak, ak)}'
+            f'——更按{kt_name.get(ak, ak)}理解'
+        )
+    if not parts:
+        return f'用户确认「{word}」属性为 四色{af or "?"} / DMT{ad or "?"} / {ak or "?"}'
+    return '；'.join(parts)
+
+
+def suggest_semantic_panel_options(
+    username: str,
+    scene_name: Optional[str],
+    *,
+    kind: str,
+    current: str = '',
+    scale_key: str = '',
+    item_key: str = '',
+    item_name: str = '',
+) -> Dict[str, Any]:
+    """为子问题增改、刻度说明修改生成可点选说法。不写入偏好。"""
+    from app_chat.semantic_source_v3_pipeline import call_strong_llm, loads_json_loose, JSON_OUTPUT_RULES
+
+    kind = str(kind or '').strip()
+    if kind not in ('sub_add', 'sub_edit', 'scale_edit', 'quadrant_edit'):
+        return {'ok': False, 'msg': '不支持的调整类型', 'options': []}
+    notebook = _load_notebook(username, scene_name)
+    meta = _load_semantic_meta(notebook) if notebook else {}
+    core = str(meta.get('core_issue') or '').strip()
+    subs = meta.get('sub_issues') if isinstance(meta.get('sub_issues'), list) else []
+    if not subs:
+        tops = meta.get('book_top_keywords') if isinstance(meta.get('book_top_keywords'), dict) else {}
+        subs = tops.get('sub_issues') if isinstance(tops.get('sub_issues'), list) else []
+    subs = [str(x).strip() for x in subs if str(x).strip()]
+    scale = meta.get('scale_definitions') if isinstance(meta.get('scale_definitions'), dict) else {}
+    block = scale.get(scale_key) if isinstance(scale.get(scale_key), dict) else {}
+    siblings = []
+    for k, v in block.items():
+        if k == item_key or not v:
+            continue
+        siblings.append(f'{k}：{str(v)[:180]}')
+    if kind == 'quadrant_edit':
+        pack = meta.get('quadrant_meaning') if isinstance(meta.get('quadrant_meaning'), dict) else {}
+        qdefs = pack.get('definitions') if isinstance(pack.get('definitions'), dict) else {}
+        qnames = {'Q1': '共识区', 'Q2': '盲区', 'Q3': '未知区', 'Q4': '隐藏区'}
+        siblings = []
+        current_qid = str(item_key or '').strip().upper()
+        for qid, label in qnames.items():
+            if qid == current_qid:
+                continue
+            raw_def = qdefs.get(qid)
+            if isinstance(raw_def, dict):
+                raw_def = raw_def.get('meaning') or raw_def.get('text') or ''
+            text = str(raw_def or '').strip()
+            if text:
+                siblings.append(f'{label}：{text[:180]}')
+    tops = meta.get('book_top_keywords') if isinstance(meta.get('book_top_keywords'), dict) else {}
+    top_words = []
+    for key in ('top1', 'top3', 'top5', 'top10'):
+        raw = tops.get(key)
+        if isinstance(raw, list):
+            top_words.extend(str(x).strip() for x in raw if str(x).strip())
+        elif raw:
+            top_words.append(str(raw).strip())
+    seen = []
+    for w in top_words:
+        if w not in seen:
+            seen.append(w)
+    if kind == 'sub_add':
+        task = (
+            '补 4 条这个本子还没问到、但现有核心问题、子问题和刻度里站得住的子问题。'
+            '每条必须是一句问话，以问号结尾，中间不要用句号。四条角度要分开，不要互相换词。'
+        )
+        bound = (
+            '这是新增，没有原文可改。'
+        )
+    elif kind == 'sub_edit':
+        task = (
+            '下面给出的是要修改的原文。请在这句原文上做精修，给出 4 个修改稿。'
+            '修改稿必须还是这一问：保留原句里的对象、做法和问法，只把含糊、别扭、不够贴本子的地方收紧。'
+            '禁止另起一个新问题，禁止换成另一组对象，禁止整句推倒重写。'
+            '每条仍是一句问话，以问号结尾，中间不要用句号。'
+        )
+        bound = '必须能看出是同一句的修改，而不是另一条子问题。'
+    elif kind == 'quadrant_edit':
+        task = (
+            f'下面给出的是「{item_name or item_key}」这一象限的语义内涵原文。请在原文上做精修，给出 4 个修改稿。'
+            '这一象限收哪些语义要留住，已经点到的对象、做法和边界都要留住。'
+            '只调整不够准确、不够顺、和本子内容贴得不紧的词句。'
+            '禁止改去讲另外一个象限，禁止整段换成另一套语义。'
+            '每条是精修后的完整说明，可以有句号。'
+        )
+        bound = '必须能看出是同一段的修改，而不是替换成另一段。'
+    else:
+        task = (
+            f'下面给出的是「{item_name or item_key}」这条刻度说明的原文。请在原文上做精修，给出 4 个修改稿。'
+            '职分不变，段落里已经点到的对象、做法、框架和后半的对应内容都要留住。'
+            '只调整不够准确、不够顺、和本子内容贴得不紧的词句。'
+            '禁止另写一条新说明，禁止改去讲旁边另一色、另一层或另一类知识。'
+            '每条是精修后的完整说明，可以有句号。'
+        )
+        bound = '必须能看出是同一段的修改，而不是替换成另一段。'
+    system = '只输出 JSON。' + JSON_OUTPUT_RULES
+    forbid = '' if kind == 'quadrant_edit' else '不要使用四色、DMT、象限、共识区、温度计、螺旋这类内部叫法。\n'
+    sibling_label = '同组其它象限内涵' if kind == 'quadrant_edit' else '同组其它刻度说明'
+    prompt = f"""{task}
+{bound}
+{forbid}核心问题：{core or '（暂无）'}
+现有子问题：{json.dumps(subs, ensure_ascii=False)[:1600]}
+本子里已经靠前的词：{'、'.join(seen[:12]) or '（暂无）'}
+要修改的原文：{current or '（新增，尚无原文）'}
+{sibling_label}（只作参照，不要写进修改稿去替换原文）：{json.dumps(siblings, ensure_ascii=False)[:1200]}
+
+输出：{{"options":["修改稿1","修改稿2","修改稿3","修改稿4"]}}
+"""
+    try:
+        raw, _model = call_strong_llm(
+            prompt,
+            system=system,
+            max_tokens=4000 if kind in ('scale_edit', 'quadrant_edit') else 1800,
+        )
+        data = loads_json_loose(raw)
+    except Exception as exc:
+        return {'ok': False, 'msg': str(exc)[:200], 'options': []}
+    if isinstance(data, dict):
+        raw_opts = data.get('options')
+    elif isinstance(data, list):
+        raw_opts = data
+    else:
+        raw_opts = []
+    options = []
+    for item in raw_opts or []:
+        text = str(item).strip()
+        if text and text not in options:
+            options.append(text)
+        if len(options) >= 4:
+            break
+    return {'ok': True, 'msg': 'ok', 'options': options}
+
+
+def save_semantic_intent_preference(
+    username: str,
+    scene_name: Optional[str],
+    *,
+    patch: Dict[str, Any],
+) -> Dict[str, Any]:
+    """写入用户意图记忆（Top/核心问题/刻度/锁定属性等），下次梳理跟随；不自动重跑。"""
+    from app_chat.semantic_source_v3_pipeline import load_intent_memory, save_intent_memory
+
+    if not username:
+        return {'ok': False, 'msg': 'username required'}
+    intent = load_intent_memory(username)
+    patch = patch if isinstance(patch, dict) else {}
+
+    if isinstance(patch.get('preferred_top'), dict):
+        cur = intent.get('preferred_top') if isinstance(intent.get('preferred_top'), dict) else {}
+        cur.update({k: v for k, v in patch['preferred_top'].items() if v})
+        intent['preferred_top'] = cur
+    if patch.get('preferred_core_issue'):
+        intent['preferred_core_issue'] = str(patch['preferred_core_issue']).strip()
+    if isinstance(patch.get('preferred_sub_issues'), list):
+        intent['preferred_sub_issues'] = [str(x).strip() for x in patch['preferred_sub_issues'] if str(x).strip()]
+        intent['sub_issues_user_locked'] = True
+    if isinstance(patch.get('preferred_scale_definitions'), dict):
+        cur = intent.get('preferred_scale_definitions') if isinstance(intent.get('preferred_scale_definitions'), dict) else {}
+        for key, val in patch['preferred_scale_definitions'].items():
+            if isinstance(val, dict):
+                base = cur.get(key) if isinstance(cur.get(key), dict) else {}
+                base.update({k: v for k, v in val.items() if v})
+                cur[key] = base
+            elif val:
+                cur[key] = val
+        intent['preferred_scale_definitions'] = cur
+    if isinstance(patch.get('preferred_quadrant_definitions'), dict):
+        cur = intent.get('preferred_quadrant_definitions') if isinstance(intent.get('preferred_quadrant_definitions'), dict) else {}
+        for key, val in patch['preferred_quadrant_definitions'].items():
+            qid = str(key or '').strip().upper()
+            text = str(val or '').strip()
+            if qid in ('Q1', 'Q2', 'Q3', 'Q4') and text:
+                cur[qid] = text
+        intent['preferred_quadrant_definitions'] = cur
+    if isinstance(patch.get('locked_attr_words'), list):
+        locked = set(intent.get('locked_attr_words') or [])
+        locked.update(str(x).strip() for x in patch['locked_attr_words'] if str(x).strip())
+        intent['locked_attr_words'] = sorted(locked)
+    # 右键改属性：锁结果 + 提炼「背后意图」供下次梳理跟随（不只锁词）
+    if isinstance(patch.get('attr_edits'), list):
+        edits = list(intent.get('attr_edits') or [])
+        notes = list(intent.get('attr_intent_notes') or [])
+        for item in patch['attr_edits']:
+            if not isinstance(item, dict):
+                continue
+            word = str(item.get('word') or '').strip()
+            before = item.get('before') if isinstance(item.get('before'), dict) else {}
+            after = item.get('after') if isinstance(item.get('after'), dict) else {}
+            if not word:
+                continue
+            entry = {
+                'word': word,
+                'before': {
+                    'four_color_type': str(before.get('four_color_type') or '').strip(),
+                    'dmt_level': str(before.get('dmt_level') or '').strip(),
+                    'knowledge_type': str(before.get('knowledge_type') or '').strip(),
+                },
+                'after': {
+                    'four_color_type': str(after.get('four_color_type') or '').strip(),
+                    'dmt_level': str(after.get('dmt_level') or '').strip(),
+                    'knowledge_type': str(after.get('knowledge_type') or '').strip(),
+                },
+                'at': datetime.now().isoformat(timespec='seconds'),
+            }
+            hint = _derive_attr_edit_intent_hint(entry['before'], entry['after'], word)
+            entry['intent_hint'] = hint
+            edits.append(entry)
+            if hint:
+                notes.append(hint)
+        intent['attr_edits'] = edits[-100:]
+        # 去重保序，最多保留最近 30 条意图说明
+        seen_n = set()
+        compact_notes = []
+        for n in reversed(notes):
+            s = str(n).strip()
+            if not s or s in seen_n:
+                continue
+            seen_n.add(s)
+            compact_notes.append(s)
+            if len(compact_notes) >= 30:
+                break
+        intent['attr_intent_notes'] = list(reversed(compact_notes))
+        intent['attr_intent_summary'] = '；'.join(intent['attr_intent_notes'][-12:])
+    if isinstance(patch.get('confirmations'), list):
+        hist = list(intent.get('confirmations') or [])
+        for item in patch['confirmations']:
+            if isinstance(item, dict):
+                item = dict(item)
+                item['at'] = datetime.now().isoformat(timespec='seconds')
+                hist.append(item)
+        intent['confirmations'] = hist[-200:]
+    # 透传其它显式字段
+    for k in ('notes', 'custom_options'):
+        if k in patch:
+            intent[k] = patch[k]
+    # C4：行为记录（新传文档/钉卡/改属性等），下次梳理跟随，不自动重跑
+    if isinstance(patch.get('panel_edit'), dict):
+        log = list(intent.get('panel_edit_log') or [])
+        item = dict(patch['panel_edit'])
+        item['at'] = datetime.now().isoformat(timespec='seconds')
+        action = str(item.get('action') or '').strip()
+        target = str(item.get('target') or '').strip()
+        item['action'] = action
+        item['target'] = target[:80]
+        log.append(item)
+        intent['panel_edit_log'] = log[-40:]
+    if isinstance(patch.get('behavior_events'), list):
+        evs = list(intent.get('behavior_events') or [])
+        for ev in patch['behavior_events']:
+            if isinstance(ev, dict):
+                item = dict(ev)
+                item.setdefault('at', datetime.now().isoformat(timespec='seconds'))
+                evs.append(item)
+        intent['behavior_events'] = evs[-300:]
+
+    save_intent_memory(username, intent)
+
+    # 若改了核心问题/刻度，同步刷新本子 meta 展示字段（不重跑流水线）
+    notebook = _load_notebook(username, scene_name)
+    if notebook:
+        meta = _load_semantic_meta(notebook)
+        changed = False
+        if patch.get('preferred_core_issue'):
+            meta['core_issue'] = intent.get('preferred_core_issue')
+            changed = True
+        if isinstance(patch.get('preferred_sub_issues'), list):
+            meta['sub_issues'] = list(intent.get('preferred_sub_issues') or [])
+            tops = meta.get('book_top_keywords') if isinstance(meta.get('book_top_keywords'), dict) else None
+            if isinstance(tops, dict):
+                tops['sub_issues'] = list(meta['sub_issues'])
+            changed = True
+        if isinstance(patch.get('preferred_scale_definitions'), dict):
+            scale = meta.get('scale_definitions') if isinstance(meta.get('scale_definitions'), dict) else {}
+            pref = intent.get('preferred_scale_definitions') or {}
+            for key in ('four_color', 'dmt', 'knowledge'):
+                if isinstance(pref.get(key), dict):
+                    base = scale.get(key) if isinstance(scale.get(key), dict) else {}
+                    base.update(pref[key])
+                    scale[key] = base
+            meta['scale_definitions'] = scale
+            changed = True
+        if isinstance(patch.get('preferred_quadrant_definitions'), dict):
+            pack = meta.get('quadrant_meaning') if isinstance(meta.get('quadrant_meaning'), dict) else {}
+            defs = dict(pack.get('definitions') or {}) if isinstance(pack.get('definitions'), dict) else {}
+            pref_q = intent.get('preferred_quadrant_definitions') or {}
+            for qid in ('Q1', 'Q2', 'Q3', 'Q4'):
+                text = str(pref_q.get(qid) or '').strip()
+                if text:
+                    defs[qid] = text
+            pack['definitions'] = defs
+            meta['quadrant_meaning'] = pack
+            changed = True
+            try:
+                from app_chat.semantic_source_v3_pipeline import book_quadrant_meaning_path
+                with open(book_quadrant_meaning_path(username), 'w', encoding='utf-8') as f:
+                    json.dump(pack, f, ensure_ascii=False, indent=2)
+            except Exception as exc:
+                print(f'[semantic_intent] quadrant meaning write fail: {exc}', flush=True)
+        if isinstance(patch.get('preferred_top'), dict):
+            tops = meta.get('book_top_keywords') if isinstance(meta.get('book_top_keywords'), dict) else {}
+            pref_top = intent.get('preferred_top') or {}
+            if pref_top.get('top1'):
+                tops['top1'] = [pref_top['top1']]
+            meta['book_top_keywords'] = tops
+            changed = True
+        if changed:
+            kw_map: Dict[str, Any] = {}
+            if notebook.keywordFourColorDMT:
+                try:
+                    kw_map = json.loads(notebook.keywordFourColorDMT)
+                except Exception:
+                    kw_map = {}
+            _save_notebook_semantic_state(notebook, kw_map, meta)
+
+    return {'ok': True, 'msg': 'ok', 'intent': intent}
+
+
+def confirm_semantic_pending(
+    username: str,
+    scene_name: Optional[str],
+    *,
+    word: str,
+    choice: str,
+    custom_text: str = '',
+    preview_applied: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """确认存疑/冲突选项：更新象限或属性，写入记忆；不自动重跑。"""
+    from app_chat.semantic_source_v3_pipeline import (
+        book_quadrant_path,
+        load_intent_memory,
+        save_intent_memory,
+    )
+
+    word = (word or '').strip()
+    choice = (choice or '').strip()
+    if not username or not word:
+        return {'ok': False, 'msg': 'username/word required'}
+
+    notebook = _load_notebook(username, scene_name)
+    if not notebook:
+        return {'ok': False, 'msg': '本子不存在'}
+
+    kw_map: Dict[str, Any] = {}
+    if notebook.keywordFourColorDMT:
+        try:
+            kw_map = json.loads(notebook.keywordFourColorDMT)
+        except Exception:
+            kw_map = {}
+    entry = dict(kw_map.get(word) or {})
+    meta = _load_semantic_meta(notebook)
+    quads = meta.get('quadrants') if isinstance(meta.get('quadrants'), dict) else {}
+    q = dict(quads.get(word) or {})
+
+    applied: Dict[str, Any] = {'word': word, 'choice': choice}
+    # 优先按结构化 option id / human_know 字段解析（禁止靠中文子串猜）
+    opt_matched: Optional[Dict[str, Any]] = None
+    for opt in (q.get('pending_options') or []):
+        if not isinstance(opt, dict):
+            continue
+        oid = str(opt.get('id') or '').strip()
+        label = str(opt.get('label') or '').strip()
+        if choice and (choice == oid or choice == label or choice == f"{oid}:{label}"):
+            opt_matched = opt
+            break
+    if opt_matched is None and isinstance(preview_applied, dict) and preview_applied.get('option_id'):
+        for opt in (q.get('pending_options') or []):
+            if isinstance(opt, dict) and str(opt.get('id')) == str(preview_applied.get('option_id')):
+                opt_matched = opt
+                break
+
+    if opt_matched is not None:
+        hk = opt_matched.get('human_know')
+        applied['option_id'] = opt_matched.get('id')
+        applied['preview'] = opt_matched.get('preview') or ''
+        patch = opt_matched.get('attr_patch') if isinstance(opt_matched.get('attr_patch'), dict) else {}
+        for k in ('four_color_type', 'dmt_level', 'knowledge_type'):
+            if patch.get(k):
+                entry[k] = patch[k]
+                applied[k] = patch[k]
+        direct_q = str(opt_matched.get('quadrant') or '').strip().upper()
+        if direct_q in ('Q1', 'Q2', 'Q3', 'Q4'):
+            q['quadrant'] = direct_q
+            q['machine_know'] = direct_q in ('Q1', 'Q2')
+            q['human_know'] = direct_q in ('Q1', 'Q4')
+            applied['human_know'] = q['human_know']
+            applied['quadrant'] = direct_q
+            q['pending'] = [
+                p for p in (q.get('pending') or [])
+                if p not in ('quadrant', 'human_true_know_uncertain')
+            ]
+            q['pending_faded'] = False
+        elif hk is True:
+            q['human_know'] = True
+            mk = bool(q.get('machine_know'))
+            q['quadrant'] = 'Q1' if mk else 'Q4'
+            applied['human_know'] = True
+            applied['quadrant'] = q['quadrant']
+            # A 类：机不知 + 人选知道 → 虚线保留但淡化示疑
+            if not mk:
+                q['pending'] = [p for p in (q.get('pending') or []) if p != 'quadrant']
+                if 'human_true_know_uncertain' not in q['pending']:
+                    q['pending'].append('human_true_know_uncertain')
+                q['pending_faded'] = True
+                applied['pending_faded'] = True
+            else:
+                q['pending'] = [
+                    p for p in (q.get('pending') or [])
+                    if p not in ('quadrant', 'human_true_know_uncertain')
+                ]
+                q['pending_faded'] = False
+        elif hk is False:
+            q['human_know'] = False
+            mk = bool(q.get('machine_know'))
+            q['quadrant'] = 'Q2' if mk else 'Q3'
+            applied['human_know'] = False
+            applied['quadrant'] = q['quadrant']
+            q['pending'] = [p for p in (q.get('pending') or []) if p not in ('quadrant', 'human_true_know_uncertain')]
+            q['pending_faded'] = False
+        else:
+            q['pending'] = [p for p in (q.get('pending') or []) if p != 'attr_or_meaning']
+        entry['quadrant'] = q.get('quadrant') or entry.get('quadrant') or ''
+        if q.get('pending_faded'):
+            entry['status'] = 'soft_pending'
+            entry['pending_faded'] = True
+        else:
+            entry['status'] = 'confirmed' if not q.get('pending') else 'pending'
+            entry['pending_faded'] = False
+    elif choice.startswith('attr:') or choice in ('R', 'B', 'P', 'G', 'D', 'M', 'T', 'trad', 'org', 'trib'):
+        val = choice.split(':', 1)[-1] if ':' in choice else choice
+        if val in ('R', 'B', 'P', 'G'):
+            entry['four_color_type'] = val
+            applied['four_color_type'] = val
+        elif val in ('D', 'M', 'T'):
+            entry['dmt_level'] = val
+            applied['dmt_level'] = val
+        elif val in ('trad', 'org', 'trib'):
+            entry['knowledge_type'] = val
+            applied['knowledge_type'] = val
+        q['pending'] = [p for p in (q.get('pending') or []) if p != 'attr_or_meaning']
+        entry['status'] = 'confirmed' if not q.get('pending') else 'pending'
+    elif custom_text:
+        applied['custom_text'] = custom_text.strip()
+        q['pending'] = []
+        entry['status'] = 'confirmed'
+        entry['analysis'] = ((entry.get('analysis') or '') + f' | 用户确认：{custom_text.strip()}')[:500]
+    else:
+        q['pending'] = []
+        entry['status'] = 'confirmed'
+        if custom_text:
+            applied['custom_text'] = custom_text.strip()
+
+    if isinstance(preview_applied, dict):
+        applied['preview'] = preview_applied
+
+    quads[word] = q
+    meta['quadrants'] = quads
+    kw_map[word] = entry
+    _save_notebook_semantic_state(notebook, kw_map, meta)
+    try:
+        with open(book_quadrant_path(username), 'w', encoding='utf-8') as f:
+            json.dump(quads, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+    intent = load_intent_memory(username)
+    hist = list(intent.get('confirmations') or [])
+    hist.append({
+        'word': word,
+        'choice': choice,
+        'custom_text': custom_text or '',
+        'applied': applied,
+        'at': datetime.now().isoformat(timespec='seconds'),
+    })
+    intent['confirmations'] = hist[-200:]
+    # 手改属性锁定
+    if any(k in applied for k in ('four_color_type', 'dmt_level', 'knowledge_type')):
+        locked = set(intent.get('locked_attr_words') or [])
+        locked.add(word)
+        intent['locked_attr_words'] = sorted(locked)
+    save_intent_memory(username, intent)
+
+    return {
+        'ok': True,
+        'msg': 'ok',
+        'applied': applied,
+        'quadrant': q,
+        'keyword': entry,
+    }
+
+
+def _keyword_surface_sim(a: str, b: str) -> float:
+    aa = (a or '').strip().lower()
+    bb = (b or '').strip().lower()
+    if not aa or not bb:
+        return 0.0
+    if aa == bb:
+        return 1.0
+    if aa in bb or bb in aa:
+        return min(len(aa), len(bb)) / max(len(aa), len(bb))
+    sa, sb = set(aa), set(bb)
+    return len(sa & sb) / max(len(sa | sb), 1)
+
+
+def _rename_keyword_in_notebook_state(
+    kw_map: Dict[str, Any],
+    meta: Dict[str, Any],
+    old: str,
+    new: str,
+) -> None:
+    """把节点词 old 改名为 new：属性、层次边、L、象限、Top 列表一并替换。"""
+    if not old or not new or old == new:
+        return
+    old_entry = dict(kw_map.get(old) or {})
+    new_entry = dict(kw_map.get(new) or {})
+    merged = dict(old_entry)
+    # 新词若已有属性则保留其非空字段，其余从旧词继承
+    for k, v in new_entry.items():
+        if v not in (None, '', [], {}):
+            merged[k] = v
+    for k in ('four_color_type', 'dmt_level', 'knowledge_type', 'analysis', 'level', 'quadrant', 'sources'):
+        if (not merged.get(k)) and old_entry.get(k):
+            merged[k] = old_entry.get(k)
+    kw_map[new] = merged
+    if old in kw_map and old != new:
+        del kw_map[old]
+
+    def _swap(s: Any) -> Any:
+        return new if str(s) == old else s
+
+    links = meta.get('hierarchy_links') if isinstance(meta.get('hierarchy_links'), list) else []
+    new_links = []
+    for link in links:
+        if isinstance(link, (list, tuple)) and len(link) >= 2:
+            row = list(link)
+            row[0] = _swap(row[0])
+            row[1] = _swap(row[1])
+            new_links.append(row)
+        else:
+            new_links.append(link)
+    meta['hierarchy_links'] = new_links
+
+    levels = meta.get('keyword_levels') if isinstance(meta.get('keyword_levels'), dict) else {}
+    if old in levels:
+        levels[new] = levels.pop(old)
+    meta['keyword_levels'] = levels
+
+    quads = meta.get('quadrants') if isinstance(meta.get('quadrants'), dict) else {}
+    if old in quads:
+        quads[new] = quads.pop(old)
+    meta['quadrants'] = quads
+
+    chains = meta.get('longitude_chains') if isinstance(meta.get('longitude_chains'), list) else []
+    new_chains = []
+    for chain in chains:
+        if isinstance(chain, list):
+            new_chains.append([_swap(x) for x in chain])
+        else:
+            new_chains.append(chain)
+    meta['longitude_chains'] = new_chains
+
+    book_kw = meta.get('book_keywords') if isinstance(meta.get('book_keywords'), list) else []
+    meta['book_keywords'] = sorted({new if str(x) == old else str(x) for x in book_kw if str(x).strip()})
+
+    tops = meta.get('book_top_keywords') if isinstance(meta.get('book_top_keywords'), dict) else {}
+    for key in ('top1', 'top3', 'top5', 'top10'):
+        raw = tops.get(key)
+        arr = list(raw) if isinstance(raw, list) else ([raw] if raw else [])
+        tops[key] = [new if str(x) == old else x for x in arr]
+    alts = tops.get('top_alternatives') if isinstance(tops.get('top_alternatives'), dict) else {}
+    for key, raw in list(alts.items()):
+        if isinstance(raw, list):
+            alts[key] = [new if str(x) == old else x for x in raw]
+    tops['top_alternatives'] = alts
+    meta['book_top_keywords'] = tops
+
+
+def apply_top_alternative_replace(
+    username: str,
+    scene_name: Optional[str],
+    *,
+    tier: str,
+    alt_word: str,
+    replace_word: str = '',
+) -> Dict[str, Any]:
+    """
+    点选 Top1/3/5/10 备选：由用户指定该档中要被替换的现有词，换成备选表述，
+    并同步属性图、层次边、L、象限与前端所需 meta。
+    """
+    from app_chat.semantic_source_v3_pipeline import load_intent_memory, save_intent_memory, book_quadrant_path
+
+    tier = str(tier or '').strip()
+    alt_word = str(alt_word or '').strip()
+    replace_word = str(replace_word or '').strip()
+    if not username or tier not in ('top1', 'top3', 'top5', 'top10') or not alt_word:
+        return {'ok': False, 'msg': 'username/tier/alt_word required'}
+    if not replace_word:
+        return {'ok': False, 'msg': '请指定要替换的该档现有词 replace_word'}
+
+    notebook = _load_notebook(username, scene_name)
+    if not notebook:
+        return {'ok': False, 'msg': '本子不存在'}
+
+    kw_map: Dict[str, Any] = {}
+    if notebook.keywordFourColorDMT:
+        try:
+            kw_map = json.loads(notebook.keywordFourColorDMT)
+        except Exception:
+            kw_map = {}
+    meta = _load_semantic_meta(notebook)
+    tops = meta.get('book_top_keywords') if isinstance(meta.get('book_top_keywords'), dict) else {}
+    raw = tops.get(tier)
+    current = [str(x).strip() for x in (raw if isinstance(raw, list) else ([raw] if raw else [])) if str(x).strip()]
+    if not current:
+        # 兜底：从 book_keywords 取前 n
+        n = {'top1': 1, 'top3': 3, 'top5': 5, 'top10': 10}[tier]
+        current = [str(x).strip() for x in (meta.get('book_keywords') or []) if str(x).strip()][:n]
+
+    if replace_word not in current:
+        return {
+            'ok': False,
+            'msg': f'「{replace_word}」不在当前 {tier} 列表中',
+            'top_list': current,
+        }
+
+    if alt_word == replace_word or alt_word in current:
+        # 备选已是该档词：仅调整顺序（提到该档相关位置），不改名
+        current = [alt_word if x == replace_word else x for x in current]
+        # 去重保序
+        seen = set()
+        deduped = []
+        for x in current:
+            if x in seen:
+                continue
+            seen.add(x)
+            deduped.append(x)
+        current = deduped
+        replaced_old = replace_word
+    else:
+        replaced_old = replace_word
+        current = [alt_word if x == replaced_old else x for x in current]
+        n = {'top1': 1, 'top3': 3, 'top5': 5, 'top10': 10}[tier]
+        current = current[:n]
+        _rename_keyword_in_notebook_state(kw_map, meta, replaced_old, alt_word)
+
+    tops = meta.get('book_top_keywords') if isinstance(meta.get('book_top_keywords'), dict) else {}
+    tops[tier] = current
+    # top1 同步进 top10 首位
+    if tier == 'top1' and current:
+        t10 = [str(x).strip() for x in (tops.get('top10') or []) if str(x).strip()]
+        tops['top10'] = [current[0]] + [x for x in t10 if x != current[0]]
+        tops['top10'] = tops['top10'][:10]
+        tops['top1'] = [current[0]]
+    meta['book_top_keywords'] = tops
+    _save_notebook_semantic_state(notebook, kw_map, meta)
+    try:
+        quads = meta.get('quadrants') if isinstance(meta.get('quadrants'), dict) else {}
+        with open(book_quadrant_path(username), 'w', encoding='utf-8') as f:
+            json.dump(quads, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+    intent = load_intent_memory(username)
+    pref = intent.get('preferred_top') if isinstance(intent.get('preferred_top'), dict) else {}
+    pref[tier] = list(current)
+    if tier == 'top1' and current:
+        pref['top1'] = current[0]
+    intent['preferred_top'] = pref
+    repl = list(intent.get('top_replacements') or [])
+    repl.append({
+        'tier': tier,
+        'old': replaced_old,
+        'new': alt_word,
+        'at': datetime.now().isoformat(timespec='seconds'),
+    })
+    intent['top_replacements'] = repl[-100:]
+    save_intent_memory(username, intent)
+
+    return {
+        'ok': True,
+        'msg': 'ok',
+        'tier': tier,
+        'old': replaced_old,
+        'new': alt_word,
+        'top_list': current,
+        'book_top_keywords': tops,
+        'keyword_map': kw_map,
+        'hierarchy_links': meta.get('hierarchy_links') or [],
+        'keyword_levels': meta.get('keyword_levels') or {},
+        'quadrants': meta.get('quadrants') or {},
+        'book_keywords': meta.get('book_keywords') or [],
     }

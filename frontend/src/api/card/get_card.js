@@ -171,6 +171,30 @@ export function semantic_reorganize_rollback(body) {
     });
 }
 
+export function semantic_intent_preference(body) {
+    return request.post('/api/semantic_intent_preference', body, {
+        headers: { 'Content-Type': 'application/json' }
+    });
+}
+
+export function semantic_panel_suggest(body) {
+    return request.post('/api/semantic_panel_suggest', body, {
+        headers: { 'Content-Type': 'application/json' }
+    });
+}
+
+export function semantic_confirm_pending(body) {
+    return request.post('/api/semantic_confirm_pending', body, {
+        headers: { 'Content-Type': 'application/json' }
+    });
+}
+
+export function semantic_top_alternative_replace(body) {
+    return request.post('/api/semantic_top_alternative_replace', body, {
+        headers: { 'Content-Type': 'application/json' }
+    });
+}
+
 export function card_generate_four_color_images(body) {
     return request.post('/api/card_generate_four_color_images', body, {
         headers: { 'Content-Type': 'application/json' }

@@ -1467,7 +1467,7 @@ import BackgroundCard from "@/components/BackgroundCard.vue"
 import { ElForm, ElFormItem, ElInput, ElButton, ElDialog, ElRate, ElSelect, ElOption, ElInputNumber, ElUpload, ElNotification, ElProgress, ElSlider, ElMessageBox, ElCheckbox, ElCheckboxGroup } from 'element-plus'
 import { h } from 'vue'
 import radarChart from '@/components/radar-chart.vue';
-import { get_file, get_file_summary, get_file_topics, get_file_text, get_img_text, update_img_text, update_img_text_stream, topic_getRelQuestions, get_card, card_generate_single_card_image } from "@/api/card/get_card"
+import { get_file, get_file_summary, get_file_topics, get_file_text, get_img_text, update_img_text, update_img_text_stream, topic_getRelQuestions, get_card, card_generate_single_card_image, semantic_intent_preference } from "@/api/card/get_card"
 import { animation } from "@/utils/util";
 import { card_evalSFT } from "@/api/card/send_card"
 import radarChart2 from '@/components/radar-chart2.vue';
@@ -3091,6 +3091,24 @@ export default {
 
     pinCard(cardData) {
       this.recordOperation('create_card', cardData);
+      // C4：钉卡行为写入语义意图记忆（下次梳理跟随，不自动重跑）
+      try {
+        const username = localStorage.getItem('userId');
+        if (username) {
+          const hasQuestion = !!(cardData && (cardData.question || cardData.userQuestion || cardData.isQuestion));
+          semantic_intent_preference({
+            username,
+            scene_name: this.sceneName || '',
+            patch: {
+              behavior_events: [{
+                type: 'pin_card',
+                cid: cardData && (cardData.created_card_id || cardData.cid),
+                has_user_question: hasQuestion,
+              }],
+            },
+          }).catch(() => {});
+        }
+      } catch (e) { /* ignore */ }
 
       // 🔥 获取当前三窗口模型配置并保存到卡片
       if (cardData.created_card_id) {
@@ -10429,6 +10447,19 @@ TODO（下为默认模板，可随着制备过程发现问题随时调整修改�
     },
 
     handlePdfUploaded(fileName) {
+      // C4：新传文档写入语义意图记忆（下次梳理跟随，不自动重跑）
+      try {
+        const username = localStorage.getItem('userId');
+        if (username && fileName) {
+          semantic_intent_preference({
+            username,
+            scene_name: this.sceneName || '',
+            patch: {
+              behavior_events: [{ type: 'upload_document', filename: String(fileName) }],
+            },
+          }).catch(() => {});
+        }
+      } catch (e) { /* ignore */ }
       // PDF文件上传完成，开始图片处理状态检查
       console.log(`PDF文件 ${fileName} 上传完成，开始图片处理状态检查`);
       // this.startImageProcessingCheck(fileName);

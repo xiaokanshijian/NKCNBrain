@@ -574,6 +574,28 @@ import AnswerParser from '@/components/chatWindow/AnswerParser.vue';
 import { ElForm, ElFormItem, ElInput, ElButton, ElDialog, ElSelect, ElOption, ElMessageBox, ElProgress } from 'element-plus'
 
 import { get_cards, get_filtered_cards, get_card, semantic_reorganize_start, semantic_reorganize_status, semantic_reorganize_rollback, card_generate_four_color_images, card_get_image_generating_status, card_get_html_generating_status } from "@/api/card/get_card"
+
+const SEMANTIC_ACTIVE_PHASES = [
+  'preparing',
+  'source_backfill',
+  'extract',
+  'extract_condense',
+  'key_issues_merge',
+  'enrich',
+  'connect',
+  'attributes',
+  'card_condense',
+  'source_extract',
+  'aggregate_top',
+  'scale_definitions',
+  'hierarchy_levels',
+  'longitude_links',
+  'quadrant_guide',
+  'quadrant_machine',
+  'quadrant_human',
+  'quadrant_revise',
+  'thermometer',
+];
 import { card_evalSFT } from "@/api/card/send_card"
 import { mergeCardBackend, cardUserDefine, react, cardTidyUpById, cardUpdPostIndex } from "@/api/card_zym/card_js"
 import { getDateTime, modelHL } from "@/api/getData";
@@ -960,15 +982,7 @@ export default {
       if (this.semanticReorganizing) return true;
       const st = this.semanticReorganizeStatus || {};
       if (st.running) return true;
-      return [
-        'preparing',
-        'extract',
-        'extract_condense',
-        'key_issues_merge',
-        'enrich',
-        'connect',
-        'attributes',
-      ].includes(st.phase);
+      return SEMANTIC_ACTIVE_PHASES.includes(st.phase);
     },
     semanticReorganizeFloatingVisible() {
       if (this.semanticReorganizeFloatingDismissed) return false;
@@ -1045,9 +1059,12 @@ export default {
       }
       return parts.join(' · ') || '准备中…';
     },
-    /** 语义梳理后：节点图只用新梳理选中卡（v2）或旧版抽样 processed */
+    /** 语义梳理后：节点图只用新梳理选中卡（v2）或旧版抽样 processed；v3 用全书卡片作佐证池 */
     keywordNetworkCards() {
       const meta = this.semanticReorganizeMeta || {};
+      if (String(meta.pipeline || '').startsWith('v3')) {
+        return this.cardList || [];
+      }
       const selected = meta.reorganize_selected_cids;
       if (
         meta.pipeline === 'v2_condense_hierarchy'
@@ -3425,8 +3442,8 @@ export default {
       }
       const isIncremental = mode === 'incremental';
       const confirmMsg = isIncremental
-        ? '将保留已有语义备选池，仅从未纳入梳理的卡片中抽样（浅卡最多40、另抽白卡最多20，合计最多60），并发抽词+浓缩后做核心问题/合并同类项、层次补词、连边与属性分析。是否继续？'
-        : '将对本子卡片抽样（浅卡≤40全取或最近10+随机30；另从其余白卡最多抽20；合计最多60），并发抽词+浓缩后做核心问题/合并同类项、层次补词、连边与属性分析。是否继续？';
+        ? '将按本子源头文档（DocStructure/Presummary/Skill）迭代梳理主体本体语义关键词空间；有源头时不靠卡片统计发明权威词。卡片浓缩仅作人机象限佐证。Presummary 补不上时，这份文档若有 PreImageSummary 就用它代替。DocStructure 或 Skill 补不上时，只要还有摘要，并且这两项至少有一个，就继续；摘要没有、或 DocStructure 与 Skill 都没有，才停止，不会改走旧卡片链路。是否继续？'
+        : '将按本子源头文档（DocStructure/Presummary/Skill）重新梳理主体本体语义关键词空间；有源头时不靠卡片统计发明权威词。仅本子完全无文档时才走旧卡片链路。Presummary 补不上时，这份文档若有 PreImageSummary 就用它代替。DocStructure 或 Skill 补不上时，只要还有摘要，并且这两项至少有一个，就继续；摘要没有、或 DocStructure 与 Skill 都没有，才停止，不会改走旧链路。是否继续？';
       try {
         await this.$confirm(confirmMsg, '语义梳理', { type: 'warning' });
       } catch (e) {
@@ -3441,14 +3458,42 @@ export default {
           username,
           scene_name: this.sceneName || '',
           mode: isIncremental ? 'incremental' : 'full',
+          force_v2: false,
         });
         const data = res.data || res;
+        if (data.source_incomplete || data.need_force_v2) {
+          this.semanticReorganizing = false;
+          const rd = data.readiness || {};
+          const total = rd.total != null ? rd.total : '?';
+          const ready = rd.ready_count != null ? rd.ready_count : 0;
+          const missing = (rd.missing || [])
+            .map((m) => `${m.filename}: ${(m.lack || []).join('/')}`)
+            .slice(0, 12)
+            .join('\n');
+          const tip = (data.msg || '文档源头材料不齐，已停止')
+            + `\n\n【重要】本子共 ${total} 份文档，${ready} 份可以梳理。`
+            + '可以梳理的条件是：有 Presummary 或 PreImageSummary，并且有 DocStructure 或 Skill。'
+            + '仍有文档达不到，已停止；不会只分析已可梳理的那几份，也不会改走旧卡片链路。'
+            + (missing ? `\n\n仍缺：\n${missing}` : '');
+          try {
+            await this.$alert(tip, '源头未全部就绪 · 已停止', {
+              type: 'error',
+              confirmButtonText: '知道了',
+            });
+          } catch (e) { /* ignore */ }
+          return;
+        }
         if (data.error_num !== 0) {
           this.$message.error(data.msg || '发起语义梳理失败');
           this.semanticReorganizing = false;
           return;
         }
-        this.$message.success(isIncremental ? '已开始迭代梳理语义' : '已开始重新梳理语义');
+        const pipeHint = data.pipeline && String(data.pipeline).startsWith('v3')
+          ? '（源头文档流水线）'
+          : ((data.pipeline || '').includes('v2') ? '（无文档·旧卡片链路）' : '');
+        this.$message.success(
+          (isIncremental ? '已开始迭代梳理语义' : '已开始重新梳理语义') + pipeHint
+        );
         this.semanticReorganizeStatus = (data.status || { running: true, phase: 'preparing' });
         this.pollSemanticReorganizeStatus(username);
       } catch (e) {
@@ -3470,16 +3515,7 @@ export default {
           this.semanticReorganizeStatus = st;
           this.semanticReorganizeCanRollback = !!st.rollback_available;
 
-          const activePhases = [
-            'preparing',
-            'extract',
-            'extract_condense',
-            'key_issues_merge',
-            'enrich',
-            'connect',
-            'attributes',
-          ];
-          if (st.running || activePhases.includes(st.phase)) {
+          if (st.running || SEMANTIC_ACTIVE_PHASES.includes(st.phase)) {
             this.semanticReorganizing = true;
             this.semanticReorganizePollTimer = setTimeout(poll, 2000);
             return;
@@ -3496,9 +3532,17 @@ export default {
           if (st.phase === 'completed') {
             const skipped = st.skipped_cards || 0;
             const extra = skipped > 0 ? `（本次处理 ${st.selected_cards || st.cards_processed || 0} 张，跳过 ${skipped} 张）` : '';
-            this.$message.success(`语义梳理完成，共 ${st.total_keywords || 0} 个关键词${extra}`);
+            const fails = Array.isArray(st.extract_failures) ? st.extract_failures : [];
+            if (fails.length > 0) {
+              const names = fails.map((f) => f.filename || f.error || '').filter(Boolean).slice(0, 6).join('、');
+              this.$message.warning(
+                `语义梳理完成（共 ${st.total_keywords || 0} 个关键词）${extra}；有 ${fails.length} 份文档抽词失败：${names}${fails.length > 6 ? '…' : ''}`,
+              );
+            } else {
+              this.$message.success(`语义梳理完成，共 ${st.total_keywords || 0} 个关键词${extra}`);
+            }
             await this.get_all_cards();
-            this.scheduleSemanticReorganizeFloatingAutoHide(3000);
+            this.scheduleSemanticReorganizeFloatingAutoHide(fails.length > 0 ? 8000 : 3000);
           }
         } catch (e) {
           if (this.semanticReorganizing) {
@@ -3545,15 +3589,7 @@ export default {
         const st = data.status || {};
         this.semanticReorganizeStatus = st;
         this.semanticReorganizeCanRollback = !!st.rollback_available;
-        if (st.running || [
-          'preparing',
-          'extract',
-          'extract_condense',
-          'key_issues_merge',
-          'enrich',
-          'connect',
-          'attributes',
-        ].includes(st.phase)) {
+        if (st.running || SEMANTIC_ACTIVE_PHASES.includes(st.phase)) {
           this.semanticReorganizing = true;
           this.semanticReorganizeFloatingDismissed = false;
           this.semanticReorganizeResultVisible = false;
@@ -4354,6 +4390,21 @@ export default {
       // 获取所有 keyWords，分割后去重并存入 keyTopics
       const keywordsSet = new Set();
       const meta = this.semanticReorganizeMeta || {};
+      // v3：权威词来自源头 book_keywords，不以卡片统计发明词表
+      if (String(meta.pipeline || '').startsWith('v3') && Array.isArray(meta.book_keywords) && meta.book_keywords.length) {
+        meta.book_keywords.forEach((kw) => {
+          const t = String(kw || '').trim();
+          if (t) keywordsSet.add(t);
+        });
+        this.keyTopics = Array.from(keywordsSet);
+        this.cardList.forEach((card) => {
+          if (card.contentTitle) {
+            this.contentTitles.push(card.contentTitle);
+            this.preIndexs.push(card.preIndex);
+          }
+        });
+        return;
+      }
       const metaFiltered = !!(
         meta.sampled
         || (meta.pipeline === 'v2_condense_hierarchy'
