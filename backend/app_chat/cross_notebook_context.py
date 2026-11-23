@@ -298,18 +298,25 @@ def _resolve_vector_db_path_readonly(full_username: str) -> Optional[Tuple[str, 
     has_user_db = os.path.exists(user_db_path) and os.path.exists(user_db_file)
 
     has_shared_data = False
-    if os.path.exists(shared_db_file):
-        collection_name = util.construct_collection(full_username)
-        try:
-            collection_exists, has_any_row = parse_input._detect_shared_chroma_collection_fast(
-                shared_db_file=shared_db_file,
-                collection_name=collection_name,
-                timeout_sec=1.0,
-            )
-            if collection_exists:
-                has_shared_data = True if has_any_row is None else bool(has_any_row)
-        except Exception as e:
-            print(f"[cross_notebook] 共享库探测失败 {full_username}: {e}")
+    shared_unusable = getattr(parse_input, '_SHARED_CHROMA_BROKEN', False)
+    if os.path.exists(shared_db_file) and not shared_unusable:
+        if parse_input._shared_sqlite_file_looks_torn(shared_db_file):
+            shared_unusable = True
+        else:
+            collection_name = util.construct_collection(full_username)
+            try:
+                collection_exists, has_any_row = parse_input._detect_shared_chroma_collection_fast(
+                    shared_db_file=shared_db_file,
+                    collection_name=collection_name,
+                    timeout_sec=1.0,
+                )
+                if collection_exists:
+                    has_shared_data = True if has_any_row is None else bool(has_any_row)
+            except Exception as e:
+                if parse_input._shared_sqlite_error_is_broken(e):
+                    shared_unusable = True
+                else:
+                    print(f"[cross_notebook] 共享库探测失败 {full_username}: {e}")
 
     if has_user_db and has_shared_data:
         return user_db_path, '混合'

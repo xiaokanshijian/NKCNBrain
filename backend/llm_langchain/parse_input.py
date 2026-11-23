@@ -25,6 +25,7 @@ from langchain_openai import OpenAIEmbeddings
 from datetime import datetime
 from app_chat.utils import encode_chinese_to_hex
 import shutil
+import atexit
 import chardet
 import time
 import chromadb
@@ -314,6 +315,37 @@ def _wait_for_inflight_load(user_name, progress_id, seconds=180):
 _SHARED_CHROMA_PRESENCE_CACHE = {}
 _SHARED_CHROMA_PRESENCE_CACHE_LOCK = RLock()
 _SHARED_CHROMA_PRESENCE_CACHE_TTL_SEC = 300
+# 共享 chroma.sqlite3 一旦确认损坏，本次进程内不再打开它
+_SHARED_CHROMA_BROKEN = False
+
+
+def _shared_sqlite_error_is_broken(exc) -> bool:
+    text = str(exc).lower()
+    return (
+        "malformed" in text
+        or "disk image" in text
+        or "not a database" in text
+    )
+
+
+def _shared_sqlite_file_looks_torn(path: str) -> bool:
+    """文件头里的页数和实际大小对不上，说明库被写坏了，不必再去查询。"""
+    try:
+        with open(path, "rb") as handle:
+            header = handle.read(100)
+        if len(header) < 100 or not header.startswith(b"SQLite format 3"):
+            return True
+        page_size = int.from_bytes(header[16:18], "big")
+        if page_size == 1:
+            page_size = 65536
+        page_count = int.from_bytes(header[28:32], "big")
+        if page_size <= 0 or page_count <= 0:
+            return True
+        expected = page_size * page_count
+        size = os.path.getsize(path)
+        return size < expected or size > expected + page_size
+    except Exception:
+        return False
 
 
 def _detect_shared_chroma_collection_fast(shared_db_file: str, collection_name: str, timeout_sec: float = 1.0):
@@ -464,35 +496,132 @@ def _detect_shared_chroma_collection_fast(shared_db_file: str, collection_name: 
 
 
 # 🔥 智能数据库路径检测函数（兼容新旧数据库结构，支持数据合并）
+def ensure_chroma_dir_wal(directory: str) -> str:
+    """每个本子单独一个 sqlite，并改成 WAL。
+
+    进程在写入中途被停掉时，WAL 丢的是最后一次提交，不会把整个库文件写花。
+    以前所有本子共用一个回滚日志库，一次打断就会一起坏。
+    """
+    import sqlite3
+
+    os.makedirs(directory, exist_ok=True)
+    db_file = os.path.join(directory, "chroma.sqlite3")
+    conn = sqlite3.connect(db_file, timeout=5)
+    try:
+        mode_row = conn.execute("PRAGMA journal_mode=WAL;").fetchone()
+        conn.execute("PRAGMA synchronous=FULL;")
+        conn.execute("PRAGMA busy_timeout=5000;")
+        conn.commit()
+        mode = (mode_row[0] if mode_row else "") or ""
+        if str(mode).lower() != "wal":
+            print(f"[DB路径检测] 未能切到 WAL: {db_file} -> {mode}")
+    finally:
+        conn.close()
+    return directory
+
+
+_CHROMA_WRITE_LOCK = RLock()
+_CHROMA_WRITES = 0
+_CHROMA_WRITE_PATHS = set()
+_CHROMA_SHUTDOWN_WAIT_INSTALLED = False
+
+
+def _chroma_directory(vector_store):
+    return getattr(vector_store, "_persist_directory", None) or getattr(vector_store, "persist_directory", None)
+
+
+def _checkpoint_chroma_dir(directory):
+    if not directory:
+        return
+    db_file = os.path.join(directory, "chroma.sqlite3")
+    if not os.path.isfile(db_file):
+        return
+    if os.path.basename(os.path.normpath(directory)).lower() == "user_db_file":
+        return
+    import sqlite3
+    try:
+        conn = sqlite3.connect(db_file, timeout=30)
+        try:
+            conn.execute("PRAGMA wal_checkpoint(FULL);")
+        finally:
+            conn.close()
+    except Exception as exc:
+        print(f"[向量库] 提交后刷盘失败（已提交的内容仍在）: {directory} {exc}")
+
+
+def wait_for_chroma_writes(timeout=7200):
+    """退出前等正在写的本子把当前这一批提交完。"""
+    started = time.time()
+    announced = False
+    while True:
+        with _CHROMA_WRITE_LOCK:
+            pending = _CHROMA_WRITES
+            paths = list(_CHROMA_WRITE_PATHS)
+        if pending <= 0:
+            for path in paths:
+                _checkpoint_chroma_dir(path)
+            with _CHROMA_WRITE_LOCK:
+                _CHROMA_WRITE_PATHS.clear()
+            if announced:
+                print("[向量库] 当前写入已经提交，可以退出")
+            return True
+        if not announced:
+            print(f"[向量库] 退出前先等正在写的本子提交，还有 {pending} 个写入")
+            announced = True
+        if time.time() - started > timeout:
+            print("[向量库] 等待写入超时。已经提交的部分还在，没提交完的这一批会重来")
+            return False
+        time.sleep(0.5)
+
+
+def install_chroma_shutdown_wait():
+    global _CHROMA_SHUTDOWN_WAIT_INSTALLED
+    if _CHROMA_SHUTDOWN_WAIT_INSTALLED:
+        return
+    _CHROMA_SHUTDOWN_WAIT_INSTALLED = True
+    atexit.register(wait_for_chroma_writes)
+
+
+def add_documents_durable(vector_store, documents, ids):
+    """一批写完才算提交。进程退出时会先等这种写入结束。"""
+    global _CHROMA_WRITES
+    install_chroma_shutdown_wait()
+    directory = _chroma_directory(vector_store)
+    with _CHROMA_WRITE_LOCK:
+        _CHROMA_WRITES += 1
+        if directory:
+            _CHROMA_WRITE_PATHS.add(directory)
+    try:
+        return vector_store.add_documents(documents=documents, ids=ids)
+    finally:
+        with _CHROMA_WRITE_LOCK:
+            _CHROMA_WRITES -= 1
+
+
 def get_user_db_path(usr_name):
     """
-    智能检测并返回用户的数据库路径（支持数据分散在两处的情况）
+    返回这个本子的向量库位置。
 
-    检测逻辑：
-    1. 检查用户独立目录是否有数据
-    2. 检查共享目录是否有数据
-    3. 根据检测结果返回合适的路径配置
-
-    返回值：
-        (primary_db_path, db_type, secondary_db_path)
-        - primary_db_path: 主数据库路径（写入目标）
-        - db_type: "独立" / "共享" / "新建独立" / "混合"
-        - secondary_db_path: 次要数据库路径（仅读取，混合模式下使用）
+    服务器上大量本子的检索数据在共享的 chroma.sqlite3 里。文件正常时必须继续打开它，
+    不能改去新建一个空库。只有这份共享文件本身已经损坏时，才避开它。
     """
+    global _SHARED_CHROMA_BROKEN
     db_path = util.db_path  # ./received_dir/user_db_file
-    user_db_path = os.path.join(db_path, usr_name)  # 用户独立目录
-    shared_db_file = os.path.join(db_path, "chroma.sqlite3")  # 共享数据库文件
-    user_db_file = os.path.join(user_db_path, "chroma.sqlite3")  # 用户独立数据库文件
+    user_db_path = os.path.join(db_path, usr_name)
+    shared_db_file = os.path.join(db_path, "chroma.sqlite3")
+    user_db_file = os.path.join(user_db_path, "chroma.sqlite3")
 
     has_user_db = os.path.exists(user_db_path) and os.path.exists(user_db_file)
     has_shared_data = False
-    shared_count = 0
 
-    # 检查共享目录是否存在该用户的数据（只读直查 sqlite，避免 chromadb API 卡住）
-    if os.path.exists(shared_db_file):
+    if os.path.exists(shared_db_file) and not _SHARED_CHROMA_BROKEN:
+        if _shared_sqlite_file_looks_torn(shared_db_file):
+            _SHARED_CHROMA_BROKEN = True
+            print(f"[DB路径检测] 共享库文件损坏（页数与文件大小不符），跳过: {shared_db_file}")
+
+    if os.path.exists(shared_db_file) and not _SHARED_CHROMA_BROKEN:
         collection_name = util.construct_collection(usr_name)
         cache_key = (shared_db_file, collection_name)
-
         now = time.time()
         with _SHARED_CHROMA_PRESENCE_CACHE_LOCK:
             cached = _SHARED_CHROMA_PRESENCE_CACHE.get(cache_key)
@@ -500,50 +629,38 @@ def get_user_db_path(usr_name):
                 has_shared_data = bool(cached.get("has_shared_data", False))
             else:
                 try:
-                    t0 = time.time()
                     collection_exists, has_any_row = _detect_shared_chroma_collection_fast(
                         shared_db_file=shared_db_file,
                         collection_name=collection_name,
                         timeout_sec=1.0,
                     )
-                    cost = time.time() - t0
-                    if cost > 2:
-                        print(f"[DB路径检测] ⚠️ 共享库探测耗时较长: {cost:.3f}s")
-
-                    # 只要 collection 记录存在，就认为共享库可能有数据，避免误判导致创建新库而“丢数据”
                     if collection_exists:
                         has_shared_data = True if (has_any_row is None) else bool(has_any_row)
                     else:
                         has_shared_data = False
                 except Exception as e:
-                    # 探测失败时，为了不阻塞 load_user，快速降级：
-                    # - 若用户独立库存在，则优先独立库
-                    # - 否则倾向认为共享库有数据（避免误创建新库导致老数据不可见）
-                    print(f"[DB路径检测] 共享库快速探测失败: {e}")
-                    has_shared_data = not has_user_db
-
+                    if _shared_sqlite_error_is_broken(e):
+                        _SHARED_CHROMA_BROKEN = True
+                        has_shared_data = False
+                        print(f"[DB路径检测] 共享库文件损坏，不再使用: {e}")
+                    else:
+                        print(f"[DB路径检测] 共享库快速探测失败: {e}")
+                        has_shared_data = not has_user_db
                 _SHARED_CHROMA_PRESENCE_CACHE[cache_key] = {
                     "ts": now,
                     "has_shared_data": has_shared_data,
                 }
 
-    # 🔥 场景1: 数据分散在两处（混合模式）
     if has_user_db and has_shared_data:
-        print(f"[DB路径检测] ⚠️ 检测到数据分散：独立目录有数据，共享目录也有数据")
         print(f"[DB路径检测] 使用混合模式：主库={user_db_path}, 从库={db_path}")
         return user_db_path, "混合", db_path
-
-    # 场景2: 仅独立目录有数据
     if has_user_db:
         print(f"[DB路径检测] 使用用户独立数据库: {user_db_path}")
         return user_db_path, "独立", None
-
-    # 场景3: 仅共享目录有数据
     if has_shared_data:
-        print(f"[DB路径检测] 在共享数据库中发现用户数据，使用共享目录: {db_path}")
+        print(f"[DB路径检测] 使用共享数据库: {db_path}")
         return db_path, "共享", None
 
-    # 场景4: 都没有数据，创建新的用户独立目录
     os.makedirs(user_db_path, exist_ok=True)
     print(f"[DB路径检测] 创建新的用户独立数据库目录: {user_db_path}")
     return user_db_path, "新建独立", None
@@ -1831,7 +1948,7 @@ def get_split_docs_vectors(realName, usr_name, docs_name, task_id, process_image
         batch_idx, docs_batch, ids_batch, vector_store, max_retries = batch_data
         for retry in range(max_retries):
             try:
-                vector_store.add_documents(documents=docs_batch, ids=ids_batch)
+                add_documents_durable(vector_store, docs_batch, ids_batch)
                 print(f"Chroma准备+处理add_documents批次{batch_idx}完成，总共时长: {time.time() - begin_time}")
                 time.sleep(1)
                 return True, batch_idx
@@ -2046,13 +2163,15 @@ def process_pdf_images_async(realName, usr_name, docs_name, task_id):
                 for i in range(n_add):
                     start_idx = len(existing_docs) + i * 166
                     end_idx = len(existing_docs) + (i + 1) * 166
-                    vector_store.add_documents(
-                        documents=docs_out[i * 166:(i + 1) * 166],
-                        ids=ids[start_idx:end_idx]
+                    add_documents_durable(
+                        vector_store,
+                        docs_out[i * 166:(i + 1) * 166],
+                        ids[start_idx:end_idx],
                     )
-                vector_store.add_documents(
-                    documents=docs_out[n_add * 166:len(docs_out)],
-                    ids=ids[len(existing_docs) + n_add * 166:len(existing_docs) + len(docs_out)]
+                add_documents_durable(
+                    vector_store,
+                    docs_out[n_add * 166:len(docs_out)],
+                    ids[len(existing_docs) + n_add * 166:len(existing_docs) + len(docs_out)],
                 )
 
                 global_var.set_user_vector(usr_name, vector_store)
@@ -2065,9 +2184,9 @@ def process_pdf_images_async(realName, usr_name, docs_name, task_id):
             import traceback
             traceback.print_exc()
 
-    # 在后台线程中执行
+    # 写向量库的线程不能是守护线程，否则退出时会被直接掐掉
     thread = threading.Thread(target=_process_images)
-    thread.daemon = True
+    thread.daemon = False
     thread.start()
 
 
@@ -2098,22 +2217,20 @@ def delete_notebook_vectors_precise(usr_name, book_name):
         folders_before = count_db_folders()
         print(f"删除前文件夹数量: {folders_before}")
 
-        # 检查 chroma.sqlite3 大小
-        chroma_db_path = "./received_dir/user_db_file/chroma.sqlite3"
-        if os.path.exists(chroma_db_path):
-            size_before = os.path.getsize(chroma_db_path)
-            print(f"删除前 chroma.sqlite3 大小: {size_before / (1024 * 1024):.2f} MB")
-        else:
-            size_before = 0
-            print("chroma.sqlite3 不存在")
-
         # 构建collection名称
         collection_name = util.construct_collection(usr_name + "_" + book_name)
         print(f"Collection名称: {collection_name}")
 
-        # 🔥 使用智能路径检测
+        # 只动这个本子自己的库，不碰共享的 chroma.sqlite3
         actual_db_path, db_type, secondary_db_path = get_user_db_path(usr_name + "_" + book_name)
         print(f"数据库类型: {db_type}, 路径: {actual_db_path}")
+        chroma_db_path = os.path.join(actual_db_path, "chroma.sqlite3")
+        if os.path.exists(chroma_db_path):
+            size_before = os.path.getsize(chroma_db_path)
+            print(f"删除前本子库大小: {size_before / (1024 * 1024):.2f} MB")
+        else:
+            size_before = 0
+            print("本子库尚不存在")
 
         vector_store = Chroma(
             collection_name=collection_name,
@@ -2333,11 +2450,34 @@ def load_user(user_name, progress_id=None):
                 progress_data[progress_id]['progress'] = 17
                 progress_data[progress_id]['message'] = f'创建向量存储({db_type})...'
 
-            vector_store = Chroma(
-                collection_name=collection_name,
-                embedding_function=embeddings,
-                persist_directory=actual_db_path  # 🔥 使用智能检测的路径
-            )
+            try:
+                vector_store = Chroma(
+                    collection_name=collection_name,
+                    embedding_function=embeddings,
+                    persist_directory=actual_db_path  # 🔥 使用智能检测的路径
+                )
+            except Exception as chroma_open_error:
+                # 共享库打不开时，不要让没有独立库的本子整本进不去
+                err_text = str(chroma_open_error).lower()
+                shared_unusable = db_type == "共享" and (
+                    _shared_sqlite_error_is_broken(chroma_open_error)
+                    or "tenant" in err_text
+                )
+                if not shared_unusable:
+                    raise
+                user_only_path = os.path.join(util.db_path, user_name)
+                os.makedirs(user_only_path, exist_ok=True)
+                print(
+                    f"[{progress_id}] 共享向量库打不开，改为新建本子自己的库: {user_only_path} ({chroma_open_error})"
+                )
+                actual_db_path = user_only_path
+                db_type = "新建独立"
+                secondary_db_path = None
+                vector_store = Chroma(
+                    collection_name=collection_name,
+                    embedding_function=embeddings,
+                    persist_directory=actual_db_path,
+                )
 
             # 🔥 混合模式：同时加载从库（共享数据库）
             secondary_vector_store = None
@@ -3158,20 +3298,16 @@ def get_split_docs_vectors_scene(scene_name, docs_name):
         split_docs.extend(docs_out)
     # print(split_docs)
     ids = util.construct_ids(file_path, len(split_docs))  # ids = 其实可以由docs_name + 顺序组成 # 另一个问题是顺序也可以由meta_data得到
-    db_path = util.db_path
-    # encoded_bytes = scene_name.encode('utf-8')
-    # encoded_text = base64.b64encode(encoded_bytes)
-    # scene_name = encoded_text.decode('utf-8')
-    # print(scene_name)
     hex_scene = encode_chinese_to_hex(scene_name)
     # print(hex_scene)
     collection_name = util.construct_collection("scene_name_" + hex_scene)
     if len(collection_name) > 63:
         collection_name = collection_name[:63]
+    scene_db_path = util.db_path
     vector_store = Chroma(
         collection_name=collection_name,
         embedding_function=embeddings,
-        persist_directory=db_path
+        persist_directory=scene_db_path
     )
     # 已经找到了问题所在
     # 使用add与from的问题在于当时使用from没有指定path和collection_name，所以是新生成的
@@ -3183,10 +3319,18 @@ def get_split_docs_vectors_scene(scene_name, docs_name):
     # split_docs_s = []
     n_add = len(split_docs) // 55
     for i in range(n_add):
-        vector_store.add_documents(documents=split_docs[i * 55:(i + 1) * 55], ids=ids[i * 55:(i + 1) * 55])
+        add_documents_durable(
+            vector_store,
+            split_docs[i * 55:(i + 1) * 55],
+            ids[i * 55:(i + 1) * 55],
+        )
         print(f"分割处理上传的场景文档add_documents批次{i}/{n_add}完成")
         time.sleep(0.5)
-    vector_store.add_documents(documents=split_docs[n_add * 55:len(split_docs)], ids=ids[n_add * 55:len(split_docs)])
+    add_documents_durable(
+        vector_store,
+        split_docs[n_add * 55:len(split_docs)],
+        ids[n_add * 55:len(split_docs)],
+    )
     # vector_store.add_documents(documents=split_docs, ids=ids)
     # global_var.set_user_split(usr_name, docs_name, split_docs)
     # if len(base_64_out) != 0:
@@ -3209,7 +3353,7 @@ def split_scene_to_user(scene_name, user_name):
     hex_scene = encode_chinese_to_hex(scene_name)
     # chinese = decode_chinese_from_binary(binary)
     scene_collection_name = util.construct_collection("scene_name_" + hex_scene)
-    scene_db_path = util.db_path  # 场景数据库使用共享路径
+    scene_db_path = util.db_path
     if len(scene_collection_name) > 63:
         scene_collection_name = scene_collection_name[:63]
 
@@ -3292,12 +3436,18 @@ def split_scene_to_user(scene_name, user_name):
             ids = util.construct_ids(user_doc_path, len(split_docs))
             n_add = len(split_docs) // 55
             for i in range(n_add):
-                vector_store_user.add_documents(documents=split_docs[i * 55:(i + 1) * 55],
-                                                ids=ids[i * 55:(i + 1) * 55])
+                add_documents_durable(
+                    vector_store_user,
+                    split_docs[i * 55:(i + 1) * 55],
+                    ids[i * 55:(i + 1) * 55],
+                )
                 print(f"分割处理分享本子的场景文档add_documents批次{i}/{n_add}完成")
                 time.sleep(0.5)
-            vector_store_user.add_documents(documents=split_docs[n_add * 55:len(split_docs)],
-                                            ids=ids[n_add * 55:len(split_docs)])
+            add_documents_durable(
+                vector_store_user,
+                split_docs[n_add * 55:len(split_docs)],
+                ids[n_add * 55:len(split_docs)],
+            )
             # global_var.set_user_split(user_name, f, split_docs)
             return None
         except Exception as e:
@@ -3416,12 +3566,18 @@ def split_user_to_user(user_from_name, user_name):
             ids = util.construct_ids(user_doc_path, len(split_docs))
             n_add = len(split_docs) // 55
             for i in range(n_add):
-                vector_store_user.add_documents(documents=split_docs[i * 55:(i + 1) * 55],
-                                                ids=ids[i * 55:(i + 1) * 55])
+                add_documents_durable(
+                    vector_store_user,
+                    split_docs[i * 55:(i + 1) * 55],
+                    ids[i * 55:(i + 1) * 55],
+                )
                 print(f"分割处理分享本子的用户增量文档add_documents批次{i}/{n_add}完成")
                 time.sleep(0.5)
-            vector_store_user.add_documents(documents=split_docs[n_add * 55:len(split_docs)],
-                                            ids=ids[n_add * 55:len(split_docs)])
+            add_documents_durable(
+                vector_store_user,
+                split_docs[n_add * 55:len(split_docs)],
+                ids[n_add * 55:len(split_docs)],
+            )
             # global_var.set_user_split(user_name, f, split_docs)
             return None
         except Exception as e:

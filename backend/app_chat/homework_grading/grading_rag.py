@@ -268,8 +268,9 @@ def ensure_index(item, store):
                 return chunks
         atomic_json(state_path, {'schema_version': INDEX_SCHEMA, 'version': item['version'], 'status': 'indexing'})
         try:
+            from llm_langchain.parse_input import add_documents_durable
             for offset in range(0, len(chunks), 32):
-                store.add_documents(chunks[offset:offset + 32], ids=ids[offset:offset + 32])
+                add_documents_durable(store, chunks[offset:offset + 32], ids[offset:offset + 32])
             atomic_json(state_path, {'schema_version': INDEX_SCHEMA, 'version': item['version'],
                                     'status': 'ready', 'chunk_count': len(chunks)})
             return chunks

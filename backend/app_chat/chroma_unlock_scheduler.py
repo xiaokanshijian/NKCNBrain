@@ -161,12 +161,13 @@ class ChromaUnlockScheduler:
                 from llm_langchain.parse_input import embeddings
                 from llm_langchain import util
 
-                db_path = util.db_path
+                from llm_langchain.parse_input import get_user_db_path
+                actual_db_path, _db_type, _secondary = get_user_db_path(self.test_username)
                 collection_name = util.construct_collection(self.test_username)
                 vector_store = Chroma(
                     collection_name=collection_name,
                     embedding_function=embeddings,
-                    persist_directory=db_path
+                    persist_directory=actual_db_path
                 )
                 logger.info(f"直接创建向量存储成功: {collection_name}")
                 

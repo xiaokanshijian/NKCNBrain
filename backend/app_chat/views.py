@@ -6794,17 +6794,17 @@ def card_getAllUserFiles(request):
             split_file_list = langchain_global_var.store_memory.get(username, {}).get("split_file", [])
 
             # 获取向量数据库
-            db_path = langchain_util.db_path
             collection_name = langchain_util.construct_collection(username)
 
             try:
                 # 🔥 使用parse_input中的create_embeddings_with_retry函数
-                from llm_langchain.parse_input import create_embeddings_with_retry
+                from llm_langchain.parse_input import create_embeddings_with_retry, get_user_db_path
                 embeddings = create_embeddings_with_retry()
+                actual_db_path, _db_type, _secondary = get_user_db_path(username)
                 vector_store = Chroma(
                     collection_name=collection_name,
                     embedding_function=embeddings,
-                    persist_directory=db_path
+                    persist_directory=actual_db_path
                 )
             except Exception as e:
                 print(f"[card_getAllUserFiles] 获取向量数据库失败: {e}")
